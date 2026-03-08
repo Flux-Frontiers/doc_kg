@@ -182,11 +182,10 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+#  and can be added to the global gitignore or merged into this file.
+#  .vscode/ is now tracked to preserve project-specific config (tasks, settings, MCP)
 
 # Ruff stuff:
 .ruff_cache/
@@ -205,3 +204,30 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# LaTeX intermediate files
+*.aux
+*.out
+*.log
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# CodeKG generated artifacts — all transient/reproducible
+.codekg/
+# Local MCP configuration (contains absolute paths)
+.mcp.json
+
+# MacOS
+.DS_Store
+commit.txt
+
+# Large asset files (> 1MB)
+assets/*-1024x1024.png
+assets/*-xl-*.png
+assets/code_kg_arch_*.png
+commit.txt

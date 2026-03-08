@@ -90,7 +90,7 @@ class TextChunker:
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
         embedder: Embedder | None = None,
-        min_chunk_chars: int = 20,
+        min_chunk_chars: int = 1,
     ) -> None:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -225,7 +225,10 @@ class TextChunker:
             current_text = " ".join(groups[-1])
 
             # Start a new chunk if: semantic boundary OR size exceeded
-            if sim < self.similarity_threshold or len(current_text) + len(next_sent) > self.chunk_size:
+            if (
+                sim < self.similarity_threshold
+                or len(current_text) + len(next_sent) > self.chunk_size
+            ):
                 groups.append([next_sent])
             else:
                 groups[-1].append(next_sent)

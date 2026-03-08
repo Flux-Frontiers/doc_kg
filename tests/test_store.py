@@ -1,7 +1,5 @@
 """Tests for GraphStore."""
 
-import pytest
-
 from doc_kg.dockg import DocEdge, DocNode
 from doc_kg.store import GraphStore
 

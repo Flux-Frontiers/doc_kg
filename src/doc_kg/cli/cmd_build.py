@@ -16,7 +16,6 @@ import click
 
 from doc_kg.cli.main import cli
 from doc_kg.cli.options import lancedb_option, model_option, sqlite_option
-from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.kg import DocKG
 
 

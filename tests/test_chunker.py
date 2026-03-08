@@ -1,7 +1,5 @@
 """Tests for TextChunker."""
 
-import pytest
-
 from doc_kg.chunker import (
     TextChunker,
     _extract_links,

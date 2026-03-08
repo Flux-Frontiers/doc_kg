@@ -260,8 +260,7 @@ def parse_corpus(
 
     # Pre-populate all document paths so forward REFERENCES links resolve correctly
     path_to_doc_id: dict[str, str] = {
-        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root))
-        for p in files
+        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root)) for p in files
     }
 
     for abs_path in files:
