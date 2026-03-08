@@ -1,3 +1,4 @@
+[![CI](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
