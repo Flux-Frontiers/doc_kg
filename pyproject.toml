@@ -38,6 +38,7 @@ pandas = ">=2.0.0"
 rich = ">=13.0.0"
 click = ">=8.1.0"
 pyyaml = ">=6.0.0"
+mcp = ">=1.0.0"
 # markdown parsing
 markdown-it-py = ">=3.0.0"
 
@@ -52,9 +53,14 @@ mypy = ">=1.10.0"
 
 [tool.poetry.scripts]
 dockg          = "doc_kg.cli.main:cli"
+dockg-mcp      = "doc_kg.mcp_server:main"
 dockg-build    = "doc_kg.cli.cmd_build:build"
+dockg-build-graph = "doc_kg.cli.cmd_build:build_graph"
+dockg-build-index = "doc_kg.cli.cmd_build:build_index"
 dockg-query    = "doc_kg.cli.cmd_query:query"
 dockg-pack     = "doc_kg.cli.cmd_query:pack"
+dockg-analyze  = "doc_kg.cli.cmd_analyze:analyze"
+dockg-viz      = "doc_kg.cli.cmd_viz:viz"
 
 [tool.ruff]
 line-length = 100
