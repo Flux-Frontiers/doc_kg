@@ -64,7 +64,16 @@ CREATE INDEX IF NOT EXISTS idx_edges_rel ON edges(rel);
 """
 
 # Default edge types used for graph expansion
-DEFAULT_RELS: tuple[str, ...] = ("CONTAINS", "NEXT", "REFERENCES", "SIMILAR_TO")
+DEFAULT_RELS: tuple[str, ...] = (
+    "CONTAINS",
+    "NEXT",
+    "REFERENCES",
+    "SIMILAR_TO",
+    "HAS_TOPIC",
+    "MENTIONS_ENTITY",
+    "HAS_KEYWORD",
+    "CO_OCCURS_WITH",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +220,11 @@ class GraphStore:
                 e.src,
                 e.rel,
                 e.dst,
-                json.dumps(e.evidence, ensure_ascii=False) if e.evidence is not None else None,
+                (
+                    json.dumps(e.evidence, ensure_ascii=False)
+                    if e.evidence is not None
+                    else None
+                ),
             )
             for e in edges
         ]
@@ -299,7 +312,9 @@ class GraphStore:
 
         self.con.execute("DROP TABLE IF EXISTS _tmp_ids;")
         self.con.execute("CREATE TEMP TABLE _tmp_ids (id TEXT PRIMARY KEY);")
-        self.con.executemany("INSERT INTO _tmp_ids (id) VALUES (?)", [(i,) for i in node_ids])
+        self.con.executemany(
+            "INSERT INTO _tmp_ids (id) VALUES (?)", [(i,) for i in node_ids]
+        )
         rows = self.con.execute(
             """
             SELECT e.src, e.rel, e.dst, e.evidence
@@ -321,7 +336,9 @@ class GraphStore:
         :return: List of edge dicts.
         """
         if rel is not None:
-            query = "SELECT src, rel, dst, evidence FROM edges WHERE src = ? AND rel = ?"
+            query = (
+                "SELECT src, rel, dst, evidence FROM edges WHERE src = ? AND rel = ?"
+            )
             params: list[object] = [node_id, rel]
         else:
             query = "SELECT src, rel, dst, evidence FROM edges WHERE src = ?"
@@ -354,7 +371,9 @@ class GraphStore:
         :return: ``{node_id: ProvMeta}`` for all reachable nodes.
         """
         rels = tuple(rels)
-        meta: dict[str, ProvMeta] = {sid: ProvMeta(best_hop=0, via_seed=sid) for sid in seed_ids}
+        meta: dict[str, ProvMeta] = {
+            sid: ProvMeta(best_hop=0, via_seed=sid) for sid in seed_ids
+        }
         frontier: set[str] = set(seed_ids)
 
         for h in range(1, hop + 1):
@@ -396,8 +415,12 @@ class GraphStore:
         :return: dict with ``total_nodes``, ``total_edges``, ``node_counts``,
                  ``edge_counts``.
         """
-        node_rows = self.con.execute("SELECT kind, COUNT(*) FROM nodes GROUP BY kind").fetchall()
-        edge_rows = self.con.execute("SELECT rel, COUNT(*) FROM edges GROUP BY rel").fetchall()
+        node_rows = self.con.execute(
+            "SELECT kind, COUNT(*) FROM nodes GROUP BY kind"
+        ).fetchall()
+        edge_rows = self.con.execute(
+            "SELECT rel, COUNT(*) FROM edges GROUP BY rel"
+        ).fetchall()
         total_nodes = self.con.execute("SELECT COUNT(*) FROM nodes").fetchone()[0]
         total_edges = self.con.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
         return {

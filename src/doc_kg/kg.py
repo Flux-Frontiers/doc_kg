@@ -77,7 +77,9 @@ class BuildStats:
             f"edges            : {self.total_edges}  {self.edge_counts}",
         ]
         if self.indexed_rows is not None:
-            lines.append(f"indexed          : {self.indexed_rows} vectors  dim={self.index_dim}")
+            lines.append(
+                f"indexed          : {self.indexed_rows} vectors  dim={self.index_dim}"
+            )
         if self.similar_edges_added is not None:
             lines.append(f"SIMILAR_TO edges : {self.similar_edges_added}")
         return "\n".join(lines)
@@ -198,7 +200,9 @@ class TextPack:
         out.append("# DocKG Text Pack\n")
         out.append(f"**Query:** `{self.query}`  ")
         out.append(f"**Seeds:** {self.seeds}  ")
-        out.append(f"**Expanded nodes:** {self.expanded_nodes} (returned: {self.returned_nodes})  ")
+        out.append(
+            f"**Expanded nodes:** {self.expanded_nodes} (returned: {self.returned_nodes})  "
+        )
         out.append(f"**hop:** {self.hop}  ")
         out.append(f"**rels:** {', '.join(self.rels)}  ")
         out.append(f"**model:** {self.model}  ")
@@ -242,6 +246,38 @@ class TextPack:
 
 _KIND_PRIORITY = {"chunk": 0, "section": 1, "document": 2}
 
+# Weighted relation priorities for semantic ranking.
+# Intentionally favors topical/entity grounding over weak lexical co-occurrence.
+_REL_RANK_WEIGHTS: dict[str, float] = {
+    "HAS_TOPIC": 3.0,
+    "MENTIONS_ENTITY": 2.5,
+    "HAS_KEYWORD": 1.0,
+    "SIMILAR_TO": 0.8,
+    "REFERENCES": 0.5,
+    "CONTAINS": 0.2,
+    "NEXT": 0.1,
+    "CO_OCCURS_WITH": 0.05,
+}
+
+
+def _semantic_rank_boost(node_id: str, edges: list[dict]) -> float:
+    """Compute weighted semantic connectivity score for a node.
+
+    Lower-confidence structural relations receive small weights while
+    semantic grounding relations (topic/entity) dominate rank impact.
+
+    :param node_id: Node id to score.
+    :param edges: Edge dicts with ``src``, ``dst``, and ``rel`` keys.
+    :return: Non-negative rank boost score.
+    """
+    score = 0.0
+    for e in edges:
+        if e.get("src") != node_id and e.get("dst") != node_id:
+            continue
+        rel = e.get("rel", "")
+        score += _REL_RANK_WEIGHTS.get(rel, 0.0)
+    return round(score, 4)
+
 
 # ---------------------------------------------------------------------------
 # DocKG — orchestrator
@@ -278,6 +314,13 @@ class DocKG:
     :param chunk_size: Approximate max characters per chunk.
     :param chunk_overlap: Character overlap between chunks.
     :param similarity_threshold: Semantic split threshold for chunker.
+    :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
+    :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
+    :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes.
+    :param cooccur_window: Co-occurrence window metadata.
+    :param topic_threshold: Topic confidence threshold.
+    :param topics_file: Optional topic catalog file (JSON/YAML).
     """
 
     def __init__(
@@ -291,10 +334,19 @@ class DocKG:
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
+        enable_topics: bool = True,
+        enable_entities: bool = True,
+        enable_keywords: bool = True,
+        emit_cooccur: bool = True,
+        cooccur_window: int = 1,
+        topic_threshold: float = 0.2,
+        topics_file: str | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.db_path = (
-            Path(db_path) if db_path is not None else self.corpus_root / ".dockg" / "graph.sqlite"
+            Path(db_path)
+            if db_path is not None
+            else self.corpus_root / ".dockg" / "graph.sqlite"
         )
         self.lancedb_dir = (
             Path(lancedb_dir)
@@ -306,6 +358,13 @@ class DocKG:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.similarity_threshold = similarity_threshold
+        self.enable_topics = enable_topics
+        self.enable_entities = enable_entities
+        self.enable_keywords = enable_keywords
+        self.emit_cooccur = emit_cooccur
+        self.cooccur_window = cooccur_window
+        self.topic_threshold = topic_threshold
+        self.topics_file = topics_file
 
         # Lazy-initialised layers
         self._graph: DocGraph | None = None
@@ -326,6 +385,13 @@ class DocKG:
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
                 similarity_threshold=self.similarity_threshold,
+                enable_topics=self.enable_topics,
+                enable_entities=self.enable_entities,
+                enable_keywords=self.enable_keywords,
+                emit_cooccur=self.emit_cooccur,
+                cooccur_window=self.cooccur_window,
+                topic_threshold=self.topic_threshold,
+                topics_file=self.topics_file,
             )
         return self._graph
 
@@ -434,22 +500,47 @@ class DocKG:
         """
         hits = self.index.search(q, k=k)
         seed_ids: set[str] = {h.id for h in hits}
+        seed_rank: dict[str, dict] = {
+            h.id: {"rank": h.rank, "dist": h.distance} for h in hits
+        }
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
+        all_edges = self.store.edges_within(all_ids)
 
-        nodes: list[dict] = []
-        kept_ids: set[str] = set()
+        ranked_nodes: list[dict] = []
         for nid in sorted(all_ids):
-            if len(nodes) >= max_nodes:
-                break
             n = self.store.node(nid)
             if not n:
                 continue
-            kept_ids.add(nid)
+            prov: ProvMeta = meta[nid]
+            base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
+            kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
+            semantic_boost = _semantic_rank_boost(nid, all_edges)
+            n["_rank_key"] = (
+                prov.best_hop,
+                -semantic_boost,
+                base_dist,
+                kind_pri,
+                n["id"],
+            )
+            ranked_nodes.append(n)
+
+        ranked_nodes.sort(key=lambda x: x["_rank_key"])
+
+        nodes: list[dict] = []
+        kept_ids: set[str] = set()
+        for n in ranked_nodes:
+            if len(nodes) >= max_nodes:
+                break
+            kept_ids.add(n["id"])
             nodes.append(n)
 
         edges = self.store.edges_within(kept_ids)
+
+        # Strip internal ranking keys from public output.
+        for n in nodes:
+            n.pop("_rank_key", None)
 
         return QueryResult(
             query=q,
@@ -487,11 +578,14 @@ class DocKG:
         :return: :class:`TextPack`.
         """
         hits = self.index.search(q, k=k)
-        seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
+        seed_rank: dict[str, dict] = {
+            h.id: {"rank": h.rank, "dist": h.distance} for h in hits
+        }
         seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
+        all_edges = self.store.edges_within(all_ids)
 
         # Materialise + rank nodes
         raw_nodes: list[dict] = []
@@ -502,7 +596,14 @@ class DocKG:
             prov: ProvMeta = meta[nid]
             base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
-            n["_rank_key"] = (prov.best_hop, base_dist, kind_pri, n["id"])
+            semantic_boost = _semantic_rank_boost(nid, all_edges)
+            n["_rank_key"] = (
+                prov.best_hop,
+                -semantic_boost,
+                base_dist,
+                kind_pri,
+                n["id"],
+            )
             n["_best_hop"] = prov.best_hop
             raw_nodes.append(n)
 

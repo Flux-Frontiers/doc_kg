@@ -39,6 +39,13 @@ class DocGraph:
     :param chunk_overlap: Character overlap between consecutive chunks.
     :param similarity_threshold: Cosine similarity threshold for semantic split detection.
     :param embedder: Optional embedder for semantic boundary detection.
+    :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
+    :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
+    :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes.
+    :param cooccur_window: Co-occurrence window metadata.
+    :param topic_threshold: Topic confidence threshold.
+    :param topics_file: Optional topics file path (JSON/YAML).
     """
 
     def __init__(
@@ -51,6 +58,13 @@ class DocGraph:
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
         embedder=None,
+        enable_topics: bool = True,
+        enable_entities: bool = True,
+        enable_keywords: bool = True,
+        emit_cooccur: bool = True,
+        cooccur_window: int = 1,
+        topic_threshold: float = 0.2,
+        topics_file: str | None = None,
     ) -> None:
         self.corpus_root: Path = Path(corpus_root).resolve()
         self.extensions = extensions
@@ -59,6 +73,13 @@ class DocGraph:
         self.chunk_overlap = chunk_overlap
         self.similarity_threshold = similarity_threshold
         self.embedder = embedder
+        self.enable_topics = enable_topics
+        self.enable_entities = enable_entities
+        self.enable_keywords = enable_keywords
+        self.emit_cooccur = emit_cooccur
+        self.cooccur_window = cooccur_window
+        self.topic_threshold = topic_threshold
+        self.topics_file = topics_file
 
         self._nodes: list[DocNode] | None = None
         self._edges: list[DocEdge] | None = None
@@ -82,6 +103,13 @@ class DocGraph:
                 chunk_overlap=self.chunk_overlap,
                 similarity_threshold=self.similarity_threshold,
                 embedder=self.embedder,
+                enable_topics=self.enable_topics,
+                enable_entities=self.enable_entities,
+                enable_keywords=self.enable_keywords,
+                emit_cooccur=self.emit_cooccur,
+                cooccur_window=self.cooccur_window,
+                topic_threshold=self.topic_threshold,
+                topics_file=self.topics_file,
             )
         return self
 

@@ -6,7 +6,7 @@ SemanticIndex — LanceDB vector index for DocKG.
 
 Mirrors CodeKG's index.py with the following additions:
 
-1. Default model is a general-text embedding model (all-MiniLM-L6-v2)
+1. Default model is a general-text embedding model (all-mpnet-base-v2)
    instead of a code-specific model.
 
 2. After building the vector index, ``build()`` optionally runs a
@@ -128,8 +128,8 @@ class Embedder:
 class SentenceTransformerEmbedder(Embedder):
     """Local embedding via ``sentence-transformers``.
 
-    Defaults to ``all-MiniLM-L6-v2`` — a fast, high-quality general-text
-    model (384 dimensions).  Swap for ``BAAI/bge-small-en-v1.5`` or any
+    Defaults to ``all-mpnet-base-v2`` — a strong general-text sentence model
+    (768 dimensions).  Swap for ``BAAI/bge-small-en-v1.5`` or any
     other HuggingFace model by changing ``DEFAULT_MODEL`` or setting the
     ``DOCKG_MODEL`` environment variable.
 
@@ -156,7 +156,9 @@ class SentenceTransformerEmbedder(Embedder):
         """Embed a list of strings into float32 vectors."""
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        vecs = self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+        vecs = self.model.encode(
+            texts, normalize_embeddings=True, show_progress_bar=False
+        )
         return [np.asarray(v, dtype="float32").tolist() for v in vecs]
 
     def embed_query(self, query: str) -> list[float]:
@@ -202,7 +204,7 @@ class SeedHit:
 # ---------------------------------------------------------------------------
 
 _DEFAULT_TABLE = "dockg_nodes"
-_DEFAULT_KINDS = ("document", "section", "chunk")
+_DEFAULT_KINDS = ("document", "section", "chunk", "topic", "entity", "keyword")
 
 
 class SemanticIndex:
@@ -366,7 +368,9 @@ class SemanticIndex:
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
         # Only chunk nodes get SIMILAR_TO edges
-        chunk_indices = [i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")]
+        chunk_indices = [
+            i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")
+        ]
         if not chunk_indices:
             return 0
 

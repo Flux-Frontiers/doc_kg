@@ -37,6 +37,7 @@ sentence-transformers = ">=2.7.0"
 pandas = ">=2.0.0"
 rich = ">=13.0.0"
 click = ">=8.1.0"
+pyyaml = ">=6.0.0"
 # markdown parsing
 markdown-it-py = ">=3.0.0"
 
@@ -76,3 +77,9 @@ pythonpath = ["src"]
 [tool.dockg]
 # Exclude directories from the knowledge graph by default.
 exclude = [".dockg", ".git", ".venv", "venv", "__pycache__"]
+
+[tool.codekg]
+# Exclude test directories from the knowledge graph.
+# Tests skew architectural metrics (fan-in, public API surface, docstring coverage)
+exclude = ["tests"]
+

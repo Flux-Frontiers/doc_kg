@@ -104,6 +104,48 @@ def test_parse_corpus_next_edges(tmp_path):
     assert len(next_edges) >= 1
 
 
+def test_parse_corpus_semantic_edges(tmp_path):
+    (tmp_path / "semantic.md").write_text(
+        "# Architecture\n\n"
+        "DocKG architecture improves database query design. "
+        "DocKG integrates LanceDB and SQLite for performance.\n"
+    )
+
+    nodes, edges = parse_corpus(tmp_path)
+
+    kinds = {n.kind for n in nodes}
+    rels = {e.rel for e in edges}
+
+    assert "topic" in kinds
+    assert "entity" in kinds
+    assert "keyword" in kinds
+
+    assert "HAS_TOPIC" in rels
+    assert "MENTIONS_ENTITY" in rels
+    assert "HAS_KEYWORD" in rels
+    assert "CO_OCCURS_WITH" in rels
+
+
+def test_parse_corpus_semantic_edges_can_be_disabled(tmp_path):
+    (tmp_path / "plain.md").write_text(
+        "# Title\n\nSimple content about architecture and query design.\n"
+    )
+
+    nodes, edges = parse_corpus(
+        tmp_path,
+        enable_topics=False,
+        enable_entities=False,
+        enable_keywords=False,
+        emit_cooccur=False,
+    )
+
+    rels = {e.rel for e in edges}
+    assert "HAS_TOPIC" not in rels
+    assert "MENTIONS_ENTITY" not in rels
+    assert "HAS_KEYWORD" not in rels
+    assert "CO_OCCURS_WITH" not in rels
+
+
 def test_parse_corpus_empty_dir(tmp_path):
     nodes, edges = parse_corpus(tmp_path)
     assert nodes == []

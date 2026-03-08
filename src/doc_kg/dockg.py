@@ -13,14 +13,21 @@ Instead of Python AST analysis, parse_corpus() delegates to the TextChunker
 (chunker.py) which performs semantically-aware text segmentation.
 
 Node kinds:
-  document  — one per .md/.txt file
-  section   — a heading-delimited region within a markdown document
-  chunk     — a semantically coherent text block within a section
+    document  — one per .md/.txt file
+    section   — a heading-delimited region within a markdown document
+    chunk     — a semantically coherent text block within a section
+    topic     — normalized semantic topic label
+    entity    — named concept/person/tool/org extracted from chunk text
+    keyword   — high-signal lexical keyword extracted from chunk text
 
 Edge relations:
-  CONTAINS   — document→section, section→chunk  (structural hierarchy)
-  NEXT       — chunk→chunk  (sequential order within a section)
-  REFERENCES — chunk→document  (when a chunk contains a hyperlink to another doc)
+    CONTAINS        — document→section, section→chunk  (structural hierarchy)
+    NEXT            — chunk→chunk  (sequential order within a section)
+    REFERENCES      — chunk→document  (when a chunk contains a hyperlink to another doc)
+    HAS_TOPIC       — chunk→topic  (topic classification)
+    MENTIONS_ENTITY — chunk→entity (entity extraction)
+    HAS_KEYWORD     — chunk→keyword (lexical salience)
+    CO_OCCURS_WITH  — topic/entity→topic/entity (same chunk co-occurrence)
 
 Author: Eric G. Suchanek, PhD
 """
@@ -32,13 +39,23 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from doc_kg.relations import (
+    cooccur_pairs,
+    extract_entities,
+    stable_entity_id,
+    stable_keyword_id,
+    stable_topic_id,
+)
+from doc_kg.topics import TopicExtractor
+
 # ============================================================================
 # Configuration
 # ============================================================================
 
 #: Default sentence-transformer model for general text (not code).
+#: Mirrors personal_agent's sentence-transformer default.
 #: Override via the ``DOCKG_MODEL`` environment variable.
-DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "all-MiniLM-L6-v2")
+DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "all-mpnet-base-v2")
 
 # ============================================================================
 # Graph primitives (LOCKED v0 CONTRACT)
@@ -95,8 +112,17 @@ class DocEdge:
 # Constants
 # ============================================================================
 
-NODE_KINDS = {"document", "section", "chunk"}
-EDGE_KINDS = {"CONTAINS", "NEXT", "REFERENCES", "SIMILAR_TO"}
+NODE_KINDS = {"document", "section", "chunk", "topic", "entity", "keyword"}
+EDGE_KINDS = {
+    "CONTAINS",
+    "NEXT",
+    "REFERENCES",
+    "SIMILAR_TO",
+    "HAS_TOPIC",
+    "MENTIONS_ENTITY",
+    "HAS_KEYWORD",
+    "CO_OCCURS_WITH",
+}
 
 SKIP_DIRS = {
     ".git",
@@ -219,6 +245,13 @@ def parse_corpus(
     chunk_overlap: int = 64,
     similarity_threshold: float = 0.75,
     embedder=None,
+    enable_topics: bool = True,
+    enable_entities: bool = True,
+    enable_keywords: bool = True,
+    emit_cooccur: bool = True,
+    cooccur_window: int = 1,
+    topic_threshold: float = 0.2,
+    topics_file: str | None = None,
 ) -> tuple[list[DocNode], list[DocEdge]]:
     """Extract a document knowledge graph from a corpus directory.
 
@@ -242,6 +275,13 @@ def parse_corpus(
     :param similarity_threshold: Cosine-similarity threshold for semantic split detection.
     :param embedder: Optional :class:`~doc_kg.index.Embedder` instance for semantic
                      boundary detection.  When ``None``, structure-only chunking is used.
+    :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
+    :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
+    :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among extracted semantic nodes.
+    :param cooccur_window: Reserved for future windowed co-occurrence expansion.
+    :param topic_threshold: Topic confidence threshold in [0, 1].
+    :param topics_file: Optional topics catalog (JSON/YAML).
     :return: ``(nodes, edges)`` tuple.
     """
     from doc_kg.chunker import TextChunker  # local import avoids circular dep
@@ -256,11 +296,14 @@ def parse_corpus(
         embedder=embedder,
     )
 
+    topic_extractor = TopicExtractor(topics_file=topics_file) if enable_topics else None
+
     files = iter_text_files(corpus_root, extensions=extensions, exclude=exclude)
 
     # Pre-populate all document paths so forward REFERENCES links resolve correctly
     path_to_doc_id: dict[str, str] = {
-        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root)) for p in files
+        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root))
+        for p in files
     }
 
     for abs_path in files:
@@ -352,7 +395,9 @@ def parse_corpus(
             )
 
             # NEXT edge (sequential within same section)
-            current_section_slug = slugify(section_title) if section_title else "__root__"
+            current_section_slug = (
+                slugify(section_title) if section_title else "__root__"
+            )
             if prev_chunk_id is not None and prev_section_slug == current_section_slug:
                 edges[(prev_chunk_id, "NEXT", chunk_id)] = DocEdge(
                     src=prev_chunk_id, rel="NEXT", dst=chunk_id
@@ -371,6 +416,102 @@ def parse_corpus(
                         rel="REFERENCES",
                         dst=ref_doc_id,
                         evidence={"href": href},
+                    )
+
+            # Semantic nodes/edges (topic/entity/keyword + co-occurrence)
+            semantic_ids: list[str] = []
+
+            if topic_extractor is not None:
+                topic_matches = topic_extractor.classify(
+                    text,
+                    threshold=topic_threshold,
+                    top_k=3,
+                )
+                for match in topic_matches:
+                    topic_id = stable_topic_id(match.topic)
+                    semantic_ids.append(topic_id)
+                    if topic_id not in nodes:
+                        nodes[topic_id] = DocNode(
+                            id=topic_id,
+                            kind="topic",
+                            name=match.topic,
+                            title=match.topic,
+                            file_path=None,
+                            char_start=None,
+                            char_end=None,
+                            heading_level=None,
+                            text=", ".join(match.matched_terms),
+                        )
+                    edges[(chunk_id, "HAS_TOPIC", topic_id)] = DocEdge(
+                        src=chunk_id,
+                        rel="HAS_TOPIC",
+                        dst=topic_id,
+                        evidence={
+                            "confidence": match.score,
+                            "terms": match.matched_terms,
+                        },
+                    )
+
+            if enable_entities:
+                entities = extract_entities(text, max_entities=8)
+                for entity in entities:
+                    entity_id = stable_entity_id(entity)
+                    semantic_ids.append(entity_id)
+                    if entity_id not in nodes:
+                        nodes[entity_id] = DocNode(
+                            id=entity_id,
+                            kind="entity",
+                            name=entity,
+                            title=entity,
+                            file_path=None,
+                            char_start=None,
+                            char_end=None,
+                            heading_level=None,
+                            text=None,
+                        )
+                    edges[(chunk_id, "MENTIONS_ENTITY", entity_id)] = DocEdge(
+                        src=chunk_id,
+                        rel="MENTIONS_ENTITY",
+                        dst=entity_id,
+                        evidence={"source": "titlecase+acronym"},
+                    )
+
+            if topic_extractor is not None and enable_keywords:
+                keywords = topic_extractor.extract_keywords(text, max_keywords=4)
+                for keyword in keywords:
+                    kw_id = stable_keyword_id(keyword)
+                    if kw_id not in nodes:
+                        nodes[kw_id] = DocNode(
+                            id=kw_id,
+                            kind="keyword",
+                            name=keyword,
+                            title=keyword,
+                            file_path=None,
+                            char_start=None,
+                            char_end=None,
+                            heading_level=None,
+                            text=None,
+                        )
+                    edges[(chunk_id, "HAS_KEYWORD", kw_id)] = DocEdge(
+                        src=chunk_id,
+                        rel="HAS_KEYWORD",
+                        dst=kw_id,
+                        evidence={"ranked": True},
+                    )
+
+            if emit_cooccur and semantic_ids and cooccur_window >= 1:
+                for left, right in cooccur_pairs(semantic_ids):
+                    edges[(left, "CO_OCCURS_WITH", right)] = DocEdge(
+                        src=left,
+                        rel="CO_OCCURS_WITH",
+                        dst=right,
+                        evidence={"file": file_path, "window": cooccur_window},
+                    )
+                    edges[(right, "CO_OCCURS_WITH", left)] = DocEdge(
+                        src=right,
+                        rel="CO_OCCURS_WITH",
+                        dst=left,
+                        evidence={"file": file_path, "window": cooccur_window},
                     )
 
     return list(nodes.values()), list(edges.values())
@@ -395,7 +536,9 @@ def _extract_doc_title(text: str, path: Path) -> str:
     return path.stem.replace("_", " ").replace("-", " ").title()
 
 
-def _resolve_reference(href: str, source_file: str, path_to_doc_id: dict[str, str]) -> str | None:
+def _resolve_reference(
+    href: str, source_file: str, path_to_doc_id: dict[str, str]
+) -> str | None:
     """Attempt to resolve a hyperlink href to a known corpus document path.
 
     Only resolves relative links (not http/https URLs).

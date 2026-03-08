@@ -20,7 +20,9 @@ from doc_kg.kg import DocKG
 
 
 @cli.command("build")
-@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
+@click.argument(
+    "corpus_root", default=".", type=click.Path(exists=True, file_okay=False)
+)
 @sqlite_option
 @lancedb_option
 @model_option
@@ -52,12 +54,58 @@ from doc_kg.kg import DocKG
     help="Cosine similarity threshold for semantic split detection.",
 )
 @click.option(
+    "--enable-topics/--no-topics",
+    default=True,
+    show_default=True,
+    help="Enable chunk->topic extraction and HAS_TOPIC edges.",
+)
+@click.option(
+    "--enable-entities/--no-entities",
+    default=True,
+    show_default=True,
+    help="Enable chunk->entity extraction and MENTIONS_ENTITY edges.",
+)
+@click.option(
+    "--enable-keywords/--no-keywords",
+    default=True,
+    show_default=True,
+    help="Enable chunk->keyword extraction and HAS_KEYWORD edges.",
+)
+@click.option(
+    "--emit-cooccur/--no-cooccur",
+    default=True,
+    show_default=True,
+    help="Emit CO_OCCURS_WITH edges among semantic nodes in each chunk.",
+)
+@click.option(
+    "--cooccur-window",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Co-occurrence window metadata for emitted CO_OCCURS_WITH edges.",
+)
+@click.option(
+    "--topic-threshold",
+    type=float,
+    default=0.2,
+    show_default=True,
+    help="Topic confidence threshold in [0, 1].",
+)
+@click.option(
+    "--topics-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Optional JSON/YAML topic catalog file.",
+)
+@click.option(
     "--no-similar",
     is_flag=True,
     default=False,
     help="Skip SIMILAR_TO edge discovery after indexing.",
 )
-@click.option("--wipe", is_flag=True, default=False, help="Wipe existing data before building.")
+@click.option(
+    "--wipe", is_flag=True, default=False, help="Wipe existing data before building."
+)
 @click.option(
     "--ext",
     multiple=True,
@@ -74,6 +122,13 @@ def build(
     chunk_size: int,
     chunk_overlap: int,
     similarity_threshold: float,
+    enable_topics: bool,
+    enable_entities: bool,
+    enable_keywords: bool,
+    emit_cooccur: bool,
+    cooccur_window: int,
+    topic_threshold: float,
+    topics_file: str | None,
     no_similar: bool,
     wipe: bool,
     ext: tuple[str, ...],
@@ -95,6 +150,13 @@ def build(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         similarity_threshold=similarity_threshold,
+        enable_topics=enable_topics,
+        enable_entities=enable_entities,
+        enable_keywords=enable_keywords,
+        emit_cooccur=emit_cooccur,
+        cooccur_window=cooccur_window,
+        topic_threshold=topic_threshold,
+        topics_file=topics_file,
     )
 
     # Override graph extensions if provided
@@ -106,6 +168,9 @@ def build(
     click.echo(f"  sqlite   : {sqlite}")
     click.echo(f"  lancedb  : {lancedb}")
     click.echo(f"  ext      : {', '.join(sorted(extensions))}")
+    click.echo(f"  topics   : {'on' if enable_topics else 'off'}")
+    click.echo(f"  entities : {'on' if enable_entities else 'off'}")
+    click.echo(f"  keywords : {'on' if enable_keywords else 'off'}")
 
     # Step 1: Parse corpus → SQLite
     click.echo("\n[1/2] Parsing corpus → SQLite …")
@@ -121,7 +186,9 @@ def build(
         wipe=wipe,
         discover_similar=not no_similar,
     )
-    click.echo(f"      indexed: {idx_stats['indexed_rows']} vectors  dim={idx_stats['dim']}")
+    click.echo(
+        f"      indexed: {idx_stats['indexed_rows']} vectors  dim={idx_stats['dim']}"
+    )
     if not no_similar:
         click.echo(f"      SIMILAR_TO edges: {idx_stats.get('similar_edges_added', 0)}")
 

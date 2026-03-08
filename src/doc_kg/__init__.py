@@ -22,6 +22,7 @@ from doc_kg.graph import DocGraph
 from doc_kg.index import Embedder, SemanticIndex, SentenceTransformerEmbedder
 from doc_kg.kg import BuildStats, DocKG, QueryResult, TextPack
 from doc_kg.store import GraphStore
+from doc_kg.topics import TopicExtractor
 
 __all__ = [
     "DocKG",
@@ -36,4 +37,5 @@ __all__ = [
     "QueryResult",
     "TextPack",
     "DEFAULT_MODEL",
+    "TopicExtractor",
 ]

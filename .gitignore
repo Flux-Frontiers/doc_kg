@@ -219,6 +219,10 @@ __marimo__/
 
 # CodeKG generated artifacts — all transient/reproducible
 .codekg/
+
+# CodeKG generated artifacts — all transient/reproducible
+.dockg/
+
 # Local MCP configuration (contains absolute paths)
 .mcp.json
 
