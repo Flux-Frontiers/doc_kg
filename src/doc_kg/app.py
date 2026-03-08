@@ -265,9 +265,7 @@ def _render_sidebar() -> dict:
     }
 
 
-def _load_all_nodes_edges(
-    store: GraphStore, max_nodes: int
-) -> tuple[list[dict], list[dict]]:
+def _load_all_nodes_edges(store: GraphStore, max_nodes: int) -> tuple[list[dict], list[dict]]:
     rows = store.con.execute(
         """
         SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text
@@ -302,9 +300,7 @@ def main() -> None:
     cfg = _render_sidebar()
 
     st.title("DocKG Explorer")
-    st.caption(
-        "Interactive graph, query, and text-pack inspection for document corpora."
-    )
+    st.caption("Interactive graph, query, and text-pack inspection for document corpora.")
 
     tab_graph, tab_query, tab_pack = st.tabs(["Graph", "Query", "Pack"])
 
@@ -319,9 +315,7 @@ def main() -> None:
                 height=cfg["graph_height"],
                 physics=cfg["physics_on"],
             )
-            st.components.v1.html(
-                html, height=int(cfg["graph_height"].replace("px", "")) + 30
-            )
+            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)
             st.caption(f"Showing {len(nodes)} nodes and {len(edges)} edges.")
 
     with tab_query:
@@ -364,9 +358,7 @@ def main() -> None:
                 seed_ids={n["id"] for n in result.nodes[: cfg["k"]]},
                 physics=cfg["physics_on"],
             )
-            st.components.v1.html(
-                html, height=int(cfg["graph_height"].replace("px", "")) + 30
-            )
+            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)
 
     with tab_pack:
         pquery = st.text_input("Pack query", value="MCP setup and usage")

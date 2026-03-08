@@ -92,8 +92,8 @@ class DocKGAnalyzer:
             """
         ).fetchall()
 
-        refs_by_doc = defaultdict(int)
-        semantic_by_doc = defaultdict(int)
+        refs_by_doc: dict[str, int] = defaultdict(int)
+        semantic_by_doc: dict[str, int] = defaultdict(int)
 
         edge_rows = self.store.con.execute(
             """
@@ -244,9 +244,7 @@ class DocKGAnalyzer:
                     f"Low {label} coverage ({cov:.1%}); consider enabling extraction and tuning thresholds."
                 )
             elif cov >= 0.6:
-                self.strengths.append(
-                    f"Strong {label} coverage ({cov:.1%}) across chunks."
-                )
+                self.strengths.append(f"Strong {label} coverage ({cov:.1%}) across chunks.")
 
         if self.orphan_semantic_nodes.get("topic", 0) == 0:
             self.strengths.append("No orphaned topic nodes detected.")
@@ -390,9 +388,7 @@ def main(
 
     json_target = Path(json_out)
     json_target.parent.mkdir(parents=True, exist_ok=True)
-    json_target.write_text(
-        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    json_target.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
 
     if not quiet:
         _print_summary(console, result)

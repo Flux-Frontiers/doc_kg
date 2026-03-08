@@ -25,9 +25,7 @@ _kg: DocKG | None = None
 def _get_kg() -> DocKG:
     """Return the global DocKG instance, raising if not initialised."""
     if _kg is None:
-        raise RuntimeError(
-            "DocKG not initialised. Run via 'dockg-mcp --repo /path/to/repo'"
-        )
+        raise RuntimeError("DocKG not initialised. Run via 'dockg-mcp --repo /path/to/repo'")
     return _kg
 
 
@@ -137,14 +135,11 @@ def main(argv: list | None = None) -> None:
 
     repo = Path(args.repo).resolve()
     db = Path(args.db) if Path(args.db).is_absolute() else repo / args.db
-    lancedb_dir = (
-        Path(args.lancedb) if Path(args.lancedb).is_absolute() else repo / args.lancedb
-    )
+    lancedb_dir = Path(args.lancedb) if Path(args.lancedb).is_absolute() else repo / args.lancedb
 
     if not db.exists():
         print(
-            f"WARNING: SQLite database not found at '{db}'.\\n"
-            "Run 'dockg build' first.",
+            f"WARNING: SQLite database not found at '{db}'.\\nRun 'dockg build' first.",
             file=sys.stderr,
         )
 

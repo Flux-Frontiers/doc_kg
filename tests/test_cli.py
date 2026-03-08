@@ -15,5 +15,6 @@ def test_cli_includes_expected_commands():
     assert "query" in result.output
     assert "pack" in result.output
     assert "analyze" in result.output
+    assert "snapshot" in result.output
     assert "viz" in result.output
     assert "mcp" in result.output

@@ -302,8 +302,7 @@ def parse_corpus(
 
     # Pre-populate all document paths so forward REFERENCES links resolve correctly
     path_to_doc_id: dict[str, str] = {
-        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root))
-        for p in files
+        rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root)) for p in files
     }
 
     for abs_path in files:
@@ -395,9 +394,7 @@ def parse_corpus(
             )
 
             # NEXT edge (sequential within same section)
-            current_section_slug = (
-                slugify(section_title) if section_title else "__root__"
-            )
+            current_section_slug = slugify(section_title) if section_title else "__root__"
             if prev_chunk_id is not None and prev_section_slug == current_section_slug:
                 edges[(prev_chunk_id, "NEXT", chunk_id)] = DocEdge(
                     src=prev_chunk_id, rel="NEXT", dst=chunk_id
@@ -536,9 +533,7 @@ def _extract_doc_title(text: str, path: Path) -> str:
     return path.stem.replace("_", " ").replace("-", " ").title()
 
 
-def _resolve_reference(
-    href: str, source_file: str, path_to_doc_id: dict[str, str]
-) -> str | None:
+def _resolve_reference(href: str, source_file: str, path_to_doc_id: dict[str, str]) -> str | None:
     """Attempt to resolve a hyperlink href to a known corpus document path.
 
     Only resolves relative links (not http/https URLs).

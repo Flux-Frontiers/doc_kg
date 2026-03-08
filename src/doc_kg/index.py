@@ -156,9 +156,7 @@ class SentenceTransformerEmbedder(Embedder):
         """Embed a list of strings into float32 vectors."""
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        vecs = self.model.encode(
-            texts, normalize_embeddings=True, show_progress_bar=False
-        )
+        vecs = self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
         return [np.asarray(v, dtype="float32").tolist() for v in vecs]
 
     def embed_query(self, query: str) -> list[float]:
@@ -368,9 +366,7 @@ class SemanticIndex:
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
         # Only chunk nodes get SIMILAR_TO edges
-        chunk_indices = [
-            i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")
-        ]
+        chunk_indices = [i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")]
         if not chunk_indices:
             return 0
 

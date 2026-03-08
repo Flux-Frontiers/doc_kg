@@ -1,0 +1,66 @@
+name: Temporal Snapshots
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    name: Capture Metrics Snapshot
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: snapshot-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Build DocKG database
+        run: |
+          poetry run dockg-build-graph --wipe
+          poetry run dockg-build-index
+
+      - name: Get version and commit info
+        id: version
+        run: |
+          VERSION=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
+          SHORT_COMMIT=$(git rev-parse --short HEAD)
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "commit=${SHORT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Run DocKG analysis
+        run: |
+          poetry run dockg-analyze . \
+            --output "analysis/doc_kg_analysis_snapshot.md" \
+            --quiet
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockg-snapshots-${{ steps.version.outputs.commit }}
+          path: |
+            .dockg/
+            analysis/doc_kg_analysis_snapshot.md
+          retention-days: 90

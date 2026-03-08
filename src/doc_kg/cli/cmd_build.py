@@ -22,9 +22,7 @@ from doc_kg.kg import DocKG
 
 
 @cli.command("build")
-@click.argument(
-    "corpus_root", default=".", type=click.Path(exists=True, file_okay=False)
-)
+@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
 @sqlite_option
 @lancedb_option
 @model_option
@@ -105,9 +103,7 @@ from doc_kg.kg import DocKG
     default=False,
     help="Skip SIMILAR_TO edge discovery after indexing.",
 )
-@click.option(
-    "--wipe", is_flag=True, default=False, help="Wipe existing data before building."
-)
+@click.option("--wipe", is_flag=True, default=False, help="Wipe existing data before building.")
 @click.option(
     "--ext",
     multiple=True,
@@ -188,9 +184,7 @@ def build(
         wipe=wipe,
         discover_similar=not no_similar,
     )
-    click.echo(
-        f"      indexed: {idx_stats['indexed_rows']} vectors  dim={idx_stats['dim']}"
-    )
+    click.echo(f"      indexed: {idx_stats['indexed_rows']} vectors  dim={idx_stats['dim']}")
     if not no_similar:
         click.echo(f"      SIMILAR_TO edges: {idx_stats.get('similar_edges_added', 0)}")
 
@@ -199,9 +193,7 @@ def build(
 
 
 @cli.command("build-graph")
-@click.argument(
-    "corpus_root", default=".", type=click.Path(exists=True, file_okay=False)
-)
+@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
 @sqlite_option
 @model_option
 @click.option(
@@ -332,9 +324,7 @@ def build_graph(
 
 
 @cli.command("build-index")
-@click.argument(
-    "corpus_root", default=".", type=click.Path(exists=True, file_okay=False)
-)
+@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
 @sqlite_option
 @lancedb_option
 @model_option

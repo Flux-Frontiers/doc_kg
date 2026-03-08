@@ -50,9 +50,11 @@ pytest = ">=8.0.0"
 pytest-cov = ">=5.0.0"
 ruff = ">=0.4.0"
 mypy = ">=1.10.0"
+types-pyyaml = "^6.0.12.20250915"
 
 [tool.poetry.scripts]
 dockg          = "doc_kg.cli.main:cli"
+dockg-snapshot = "doc_kg.cli.cmd_snapshot:snapshot"
 dockg-mcp      = "doc_kg.mcp_server:main"
 dockg-build    = "doc_kg.cli.cmd_build:build"
 dockg-build-graph = "doc_kg.cli.cmd_build:build_graph"
@@ -88,4 +90,3 @@ exclude = [".dockg", ".git", ".venv", "venv", "__pycache__"]
 # Exclude test directories from the knowledge graph.
 # Tests skew architectural metrics (fan-in, public API surface, docstring coverage)
 exclude = ["tests"]
-

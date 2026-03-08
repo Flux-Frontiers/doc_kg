@@ -77,9 +77,7 @@ class BuildStats:
             f"edges            : {self.total_edges}  {self.edge_counts}",
         ]
         if self.indexed_rows is not None:
-            lines.append(
-                f"indexed          : {self.indexed_rows} vectors  dim={self.index_dim}"
-            )
+            lines.append(f"indexed          : {self.indexed_rows} vectors  dim={self.index_dim}")
         if self.similar_edges_added is not None:
             lines.append(f"SIMILAR_TO edges : {self.similar_edges_added}")
         return "\n".join(lines)
@@ -200,9 +198,7 @@ class TextPack:
         out.append("# DocKG Text Pack\n")
         out.append(f"**Query:** `{self.query}`  ")
         out.append(f"**Seeds:** {self.seeds}  ")
-        out.append(
-            f"**Expanded nodes:** {self.expanded_nodes} (returned: {self.returned_nodes})  "
-        )
+        out.append(f"**Expanded nodes:** {self.expanded_nodes} (returned: {self.returned_nodes})  ")
         out.append(f"**hop:** {self.hop}  ")
         out.append(f"**rels:** {', '.join(self.rels)}  ")
         out.append(f"**model:** {self.model}  ")
@@ -344,9 +340,7 @@ class DocKG:
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.db_path = (
-            Path(db_path)
-            if db_path is not None
-            else self.corpus_root / ".dockg" / "graph.sqlite"
+            Path(db_path) if db_path is not None else self.corpus_root / ".dockg" / "graph.sqlite"
         )
         self.lancedb_dir = (
             Path(lancedb_dir)
@@ -500,9 +494,7 @@ class DocKG:
         """
         hits = self.index.search(q, k=k)
         seed_ids: set[str] = {h.id for h in hits}
-        seed_rank: dict[str, dict] = {
-            h.id: {"rank": h.rank, "dist": h.distance} for h in hits
-        }
+        seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
@@ -578,9 +570,7 @@ class DocKG:
         :return: :class:`TextPack`.
         """
         hits = self.index.search(q, k=k)
-        seed_rank: dict[str, dict] = {
-            h.id: {"rank": h.rank, "dist": h.distance} for h in hits
-        }
+        seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
         seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)

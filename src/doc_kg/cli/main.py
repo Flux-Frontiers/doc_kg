@@ -11,6 +11,7 @@ Usage::
     dockg query       [OPTIONS] QUERY
     dockg pack        [OPTIONS] QUERY
     dockg analyze     [OPTIONS] [CORPUS_ROOT]
+    dockg snapshot    [COMMAND]
     dockg viz         [OPTIONS]
 
 Author: Eric G. Suchanek, PhD
@@ -32,4 +33,11 @@ def cli() -> None:
 
 # Import subcommands so they register against `cli`.
 # pylint: disable=unused-import
-from doc_kg.cli import cmd_analyze, cmd_build, cmd_mcp, cmd_query, cmd_viz  # noqa: E402
+from doc_kg.cli import (  # noqa: E402, F401
+    cmd_analyze,
+    cmd_build,
+    cmd_mcp,
+    cmd_query,
+    cmd_snapshot,
+    cmd_viz,
+)

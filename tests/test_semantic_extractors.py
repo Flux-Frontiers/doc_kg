@@ -12,9 +12,7 @@ from doc_kg.topics import TopicExtractor
 
 def test_topic_extractor_classify_default_topics():
     extractor = TopicExtractor()
-    matches = extractor.classify(
-        "System architecture and API design improve performance."
-    )
+    matches = extractor.classify("System architecture and API design improve performance.")
     assert matches
     assert any(m.topic == "architecture" for m in matches)
 

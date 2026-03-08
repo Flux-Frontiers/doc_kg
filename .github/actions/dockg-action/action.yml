@@ -1,0 +1,321 @@
+name: DocKG Analysis
+description: >
+  Build a DocKG knowledge graph from a document corpus, run a thorough
+  analysis, cache the index, upload artifacts, and optionally post a PR
+  comment with the analysis summary.
+
+author: Flux-Frontiers
+
+branding:
+  icon: book-open
+  color: green
+
+# ---------------------------------------------------------------------------
+# Inputs
+# ---------------------------------------------------------------------------
+inputs:
+  python-version:
+    description: Python version to install (must be >=3.10,<3.13)
+    required: false
+    default: "3.12"
+
+  corpus-path:
+    description: Path to the corpus directory to analyse (relative to workspace root)
+    required: false
+    default: "."
+
+  report-path:
+    description: Output path for the Markdown analysis report
+    required: false
+    default: "dockg_report.md"
+
+  json-path:
+    description: Output path for the JSON analysis snapshot
+    required: false
+    default: "dockg_results.json"
+
+  model:
+    description: SentenceTransformer model name used for semantic indexing
+    required: false
+    default: "all-mpnet-base-v2"
+
+  post-comment:
+    description: >
+      Post an analysis summary comment to the pull request.
+      Set to "true" to enable. Requires the GITHUB_TOKEN secret and a
+      pull_request event context.
+    required: false
+    default: "false"
+
+  fail-on-issues:
+    description: >
+      Exit with a non-zero status code when the analysis detects issues.
+      Set to "true" to make the workflow fail on detected problems.
+    required: false
+    default: "false"
+
+  github-token:
+    description: >
+      GitHub token used to post PR comments (only needed when post-comment
+      is "true"). Defaults to the automatic GITHUB_TOKEN secret.
+    required: false
+    default: ${{ github.token }}
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+outputs:
+  report-path:
+    description: Absolute path to the generated Markdown report
+    value: ${{ steps.resolve-paths.outputs.report-path }}
+
+  total-nodes:
+    description: Total number of graph nodes analysed
+    value: ${{ steps.parse-results.outputs.total-nodes }}
+
+  issues-count:
+    description: Number of issues detected during analysis
+    value: ${{ steps.parse-results.outputs.issues-count }}
+
+# ---------------------------------------------------------------------------
+# Implementation
+# ---------------------------------------------------------------------------
+runs:
+  using: composite
+  steps:
+    # ------------------------------------------------------------------
+    # 1. Resolve absolute paths so later steps can use them uniformly
+    # ------------------------------------------------------------------
+    - name: Resolve paths
+      id: resolve-paths
+      shell: bash
+      run: |
+        CORPUS_ABS="${{ github.workspace }}/${{ inputs.corpus-path }}"
+        CORPUS_ABS="$(realpath "$CORPUS_ABS")"
+        DOCKG_DIR="${CORPUS_ABS}/.dockg"
+
+        TIMESTAMP="$(date -u +%Y%m%d_%H%M%S)"
+
+        REPORT_BASE="${{ github.workspace }}/${{ inputs.report-path }}"
+        JSON_BASE="${{ github.workspace }}/${{ inputs.json-path }}"
+
+        REPORT_STEM="${REPORT_BASE%.*}"
+        REPORT_EXT="${REPORT_BASE##*.}"
+        REPORT_ABS="${REPORT_STEM}_${TIMESTAMP}.${REPORT_EXT}"
+
+        JSON_STEM="${JSON_BASE%.*}"
+        JSON_EXT="${JSON_BASE##*.}"
+        JSON_ABS="${JSON_STEM}_${TIMESTAMP}.${JSON_EXT}"
+
+        echo "corpus-abs=${CORPUS_ABS}"     >> "$GITHUB_OUTPUT"
+        echo "report-abs=${REPORT_ABS}"     >> "$GITHUB_OUTPUT"
+        echo "json-abs=${JSON_ABS}"         >> "$GITHUB_OUTPUT"
+        echo "dockg-dir=${DOCKG_DIR}"       >> "$GITHUB_OUTPUT"
+        echo "report-path=${REPORT_ABS}"    >> "$GITHUB_OUTPUT"
+
+    # ------------------------------------------------------------------
+    # 2. Set up Python
+    # ------------------------------------------------------------------
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    # ------------------------------------------------------------------
+    # 3. Cache the .dockg/ index directory
+    #    Key includes a hash of all Markdown and text source files.
+    # ------------------------------------------------------------------
+    - name: Cache .dockg index
+      id: cache-dockg
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.resolve-paths.outputs.dockg-dir }}
+        key: dockg-${{ runner.os }}-${{ hashFiles('**/*.md', '**/*.txt') }}
+        restore-keys: |
+          dockg-${{ runner.os }}-
+
+    # ------------------------------------------------------------------
+    # 4. Install DocKG
+    # ------------------------------------------------------------------
+    - name: Install DocKG
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install "doc-kg"
+
+    # ------------------------------------------------------------------
+    # 5. Build SQLite graph  (skip when cache was restored)
+    # ------------------------------------------------------------------
+    - name: Build DocKG graph
+      if: steps.cache-dockg.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        dockg-build-graph \
+          "${{ steps.resolve-paths.outputs.corpus-abs }}" \
+          --wipe
+
+    # ------------------------------------------------------------------
+    # 6. Build LanceDB semantic index  (skip when cache was restored)
+    # ------------------------------------------------------------------
+    - name: Build LanceDB semantic index
+      if: steps.cache-dockg.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        DOCKG_MODEL: ${{ inputs.model }}
+      run: |
+        dockg-build-index \
+          "${{ steps.resolve-paths.outputs.corpus-abs }}" \
+          --model "${{ inputs.model }}" \
+          --wipe
+
+    # ------------------------------------------------------------------
+    # 7. Run thorough analysis
+    # ------------------------------------------------------------------
+    - name: Run DocKG analysis
+      id: run-analysis
+      shell: bash
+      run: |
+        dockg-analyze \
+          "${{ steps.resolve-paths.outputs.corpus-abs }}" \
+          --output "${{ steps.resolve-paths.outputs.report-abs }}" \
+          --json   "${{ steps.resolve-paths.outputs.json-abs }}" \
+          --quiet
+
+    # ------------------------------------------------------------------
+    # 8. Parse JSON results to expose structured outputs
+    # ------------------------------------------------------------------
+    - name: Parse analysis results
+      id: parse-results
+      shell: python
+      run: |
+        import json
+        import os
+
+        json_path = "${{ steps.resolve-paths.outputs.json-abs }}"
+        github_output = os.environ["GITHUB_OUTPUT"]
+
+        try:
+            with open(json_path) as fh:
+                data = json.load(fh)
+
+            stats = data.get("statistics", {})
+            total_nodes = stats.get("total_nodes", 0)
+
+            issues = data.get("issues", [])
+            issues_count = len(issues)
+
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as exc:
+            print(f"Warning: could not parse results JSON: {exc}")
+            total_nodes = 0
+            issues_count = 0
+
+        with open(github_output, "a") as out:
+            out.write(f"total-nodes={total_nodes}\n")
+            out.write(f"issues-count={issues_count}\n")
+
+    # ------------------------------------------------------------------
+    # 9. Upload artifacts
+    # ------------------------------------------------------------------
+    - name: Upload analysis artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dockg-analysis
+        path: |
+          ${{ steps.resolve-paths.outputs.report-abs }}
+          ${{ steps.resolve-paths.outputs.json-abs }}
+        retention-days: 30
+        if-no-files-found: warn
+
+    # ------------------------------------------------------------------
+    # 10. Post PR comment  (only when post-comment == "true")
+    # ------------------------------------------------------------------
+    - name: Post PR comment
+      if: inputs.post-comment == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        REPORT_PATH: ${{ steps.resolve-paths.outputs.report-abs }}
+        TOTAL_NODES: ${{ steps.parse-results.outputs.total-nodes }}
+        ISSUES_COUNT: ${{ steps.parse-results.outputs.issues-count }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const reportPath = process.env.REPORT_PATH;
+          const totalNodes = process.env.TOTAL_NODES;
+          const issuesCount = process.env.ISSUES_COUNT;
+
+          let reportContent = '';
+          try {
+            const fullReport = fs.readFileSync(reportPath, 'utf8');
+            const lines = fullReport.split('\n');
+            reportContent = lines.slice(0, 100).join('\n');
+            if (lines.length > 100) {
+              reportContent += '\n\n*(report truncated — download the full artifact for complete analysis)*';
+            }
+          } catch (e) {
+            reportContent = `Could not read report at \`${reportPath}\`: ${e.message}`;
+          }
+
+          const issuesBadge = parseInt(issuesCount) > 0
+            ? `:warning: ${issuesCount} issue(s) detected`
+            : ':white_check_mark: No issues detected';
+
+          const body = [
+            '## DocKG Analysis Summary',
+            '',
+            `| Metric | Value |`,
+            `|--------|-------|`,
+            `| Total nodes | ${totalNodes} |`,
+            `| Issues | ${issuesBadge} |`,
+            '',
+            '<details>',
+            '<summary>Full report (first 100 lines)</summary>',
+            '',
+            '```markdown',
+            reportContent,
+            '```',
+            '</details>',
+            '',
+            `> Generated by [DocKG Analysis Action](.github/actions/dockg-action)`,
+          ].join('\n');
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const existing = comments.find(c =>
+            c.user.login === 'github-actions[bot]' &&
+            c.body.includes('## DocKG Analysis Summary')
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    # ------------------------------------------------------------------
+    # 11. Fail on issues  (only when fail-on-issues == "true")
+    # ------------------------------------------------------------------
+    - name: Check for issues
+      if: inputs.fail-on-issues == 'true'
+      shell: bash
+      run: |
+        ISSUES_COUNT="${{ steps.parse-results.outputs.issues-count }}"
+        if [ "${ISSUES_COUNT}" -gt 0 ]; then
+          echo "::error::DocKG analysis detected ${ISSUES_COUNT} issue(s). Review the report at ${{ inputs.report-path }}."
+          exit 1
+        fi
+        echo "No issues detected."

@@ -47,13 +47,12 @@ from doc_kg.dockg import DEFAULT_MODEL
 def mcp(repo: str, db: str, lancedb: str, model: str, transport: str) -> None:
     """Start the DocKG MCP server."""
     try:
-        from mcp.server.fastmcp import (  # pylint: disable=import-outside-toplevel; noqa: F401
-            FastMCP,
-        )
+        import importlib.util  # pylint: disable=import-outside-toplevel
+
+        if importlib.util.find_spec("mcp") is None:
+            raise ImportError
     except ImportError:
-        raise click.ClickException(
-            "'mcp' package not found. Install with: pip install mcp"
-        )
+        raise click.ClickException("'mcp' package not found. Install with: pip install mcp")
 
     argv = [
         "--repo",

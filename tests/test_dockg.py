@@ -1,13 +1,6 @@
 """Tests for dockg.py — corpus extraction primitives."""
 
-import tempfile
-from pathlib import Path
-
-import pytest
-
 from doc_kg.dockg import (
-    DocEdge,
-    DocNode,
     chunk_node_id,
     doc_node_id,
     iter_text_files,
@@ -62,7 +55,6 @@ def test_parse_corpus_basic(tmp_path):
 
     nodes, edges = parse_corpus(tmp_path)
 
-    node_ids = {n.id for n in nodes}
     assert any(n.id.startswith("doc:") for n in nodes)
     assert any(n.id.startswith("chunk:") for n in nodes)
 

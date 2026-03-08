@@ -131,11 +131,7 @@ class TopicExtractor:
             density = len(matched) / max(1, min(12, len(unique_tokens)))
             score = min(1.0, (coverage * 0.75) + (density * 0.25))
             if score >= threshold:
-                scores.append(
-                    TopicMatch(
-                        topic=topic, score=round(score, 4), matched_terms=matched
-                    )
-                )
+                scores.append(TopicMatch(topic=topic, score=round(score, 4), matched_terms=matched))
 
         scores.sort(key=lambda x: x.score, reverse=True)
         if scores:
@@ -145,9 +141,7 @@ class TopicExtractor:
         fallback = self.extract_keywords(text, max_keywords=2)
         if fallback:
             pseudo = "_".join(fallback)
-            return [
-                TopicMatch(topic=f"topic:{pseudo}", score=0.2, matched_terms=fallback)
-            ]
+            return [TopicMatch(topic=f"topic:{pseudo}", score=0.2, matched_terms=fallback)]
         return []
 
     def extract_keywords(self, text: str, *, max_keywords: int = 5) -> list[str]:
@@ -192,9 +186,7 @@ class TopicExtractor:
                 raise ValueError("Invalid YAML topics format: expected mapping")
             raw = parsed
         else:
-            raise ValueError(
-                "Unsupported topics file format; use .json, .yml, or .yaml"
-            )
+            raise ValueError("Unsupported topics file format; use .json, .yml, or .yaml")
 
         if "topics" in raw and isinstance(raw["topics"], dict):
             raw = raw["topics"]
@@ -202,9 +194,7 @@ class TopicExtractor:
         topic_map: dict[str, list[str]] = {}
         for topic, terms in raw.items():
             if isinstance(terms, list):
-                topic_map[str(topic).strip().lower()] = [
-                    str(t).strip().lower() for t in terms
-                ]
+                topic_map[str(topic).strip().lower()] = [str(t).strip().lower() for t in terms]
             elif (
                 isinstance(terms, dict)
                 and "keywords" in terms
@@ -220,6 +210,4 @@ class TopicExtractor:
 
 
 def _tokenize(text: str) -> list[str]:
-    return [
-        m.group(0).lower() for m in re.finditer(r"[A-Za-z][A-Za-z0-9_\-]{1,30}", text)
-    ]
+    return [m.group(0).lower() for m in re.finditer(r"[A-Za-z][A-Za-z0-9_\-]{1,30}", text)]
