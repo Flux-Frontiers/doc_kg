@@ -380,6 +380,8 @@ class SemanticIndex:
         seen: set[frozenset] = set()
 
         tbl = self._tbl
+        if tbl is None:
+            return 0
 
         for ci, (nid, qvec) in enumerate(zip(chunk_ids, chunk_vecs)):
             raw = tbl.search(qvec.tolist()).limit(k + 1).to_list()

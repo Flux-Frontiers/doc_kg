@@ -51,7 +51,7 @@ class Snapshot:
     vs_previous: SnapshotDelta | None = None
     vs_baseline: SnapshotDelta | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert snapshot to a JSON-serializable dictionary."""
         return {
             "commit": self.commit,
@@ -65,7 +65,7 @@ class Snapshot:
         }
 
     @staticmethod
-    def from_dict(data: dict) -> Snapshot:
+    def from_dict(data: dict[str, Any]) -> Snapshot:
         """Reconstruct snapshot from dictionary data."""
         metrics_data = data.pop("metrics")
         metrics = SnapshotMetrics(**metrics_data)
@@ -85,9 +85,9 @@ class SnapshotManifest:
 
     format_version: str = "1.0"
     last_update: str = ""
-    snapshots: list[dict] = field(default_factory=list)
+    snapshots: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "format": self.format_version,
             "last_update": self.last_update,
@@ -95,7 +95,7 @@ class SnapshotManifest:
         }
 
     @staticmethod
-    def from_dict(data: dict) -> SnapshotManifest:
+    def from_dict(data: dict[str, Any]) -> SnapshotManifest:
         return SnapshotManifest(
             format_version=data.get("format", "1.0"),
             last_update=data.get("last_update", ""),
@@ -116,11 +116,11 @@ class SnapshotManager:
         version: str,
         commit: str | None = None,
         branch: str | None = None,
-        graph_stats_dict: dict | None = None,
+        graph_stats_dict: dict[str, Any] | None = None,
         coverage_score: float = 0.0,
         issues_count: int = 0,
         complexity_median: float = 0.0,
-        hotspots: list[dict] | None = None,
+        hotspots: list[dict[str, Any]] | None = None,
     ) -> Snapshot:
         """Capture a snapshot from current metrics and analysis output."""
         if commit is None:
@@ -245,13 +245,13 @@ class SnapshotManager:
         baseline_entry = min(manifest.snapshots, key=lambda x: x["timestamp"])
         return self.load_snapshot(baseline_entry["commit"])
 
-    def list_snapshots(self, limit: int | None = None) -> list[dict]:
+    def list_snapshots(self, limit: int | None = None) -> list[dict[str, Any]]:
         """List snapshots in reverse chronological order."""
         manifest = self.load_manifest()
         snapshots = sorted(manifest.snapshots, key=lambda x: x["timestamp"], reverse=True)
         return snapshots[:limit] if limit else snapshots
 
-    def diff_snapshots(self, commit_a: str, commit_b: str) -> dict:
+    def diff_snapshots(self, commit_a: str, commit_b: str) -> dict[str, Any]:
         """Compare two snapshots and return side-by-side metrics and delta."""
         snap_a = self.load_snapshot(commit_a)
         snap_b = self.load_snapshot(commit_b)

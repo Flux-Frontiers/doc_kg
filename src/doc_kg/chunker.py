@@ -200,6 +200,9 @@ class TextChunker:
         """
         import numpy as np  # pylint: disable=import-outside-toplevel
 
+        if self.embedder is None:
+            return self._fixed_size_chunks(sentences, full_text, base_offset)
+
         # Batch-embed all sentences
         try:
             vecs = self.embedder.embed_texts(sentences)
