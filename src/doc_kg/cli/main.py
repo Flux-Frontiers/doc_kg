@@ -1,0 +1,30 @@
+"""
+main.py
+
+DocKG CLI entry point.
+
+Usage::
+
+    dockg build  [OPTIONS] [CORPUS_ROOT]
+    dockg query  [OPTIONS] QUERY
+    dockg pack   [OPTIONS] QUERY
+
+Author: Eric G. Suchanek, PhD
+"""
+
+from __future__ import annotations
+
+import click
+
+
+@click.group()
+@click.version_option(package_name="doc-kg", prog_name="dockg")
+def cli() -> None:
+    """DocKG — Document Knowledge Graph builder and query tool.
+
+    Builds a semantically searchable knowledge graph from .md and .txt files.
+    """
+
+
+# Import subcommands so they register against `cli`
+from doc_kg.cli import cmd_build, cmd_query  # noqa: F401, E402
