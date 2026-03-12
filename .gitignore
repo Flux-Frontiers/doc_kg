@@ -227,10 +227,10 @@ __marimo__/
 .codekg/models
 
 # DocKG generated artifacts — same pattern as CodeKG; snapshots will be tracked once added
-.dockg/lancedb/
-.dockg/lancedb-*
-.dockg/graph.sqlite
-.dockg/graph.sqlite*
+.dockg/lancedb*
+.dockg/*.sqlite
+.dockg/*.sqlite-shm
+.dockg/*.sqlite-wal
 .dockg/models
 
 # Local MCP configuration (contains absolute paths)

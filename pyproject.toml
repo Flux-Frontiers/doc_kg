@@ -39,9 +39,7 @@ rich = ">=13.0.0"
 click = ">=8.1.0"
 pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
-# markdown parsing
 markdown-it-py = ">=3.0.0"
-
 
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
@@ -71,7 +69,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
-ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -84,8 +81,9 @@ addopts = "-v --tb=short"
 pythonpath = ["src"]
 
 [tool.dockg]
-# Exclude directories from the knowledge graph by default.
-exclude = [".dockg", ".git", ".venv", "venv", "__pycache__"]
+# Add extra directories to exclude beyond the built-in SKIP_DIRS.
+# SKIP_DIRS already covers: .dockg, .git, .venv, venv, __pycache__, node_modules, etc.
+# Example: exclude = ["archive", "vendor", "generated"]
 
 [tool.codekg]
 # Exclude test directories from the knowledge graph.

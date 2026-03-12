@@ -124,15 +124,21 @@ EDGE_KINDS = {
     "CO_OCCURS_WITH",
 }
 
+# Built-in directory exclusion list — always applied during file walks regardless of config.
+# These are pruned at *every depth* of the walk, not just the top level.
+#
+# To exclude additional directories, use ``[tool.dockg].exclude`` in pyproject.toml
+# or pass ``--exclude-dir`` on the CLI. Both are merged (unioned) with SKIP_DIRS —
+# there is no override, only additive exclusion.
 SKIP_DIRS = {
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".dockg",
-    ".mypy_cache",
-    ".pytest_cache",
-    "node_modules",
+    ".git",          # version control
+    ".venv",         # Python virtual environment (Poetry/pip)
+    "venv",          # Python virtual environment (legacy name)
+    "__pycache__",   # Python bytecode cache
+    ".dockg",        # DocKG graph artifacts (SQLite, LanceDB, snapshots)
+    ".mypy_cache",   # mypy type-check cache
+    ".pytest_cache", # pytest cache
+    "node_modules",  # JS/Node dependencies
 }
 
 TEXT_EXTENSIONS = {".md", ".txt", ".rst"}

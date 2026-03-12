@@ -1,0 +1,98 @@
+{
+  "commit": "b63265193440d4109d977842657094f7c994a25e",
+  "branch": "main",
+  "timestamp": "2026-03-08T21:44:12.099032+00:00",
+  "version": "0.1.0",
+  "metrics": {
+    "total_nodes": 1860,
+    "total_edges": 1821,
+    "meaningful_nodes": 181,
+    "docstring_coverage": 0.6459999999999999,
+    "node_counts": {
+      "class": 16,
+      "function": 69,
+      "method": 75,
+      "module": 21,
+      "symbol": 1679
+    },
+    "edge_counts": {
+      "ATTR_ACCESS": 520,
+      "CALLS": 578,
+      "CONTAINS": 160,
+      "IMPORTS": 129,
+      "INHERITS": 1,
+      "RESOLVES_TO": 433
+    },
+    "critical_issues": 2,
+    "complexity_median": 2
+  },
+  "hotspots": [
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.stats",
+      "callers": 7,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.node",
+      "callers": 5,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/store.py:GraphStore.node",
+      "callers": 5,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/graph.py:DocGraph.extract",
+      "callers": 3,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/cli/cmd_build.py:build",
+      "callers": 2,
+      "callees": 15,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/cli/cmd_query.py:pack",
+      "callers": 2,
+      "callees": 16,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/cli/cmd_query.py:query",
+      "callers": 2,
+      "callees": 11,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/dockg.py:slugify",
+      "callers": 2,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.build",
+      "callers": 2,
+      "callees": 2,
+      "risk_level": "low"
+    },
+    {
+      "name": "cls:src/doc_kg/topics.py:TopicMatch",
+      "callers": 1,
+      "callees": 0,
+      "risk_level": "low"
+    }
+  ],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 102,
+    "edges": 119,
+    "coverage_delta": 0.019999999999999907,
+    "critical_issues_delta": 1
+  }
+}
