@@ -28,6 +28,9 @@ dockg build docs --wipe
 
 # Or build any corpus directory
 # dockg build /absolute/path/to/corpus --wipe
+
+# Exclude specific directories during build
+# dockg build docs --wipe --exclude-dir archive --exclude-dir vendor
 ```
 
 ## Start Server Manually
@@ -118,6 +121,26 @@ Add to `claude_desktop_config.json`:
   }
 }
 ```
+
+## Excluding Directories from Indexing
+
+By default, DocKG skips common directories (`.git`, `.venv`, `__pycache__`, `.dockg`, etc.). To exclude additional directories:
+
+**Configuration (`pyproject.toml`, persistent — recommended):**
+
+```toml
+[tool.dockg]
+exclude = ["archive", "vendor", "generated"]
+```
+
+**CLI flags (per-command override):**
+
+```bash
+dockg build docs --exclude-dir archive --exclude-dir vendor
+dockg build-graph docs --exclude-dir node_modules
+```
+
+Both options are additive — CLI flags extend `pyproject.toml` excludes. Excluded directory names are matched at every depth in the file walk.
 
 ## Tool Semantics
 

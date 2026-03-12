@@ -18,6 +18,7 @@ import click
 
 from doc_kg.cli.main import cli
 from doc_kg.cli.options import lancedb_option, model_option, sqlite_option
+from doc_kg.config import load_exclude_dirs
 from doc_kg.kg import DocKG
 
 
@@ -111,6 +112,15 @@ from doc_kg.kg import DocKG
     show_default=True,
     help="File extensions to include (repeatable).",
 )
+@click.option(
+    "--exclude-dir",
+    multiple=True,
+    metavar="DIR",
+    help=(
+        "Directory name to exclude at every depth during the file walk (repeatable). "
+        "Merged with [tool.dockg].exclude from pyproject.toml."
+    ),
+)
 def build(
     corpus_root: str,
     sqlite: str,
@@ -130,6 +140,7 @@ def build(
     no_similar: bool,
     wipe: bool,
     ext: tuple[str, ...],
+    exclude_dir: tuple[str, ...],
 ) -> None:
     """Build the DocKG from a corpus directory.
 
@@ -138,9 +149,11 @@ def build(
     Also discovers SIMILAR_TO edges between semantically related chunks.
     """
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
+    exclude = load_exclude_dirs(corpus_root) | set(exclude_dir)
 
     kg = DocKG(
         corpus_root=Path(corpus_root),
+        exclude=exclude or None,
         db_path=Path(sqlite),
         lancedb_dir=Path(lancedb),
         model=model,
@@ -166,6 +179,7 @@ def build(
     click.echo(f"  sqlite   : {sqlite}")
     click.echo(f"  lancedb  : {lancedb}")
     click.echo(f"  ext      : {', '.join(sorted(extensions))}")
+    click.echo(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
     click.echo(f"  topics   : {'on' if enable_topics else 'off'}")
     click.echo(f"  entities : {'on' if enable_entities else 'off'}")
     click.echo(f"  keywords : {'on' if enable_keywords else 'off'}")
@@ -274,6 +288,15 @@ def build(
     show_default=True,
     help="File extensions to include (repeatable).",
 )
+@click.option(
+    "--exclude-dir",
+    multiple=True,
+    metavar="DIR",
+    help=(
+        "Directory name to exclude at every depth during the file walk (repeatable). "
+        "Merged with [tool.dockg].exclude from pyproject.toml."
+    ),
+)
 def build_graph(
     corpus_root: str,
     sqlite: str,
@@ -290,13 +313,16 @@ def build_graph(
     topics_file: str | None,
     wipe: bool,
     ext: tuple[str, ...],
+    exclude_dir: tuple[str, ...],
 ) -> None:
     """Build only the SQLite graph from a corpus directory."""
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
+    exclude = load_exclude_dirs(corpus_root) | set(exclude_dir)
 
     kg = DocKG(
         corpus_root=Path(corpus_root),
         db_path=Path(sqlite),
+        exclude=exclude or None,
         model=model,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -317,6 +343,7 @@ def build_graph(
     click.echo(f"  sqlite   : {sqlite}")
     click.echo(f"  model    : {model}")
     click.echo(f"  ext      : {', '.join(sorted(extensions))}")
+    click.echo(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
 
     stats = kg.build_graph(wipe=wipe)
     click.echo(f"OK: nodes={stats.total_nodes} edges={stats.total_edges} db={sqlite}")

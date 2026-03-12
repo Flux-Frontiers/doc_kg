@@ -70,7 +70,7 @@ dockg build-index
 dockg build docs/ --wipe
 
 # Exclude specific directories
-dockg build docs/ --exclude dir1 --exclude dir2
+dockg build docs/ --exclude-dir dir1 --exclude-dir dir2
 ```
 
 ### Query and pack passages
@@ -220,7 +220,7 @@ Every subcommand also ships as a dedicated `dockg-<name>` script — useful for 
 
 ```bash
 dockg build CORPUS_ROOT [--db PATH] [--lancedb PATH] [--model NAME]
-            [--wipe] [--no-similar] [--exclude DIR]...
+            [--wipe] [--no-similar] [--exclude-dir DIR]...
 ```
 
 | Option | Default | Description |
@@ -231,15 +231,19 @@ dockg build CORPUS_ROOT [--db PATH] [--lancedb PATH] [--model NAME]
 | `--model` | `all-MiniLM-L6-v2` | Sentence-transformer embedding model |
 | `--wipe` | off | Drop and recreate database before build |
 | `--no-similar` | off | Skip computing `SIMILAR_TO` edges |
-| `--exclude` | — | Exclude a directory (repeatable) |
+| `--exclude-dir` | — | Exclude a directory at every depth (repeatable); merged with `[tool.dockg].exclude` |
 
 ### `dockg build-graph` — SQLite only
 
 ```bash
-dockg build-graph CORPUS_ROOT [--db PATH] [--wipe] [--exclude DIR]...
+dockg build-graph CORPUS_ROOT [--db PATH] [--wipe] [--exclude-dir DIR]...
 ```
 
 Parses documents, extracts nodes (documents, sections, chunks, topics, entities, keywords), and writes the SQLite graph. No embedding model required.
+
+| Option | Default | Description |
+|---|---|---|
+| `--exclude-dir` | — | Exclude a directory at every depth (repeatable); merged with `[tool.dockg].exclude` |
 
 ### `dockg build-index` — LanceDB only
 
@@ -443,7 +447,22 @@ Add to your project's `pyproject.toml` to persist common settings:
 exclude = ["archive", "vendor", "generated"]
 ```
 
-The default skip list already excludes `.git`, `.venv`, `__pycache__`, `.dockg`, and similar directories.
+### Exclude priority order
+
+Exclusions are **additive** across three levels:
+
+1. **Built-in** — hardcoded in `dockg.py`: `.git`, `.venv`, `__pycache__`, `.dockg`, `.codekg`, etc.
+2. **Config** — `[tool.dockg].exclude` from `pyproject.toml` (auto-loaded from corpus root)
+3. **CLI** — `--exclude-dir` flags (merged at call time)
+
+All three are unioned—there is no override, only additive exclusion. Example:
+
+```bash
+# pyproject.toml has: exclude = ["archive", "vendor"]
+# This adds to those:
+dockg build docs/ --exclude-dir node_modules --exclude-dir dist
+# Result: archive + vendor + node_modules + dist are all excluded (plus built-ins)
+```
 
 ---
 

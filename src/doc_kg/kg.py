@@ -337,8 +337,10 @@ class DocKG:
         cooccur_window: int = 1,
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
+        exclude: set[str] | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
+        self.exclude: set[str] = exclude or set()
         self.db_path = (
             Path(db_path) if db_path is not None else self.corpus_root / ".dockg" / "graph.sqlite"
         )
@@ -376,6 +378,7 @@ class DocKG:
         if self._graph is None:
             self._graph = DocGraph(
                 self.corpus_root,
+                exclude=self.exclude or None,
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
                 similarity_threshold=self.similarity_threshold,

@@ -42,6 +42,7 @@ mcp = ">=1.0.0"
 # markdown parsing
 markdown-it-py = ">=3.0.0"
 
+
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
 
@@ -90,3 +91,5 @@ exclude = [".dockg", ".git", ".venv", "venv", "__pycache__"]
 # Exclude test directories from the knowledge graph.
 # Tests skew architectural metrics (fan-in, public API surface, docstring coverage)
 exclude = ["tests"]
+include = ["src"]
+
