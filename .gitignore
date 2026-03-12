@@ -217,11 +217,21 @@ __marimo__/
 *.fdb_latexmk
 *.synctex.gz
 
-# CodeKG generated artifacts — all transient/reproducible
-.codekg/
+# CodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
+# MUST include .codekg/snapshots!
+# This is the correct pattern
+.codekg/lancedb/
+.codekg/lancedb-*
+.codekg/graph.sqlite
+.codekg/graph.sqlite*
+.codekg/models
 
-# CodeKG generated artifacts — all transient/reproducible
-.dockg/
+# DocKG generated artifacts — same pattern as CodeKG; snapshots will be tracked once added
+.dockg/lancedb/
+.dockg/lancedb-*
+.dockg/graph.sqlite
+.dockg/graph.sqlite*
+.dockg/models
 
 # Local MCP configuration (contains absolute paths)
 .mcp.json
