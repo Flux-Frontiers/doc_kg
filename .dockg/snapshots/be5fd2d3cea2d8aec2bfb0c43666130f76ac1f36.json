@@ -7,7 +7,6 @@
     "total_nodes": 1758,
     "total_edges": 1702,
     "meaningful_nodes": 171,
-    "docstring_coverage": 0.626,
     "node_counts": {
       "class": 16,
       "function": 61,
@@ -23,8 +22,9 @@
       "INHERITS": 1,
       "RESOLVES_TO": 396
     },
-    "critical_issues": 1,
-    "complexity_median": 2
+    "complexity_median": 2,
+    "coverage_score": 0.626,
+    "issues_count": 1
   },
   "hotspots": [
     {
