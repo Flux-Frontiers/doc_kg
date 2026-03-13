@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-03-13T03:53:45.324437+00:00",
+  "last_update": "2026-03-13T04:09:32.415002+00:00",
   "snapshots": [
     {
       "commit": "be5fd2d3cea2d8aec2bfb0c43666130f76ac1f36",
@@ -311,6 +311,50 @@
       "timestamp": "2026-03-13T03:53:45.323994+00:00",
       "version": "0.3.0",
       "file": "b88b02e507655ff374d6a37609a259b7139ebb11.json",
+      "metrics": {
+        "nodes": 1772,
+        "edges": 10213,
+        "coverage": 0.8733333333333334,
+        "issues": 0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 14,
+          "edges": 8511,
+          "coverage_delta": 0.2473333333333334,
+          "issues_delta": -1
+        }
+      }
+    },
+    {
+      "commit": "4658abe78e76f4effd57b2884a28717d757fccf6",
+      "branch": "main",
+      "timestamp": "2026-03-13T03:54:10.340855+00:00",
+      "version": "0.3.0",
+      "file": "4658abe78e76f4effd57b2884a28717d757fccf6.json",
+      "metrics": {
+        "nodes": 1772,
+        "edges": 10213,
+        "coverage": 0.8733333333333334,
+        "issues": 0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 14,
+          "edges": 8511,
+          "coverage_delta": 0.2473333333333334,
+          "issues_delta": -1
+        }
+      }
+    },
+    {
+      "commit": "03a6129f48d03181291160e88132364077986938",
+      "branch": "main",
+      "timestamp": "2026-03-13T04:09:32.414504+00:00",
+      "version": "0.3.0",
+      "file": "03a6129f48d03181291160e88132364077986938.json",
       "metrics": {
         "nodes": 1772,
         "edges": 10213,
