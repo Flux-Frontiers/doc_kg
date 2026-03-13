@@ -16,7 +16,7 @@ from pathlib import Path
 import click
 
 from doc_kg.cli.main import cli
-from doc_kg.cli.options import lancedb_option, model_option, sqlite_option
+from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
 from doc_kg.kg import DocKG
 from doc_kg.store import DEFAULT_RELS
 
@@ -25,6 +25,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
 
 @cli.command("query")
 @click.argument("query_text", metavar="QUERY")
+@repo_option
 @sqlite_option
 @lancedb_option
 @click.option(
@@ -51,6 +52,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
 )
 def query(
     query_text: str,
+    repo: str,
     sqlite: str,
     lancedb: str,
     table: str,
@@ -62,10 +64,9 @@ def query(
 ) -> None:
     """Run a hybrid semantic + graph query and print a ranked result summary."""
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
-    corpus_root = Path(sqlite).parent.parent  # heuristic: .dockg lives under corpus root
 
     kg = DocKG(
-        corpus_root=corpus_root,
+        corpus_root=Path(repo),
         db_path=Path(sqlite),
         lancedb_dir=Path(lancedb),
         model=model,
@@ -85,13 +86,7 @@ def query(
 
 @cli.command("pack")
 @click.argument("query_text", metavar="QUERY")
-@click.option(
-    "--corpus-root",
-    default=".",
-    type=click.Path(),
-    show_default=True,
-    help="Corpus root directory.",
-)
+@repo_option
 @sqlite_option
 @lancedb_option
 @click.option(
@@ -137,7 +132,7 @@ def query(
 )
 def pack(
     query_text: str,
-    corpus_root: str,
+    repo: str,
     sqlite: str,
     lancedb: str,
     table: str,
@@ -154,7 +149,7 @@ def pack(
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
 
     kg = DocKG(
-        corpus_root=Path(corpus_root),
+        corpus_root=Path(repo),
         db_path=Path(sqlite),
         lancedb_dir=Path(lancedb),
         model=model,

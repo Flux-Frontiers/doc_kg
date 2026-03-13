@@ -11,11 +11,12 @@ from __future__ import annotations
 import click
 
 from doc_kg.cli.main import cli
+from doc_kg.cli.options import repo_option
 from doc_kg.dockg_thorough_analysis import main as run_analysis
 
 
 @cli.command("analyze")
-@click.argument("corpus_root", default=".", required=False)
+@repo_option
 @click.option(
     "--db",
     default=None,
@@ -50,7 +51,7 @@ from doc_kg.dockg_thorough_analysis import main as run_analysis
     help="Suppress the Rich console summary table.",
 )
 def analyze(
-    corpus_root: str,
+    repo: str,
     db: str | None,
     lancedb: str | None,
     output: str | None,
@@ -59,7 +60,7 @@ def analyze(
 ) -> None:
     """Run a thorough analysis of a document corpus graph."""
     run_analysis(
-        corpus_root=corpus_root,
+        corpus_root=repo,
         db_path=db,
         lancedb_path=lancedb,
         report_path=output,

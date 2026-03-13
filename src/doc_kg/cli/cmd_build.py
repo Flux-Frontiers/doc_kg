@@ -17,13 +17,13 @@ from pathlib import Path
 import click
 
 from doc_kg.cli.main import cli
-from doc_kg.cli.options import lancedb_option, model_option, sqlite_option
+from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
 from doc_kg.config import load_exclude_dirs
 from doc_kg.kg import DocKG
 
 
 @cli.command("build")
-@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
+@repo_option
 @sqlite_option
 @lancedb_option
 @model_option
@@ -122,7 +122,7 @@ from doc_kg.kg import DocKG
     ),
 )
 def build(
-    corpus_root: str,
+    repo: str,
     sqlite: str,
     lancedb: str,
     model: str,
@@ -149,10 +149,10 @@ def build(
     Also discovers SIMILAR_TO edges between semantically related chunks.
     """
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
-    exclude = load_exclude_dirs(corpus_root) | set(exclude_dir)
+    exclude = load_exclude_dirs(repo) | set(exclude_dir)
 
     kg = DocKG(
-        corpus_root=Path(corpus_root),
+        corpus_root=Path(repo),
         exclude=exclude or None,
         db_path=Path(sqlite),
         lancedb_dir=Path(lancedb),
@@ -174,7 +174,7 @@ def build(
     if extensions:
         kg.graph.extensions = extensions
 
-    click.echo(f"Building DocKG from: {corpus_root}")
+    click.echo(f"Building DocKG from: {repo}")
     click.echo(f"  model    : {model}")
     click.echo(f"  sqlite   : {sqlite}")
     click.echo(f"  lancedb  : {lancedb}")
@@ -207,7 +207,7 @@ def build(
 
 
 @cli.command("build-graph")
-@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
+@repo_option
 @sqlite_option
 @model_option
 @click.option(
@@ -298,7 +298,7 @@ def build(
     ),
 )
 def build_graph(
-    corpus_root: str,
+    repo: str,
     sqlite: str,
     model: str,
     chunk_size: int,
@@ -317,10 +317,10 @@ def build_graph(
 ) -> None:
     """Build only the SQLite graph from a corpus directory."""
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
-    exclude = load_exclude_dirs(corpus_root) | set(exclude_dir)
+    exclude = load_exclude_dirs(repo) | set(exclude_dir)
 
     kg = DocKG(
-        corpus_root=Path(corpus_root),
+        corpus_root=Path(repo),
         db_path=Path(sqlite),
         exclude=exclude or None,
         model=model,
@@ -339,7 +339,7 @@ def build_graph(
     if extensions:
         kg.graph.extensions = extensions
 
-    click.echo(f"Building DocKG graph from: {corpus_root}")
+    click.echo(f"Building DocKG graph from: {repo}")
     click.echo(f"  sqlite   : {sqlite}")
     click.echo(f"  model    : {model}")
     click.echo(f"  ext      : {', '.join(sorted(extensions))}")
@@ -351,7 +351,7 @@ def build_graph(
 
 
 @cli.command("build-index")
-@click.argument("corpus_root", default=".", type=click.Path(exists=True, file_okay=False))
+@repo_option
 @sqlite_option
 @lancedb_option
 @model_option
@@ -381,7 +381,7 @@ def build_graph(
     help="Embedding batch size.",
 )
 def build_index(
-    corpus_root: str,
+    repo: str,
     sqlite: str,
     lancedb: str,
     model: str,
@@ -392,7 +392,7 @@ def build_index(
 ) -> None:
     """Build only the LanceDB semantic index from an existing SQLite graph."""
     kg = DocKG(
-        corpus_root=Path(corpus_root),
+        corpus_root=Path(repo),
         db_path=Path(sqlite),
         lancedb_dir=Path(lancedb),
         model=model,

@@ -11,16 +11,12 @@ from __future__ import annotations
 import click
 
 from doc_kg.cli.main import cli
+from doc_kg.cli.options import repo_option
 from doc_kg.dockg import DEFAULT_MODEL
 
 
 @cli.command("mcp")
-@click.option(
-    "--repo",
-    default=".",
-    type=click.Path(exists=True, file_okay=False),
-    help="Repository root directory.",
-)
+@repo_option
 @click.option(
     "--db",
     default=".dockg/graph.sqlite",

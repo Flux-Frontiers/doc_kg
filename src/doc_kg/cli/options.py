@@ -40,3 +40,11 @@ corpus_root_option = click.option(
     show_default=True,
     help="Root directory of the document corpus.",
 )
+
+repo_option = click.option(
+    "--repo",
+    default=".",
+    type=click.Path(exists=True, file_okay=False),
+    show_default=True,
+    help="Root directory of the document corpus.",
+)
