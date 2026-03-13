@@ -1,0 +1,121 @@
+{
+  "commit": "3c10c28727e740e31099c2b755a277ee87184bf1",
+  "branch": "main",
+  "timestamp": "2026-03-13T02:26:57.261340+00:00",
+  "version": "0.3.0",
+  "metrics": {
+    "total_nodes": 1762,
+    "total_edges": 10113,
+    "meaningful_nodes": 1747,
+    "coverage_score": 0.8729703915950333,
+    "node_counts": {
+      "chunk": 349,
+      "document": 15,
+      "entity": 427,
+      "keyword": 425,
+      "section": 293,
+      "topic": 253
+    },
+    "edge_counts": {
+      "CONTAINS": 642,
+      "CO_OCCURS_WITH": 6632,
+      "HAS_KEYWORD": 1256,
+      "HAS_TOPIC": 347,
+      "MENTIONS_ENTITY": 1084,
+      "NEXT": 50,
+      "REFERENCES": 8,
+      "SIMILAR_TO": 94
+    },
+    "issues_count": 0,
+    "complexity_median": 14.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:CHANGELOG.md:0001",
+      "file_path": "CHANGELOG.md",
+      "label": "Added",
+      "references": 0,
+      "semantic_links": 17,
+      "total_links": 17
+    },
+    {
+      "id": "chunk:README.md:0046",
+      "file_path": "README.md",
+      "label": "CLI Reference",
+      "references": 0,
+      "semantic_links": 17,
+      "total_links": 17
+    },
+    {
+      "id": "chunk:README.md:0048",
+      "file_path": "README.md",
+      "label": "`dockg build` \u2014 Full pipeline",
+      "references": 0,
+      "semantic_links": 15,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:README.md:0049",
+      "file_path": "README.md",
+      "label": "`dockg build-graph` \u2014 SQLite only",
+      "references": 0,
+      "semantic_links": 15,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0026",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Documentation",
+      "references": 4,
+      "semantic_links": 14,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:README.md:0053",
+      "file_path": "README.md",
+      "label": "`dockg analyze` \u2014 Corpus health report",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:README.md:0062",
+      "file_path": "README.md",
+      "label": "Edge types",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0020",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Architecture",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:docs/SNAPSHOTS.md:0043",
+      "file_path": "docs/SNAPSHOTS.md",
+      "label": "Best Practices",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:README.md:0066",
+      "file_path": "README.md",
+      "label": "MCP tools reference",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 14
+    }
+  ],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 4,
+    "edges": 8411,
+    "coverage_delta": 0.2469703915950333,
+    "issues_delta": -1
+  }
+}

@@ -39,3 +39,5 @@ __all__ = [
     "DEFAULT_MODEL",
     "TopicExtractor",
 ]
+
+__version__ = "0.3.0"

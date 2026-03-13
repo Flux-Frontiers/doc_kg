@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-12
+
 ### Added
 - `dockg install-hooks` CLI command: installs a DocKG pre-commit hook that captures a metrics snapshot (keyed by tree hash) and stages it atomically — mirrors CodeKG hook pattern; skip with `DOCKG_SKIP_SNAPSHOT=1` env var
 - `src/doc_kg/cli/cmd_hooks.py`: hook installation module with embedded pre-commit hook script
@@ -46,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `Snapshot.from_dict()` crashes on legacy snapshot JSON files that use old field names (`docstring_coverage`, `critical_issues`); added migration shim that renames them to `coverage_score` / `issues_count` on load
+
+## [0.2.0] - 2026-03-08
+
+### Added
+- `dockg install-hooks` CLI command
+- MCP server, Streamlit visualizer, `analyze`, `viz`, `build-graph`, `build-index` subcommands
+- Snapshot management (`dockg snapshot save|list|show|diff`)
 
 ## [0.1.0] - 2026-03-08
 

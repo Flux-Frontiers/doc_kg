@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-03-13T01:48:14.778969+00:00",
+  "last_update": "2026-03-13T02:26:57.264380+00:00",
   "snapshots": [
     {
       "commit": "be5fd2d3cea2d8aec2bfb0c43666130f76ac1f36",
@@ -245,6 +245,28 @@
       "timestamp": "2026-03-13T01:48:14.778575+00:00",
       "version": "0.2.0",
       "file": "f5dedcf94c7fb006fdf6c0bcf1601349be28a4f6.json",
+      "metrics": {
+        "nodes": 1762,
+        "edges": 10113,
+        "coverage": 0.8729703915950333,
+        "issues": 0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 4,
+          "edges": 8411,
+          "coverage_delta": 0.2469703915950333,
+          "issues_delta": -1
+        }
+      }
+    },
+    {
+      "commit": "3c10c28727e740e31099c2b755a277ee87184bf1",
+      "branch": "main",
+      "timestamp": "2026-03-13T02:26:57.261340+00:00",
+      "version": "0.3.0",
+      "file": "3c10c28727e740e31099c2b755a277ee87184bf1.json",
       "metrics": {
         "nodes": 1762,
         "edges": 10113,
