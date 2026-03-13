@@ -36,6 +36,7 @@ def cli() -> None:
 from doc_kg.cli import (  # noqa: E402, F401
     cmd_analyze,
     cmd_build,
+    cmd_hooks,
     cmd_mcp,
     cmd_query,
     cmd_snapshot,

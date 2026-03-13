@@ -29,7 +29,7 @@
 | `--sqlite` | | `<repo>/.codekg/graph.sqlite` | Path to SQLite graph (**not** `--db`) |
 | `--lancedb` | | `<repo>/.codekg/lancedb` | LanceDB output directory |
 | `--table` | | `codekg_nodes` | LanceDB table name |
-| `--model` | | `microsoft/codebert-base` | Sentence-transformer model |
+| `--model` | | `BAAI/bge-small-en-v1.5` | Sentence-transformer model (override with `CODEKG_MODEL` env var) |
 | `--wipe` | | false | Delete existing vectors first |
 | `--kinds` | | `module,class,function,method` | Node kinds to embed |
 | `--batch` | | `256` | Embedding batch size |
@@ -41,7 +41,7 @@
 | `--repo` | `.` | Repository root |
 | `--db` | `.codekg/graph.sqlite` | SQLite path |
 | `--lancedb` | `.codekg/lancedb` | LanceDB directory |
-| `--model` | `microsoft/codebert-base` | Embedding model |
+| `--model` | `BAAI/bge-small-en-v1.5` | Embedding model (override with `CODEKG_MODEL` env var) |
 | `--transport` | `stdio` | `stdio` or `sse` |
 
 ### `codekg-query`
@@ -227,15 +227,19 @@ Get venv path: `poetry env info --path`
 | `CALLS` | Tracing execution flow |
 | `IMPORTS` | Dependency analysis |
 | `INHERITS` | OOP hierarchy |
+| `RESOLVES_TO` | Connecting `sym:` stubs to definitions — used internally by `callers()`; include in `query_codebase` rels for graph traversal through import aliases |
 
 ### Typical session workflow
 
 ```
-1. graph_stats()                                    → orientation
-2. query_codebase("auth flow", k=8, hop=1)          → find nodes
-3. pack_snippets("JWT validation", k=6, hop=1)      → read source
-4. get_node("fn:src/auth/jwt.py:JWTValidator.validate")  → node detail
-5. pack_snippets("error handling", k=4, hop=2, rels="CALLS")  → deeper
+1. graph_stats()                                              → orientation
+2. query_codebase("auth flow", k=8, hop=1)                   → find nodes
+3. explain("cls:src/auth/jwt.py:JWTValidator")               → understand before reading
+4. pack_snippets("JWT validation", k=6, hop=1)               → read source
+5. get_node("fn:src/auth/jwt.py:JWTValidator.validate", include_edges=True)
+                                                              → node detail + neighborhood in one call
+6. pack_snippets("error handling", k=4, hop=2, rels="CALLS") → deeper
+7. snapshot_list() / snapshot_diff("a", "b")                 → track codebase evolution
 ```
 
 ### Node ID format

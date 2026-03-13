@@ -1,14 +1,14 @@
-# CodeKG Temporal Snapshots
+# DocKG Temporal Snapshots
 
 **Enterprise-Grade Metrics Tracking Across Commits**
 
-Capture, store, and compare codebase metrics over time. Track the evolution of complexity, coverage, and health signals from version to version.
+Capture, store, and compare document corpus metrics over time. Track the evolution of topic coverage, entity density, and documentation health signals from version to version.
 
 ---
 
 ## Overview
 
-Snapshots are point-in-time captures of your codebase's metrics, tagged with:
+Snapshots are point-in-time captures of your document corpus's metrics, tagged with:
 - **Commit hash** — for version control integration
 - **Branch name** — to distinguish release vs. develop metrics
 - **Version string** — semantic versioning (0.5.1, 1.0.0, etc.)
@@ -23,14 +23,14 @@ Each snapshot includes **automatic delta computation** against the previous snap
 
 ### Capture a Snapshot
 ```bash
-codekg snapshot save 0.5.1
+dockg snapshot save 0.5.1
 ```
 
-Automatically detects your current git commit and branch. Creates `.codekg/snapshots/{commit}.json` with full metrics.
+Automatically detects your current git commit and branch. Creates `.dockg/snapshots/{commit}.json` with full metrics.
 
 ### List All Snapshots
 ```bash
-codekg snapshot list
+dockg snapshot list
 ```
 
 Shows all snapshots in reverse chronological order:
@@ -43,7 +43,7 @@ Commit     Branch       Version    Nodes  Edges  Coverage
 
 ### Show Snapshot Details
 ```bash
-codekg snapshot show 3487ed5
+dockg snapshot show 3487ed5
 ```
 
 Displays full metrics, hotspots, and deltas:
@@ -68,7 +68,7 @@ Delta vs. Previous:
 
 ### Compare Two Snapshots
 ```bash
-codekg snapshot diff 660e4f0 3487ed5
+dockg snapshot diff 660e4f0 3487ed5
 ```
 
 Side-by-side comparison showing what changed:
@@ -88,7 +88,7 @@ critical_issues          1             0             -1
 
 ### Storage Structure
 ```
-.codekg/
+.dockg/
 ├── graph.sqlite          # Knowledge graph database
 ├── lancedb/              # Semantic embeddings
 └── snapshots/
@@ -161,13 +161,13 @@ Track metrics at each version release:
 
 ```bash
 # After tagging v0.5.1
-codekg snapshot save 0.5.1
+dockg snapshot save 0.5.1
 
 # After tagging v0.5.2
-codekg snapshot save 0.5.2
+dockg snapshot save 0.5.2
 
 # Compare releases
-codekg snapshot diff <v0.5.1-commit> <v0.5.2-commit>
+dockg snapshot diff <v0.5.1-commit> <v0.5.2-commit>
 ```
 
 ### Feature Branch Tracking
@@ -176,14 +176,14 @@ Monitor complexity as features are added:
 ```bash
 # On feature/add-caching
 codekg build --repo .
-codekg snapshot save 0.5.2-dev1
+dockg snapshot save 0.5.2-dev1
 
 # After optimization work
 codekg build --repo .
-codekg snapshot save 0.5.2-dev2
+dockg snapshot save 0.5.2-dev2
 
 # See improvement
-codekg snapshot diff <dev1-commit> <dev2-commit>
+dockg snapshot diff <dev1-commit> <dev2-commit>
 ```
 
 ### Regression Detection
@@ -192,10 +192,10 @@ Identify when metrics degrade:
 ```bash
 # Weekly health check
 codekg build --repo .
-codekg snapshot save 0.5.1-week5
+dockg snapshot save 0.5.1-week5
 
 # Compare to last week
-codekg snapshot diff <prev-week-commit> <current-week-commit>
+dockg snapshot diff <prev-week-commit> <current-week-commit>
 
 # Alert if critical_issues increased or coverage dropped
 ```
@@ -211,13 +211,13 @@ codekg install-hooks
 After each `git commit`, the hook runs silently in the background:
 1. Reads the version from `pyproject.toml`
 2. Tags the snapshot with the actual commit hash
-3. Saves to `.codekg/snapshots/` (local only — not staged or committed)
+3. Saves to `.dockg/snapshots/` (local only — not staged or committed)
 
 The hook never blocks commits — if the graph isn't built yet, it prints a warning and exits cleanly.
 
-Snapshots are local artifacts by default (`.codekg/` is gitignored). Commit them manually at milestones if you want git history:
+Snapshots are local artifacts by default (`.dockg/` is gitignored). Commit them manually at milestones if you want git history:
 ```bash
-git add .codekg/snapshots/ && CODEKG_SKIP_SNAPSHOT=1 git commit -m "chore: capture snapshot"
+git add .dockg/snapshots/ && DOCKG_SKIP_SNAPSHOT=1 git commit -m "chore: capture snapshot"
 ```
 
 To overwrite an existing hook:
@@ -237,11 +237,11 @@ codekg build --repo . --wipe
 
 # Capture snapshot
 VERSION=$(git describe --tags --always)
-codekg snapshot save $VERSION
+dockg snapshot save $VERSION
 
 # Compare to previous
 PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1)
-codekg snapshot diff $PREV_TAG $VERSION > metrics_comparison.txt
+dockg snapshot diff $PREV_TAG $VERSION > metrics_comparison.txt
 ```
 
 ---
@@ -251,10 +251,10 @@ codekg snapshot diff $PREV_TAG $VERSION > metrics_comparison.txt
 ### Python Integration
 
 ```python
-from code_kg.snapshots import SnapshotManager
+from doc_kg.snapshots import SnapshotManager
 
 # Initialize manager
-mgr = SnapshotManager(".codekg/snapshots")
+mgr = SnapshotManager(".dockg/snapshots")
 
 # Capture snapshot
 snapshot = mgr.capture(
@@ -285,9 +285,9 @@ snapshots = mgr.list_snapshots(limit=10)
 All snapshot commands support `--json` for machine consumption:
 
 ```bash
-codekg snapshot list --json > snapshots.json
-codekg snapshot show 3487ed5 > snapshot_detail.json
-codekg snapshot diff a b --json > comparison.json
+dockg snapshot list --json > snapshots.json
+dockg snapshot show 3487ed5 > snapshot_detail.json
+dockg snapshot diff a b --json > comparison.json
 ```
 
 ---
@@ -353,7 +353,7 @@ Monitor trends to detect:
 
 1. **Install the git hook**
    - Run `codekg install-hooks` once per repo
-   - Snapshots are captured automatically after every commit into `.codekg/snapshots/`
+   - Snapshots are captured automatically after every commit into `.dockg/snapshots/`
    - They stay local (gitignored) — no staging friction
 
 2. **Capture at milestones**
@@ -389,10 +389,10 @@ Monitor trends to detect:
 A: At version releases (mandatory), weekly for long projects, after major changes (optional). More frequent = better granularity, but storage is minimal.
 
 **Q: Can I commit snapshots to git?**
-A: Yes, optionally. By default `.codekg/` is gitignored — snapshots are local artifacts. To commit at a milestone: `git add .codekg/snapshots/ && CODEKG_SKIP_SNAPSHOT=1 git commit -m "chore: capture snapshot"`. The `CODEKG_SKIP_SNAPSHOT=1` env var prevents the post-commit hook from running again and creating new unstaged files.
+A: Yes, optionally. By default `.dockg/` is gitignored — snapshots are local artifacts. To commit at a milestone: `git add .dockg/snapshots/ && DOCKG_SKIP_SNAPSHOT=1 git commit -m "chore: capture snapshot"`. The `DOCKG_SKIP_SNAPSHOT=1` env var prevents the post-commit hook from running again and creating new unstaged files.
 
 **Q: What if I miss a snapshot?**
-A: You can manually create one anytime with `codekg snapshot save`. Delta comparison still works as long as timestamps are preserved.
+A: You can manually create one anytime with `dockg snapshot save`. Delta comparison still works as long as timestamps are preserved.
 
 **Q: How do I integrate with dashboards?**
 A: Use `--json` output and feed to Grafana, Datadog, or custom tools. The structure is designed for programmatic ingestion.

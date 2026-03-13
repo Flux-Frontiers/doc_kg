@@ -1,4 +1,4 @@
-# CodeKG Deployment Guide
+# DocKG Deployment Guide
 
 *Author: Eric G. Suchanek, PhD*
 
@@ -6,12 +6,12 @@
 
 ## Overview
 
-CodeKG has two distinct deployment surfaces:
+DocKG has two distinct deployment surfaces:
 
 | Surface | What it is | Best options |
 |---|---|---|
-| **Python library + CLI** | `code_kg` package + unified `codekg` CLI | PyPI, Conda, GitHub Releases |
-| **Streamlit web app** | `codekg viz` interactive graph explorer | Streamlit Cloud, Fly.io |
+| **Python library + CLI** | `doc_kg` package + unified `dockg` CLI | PyPI, Conda, GitHub Releases |
+| **Streamlit web app** | `dockg viz` interactive graph explorer | Streamlit Cloud, Fly.io |
 
 These can be deployed independently or together. The sections below cover each option in detail.
 
@@ -24,7 +24,7 @@ The project is already structured perfectly for PyPI: `pyproject.toml` with Poet
 ### 1a. Prepare for release
 
 ```bash
-# Bump version in pyproject.toml and src/code_kg/__init__.py
+# Bump version in pyproject.toml
 # e.g. 0.1.0 → 0.2.0
 
 # Ensure the lock file is current
@@ -35,8 +35,8 @@ poetry run pytest
 
 # Build sdist + wheel
 poetry build
-# → dist/code_kg-0.1.0.tar.gz
-# → dist/code_kg-0.1.0-py3-none-any.whl
+# → dist/doc_kg-0.1.0.tar.gz
+# → dist/doc_kg-0.1.0-py3-none-any.whl
 ```
 
 ### 1b. Publish to TestPyPI first
@@ -49,7 +49,7 @@ poetry publish --repository testpypi
 Verify the install:
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ code-kg
+pip install --index-url https://test.pypi.org/simple/ doc-kg
 ```
 
 ### 1c. Publish to PyPI
@@ -62,20 +62,21 @@ poetry publish
 After publishing, users install with:
 
 ```bash
-pip install code-kg
+pip install doc-kg
 ```
 
-The `codekg` CLI and all subcommands become available immediately:
+The `dockg` CLI and all subcommands become available immediately:
 
 ```
-codekg build-sqlite
-codekg build-lancedb
-codekg query
-codekg pack
-codekg viz
-codekg viz3d
-codekg analyze
-codekg mcp
+dockg build
+dockg build-graph
+dockg build-index
+dockg query
+dockg pack
+dockg analyze
+dockg viz
+dockg snapshot
+dockg mcp
 ```
 
 ### 1d. Automate with GitHub Actions
@@ -119,9 +120,9 @@ git push origin v0.1.0
 
 The fastest way to share the Streamlit app publicly — free tier available.
 
-1. Push the repo to GitHub (already done: `github.com/Flux-Frontiers/code_kg`)
+1. Push the repo to GitHub (already done: `github.com/Flux-Frontiers/doc_kg`)
 2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**
-3. Select repo `Flux-Frontiers/code_kg`, branch `main`, main file `src/code_kg/app.py`
+3. Select repo `Flux-Frontiers/doc_kg`, branch `main`, main file `src/doc_kg/app.py`
 4. Add a `requirements.txt` (Streamlit Cloud doesn't use Poetry directly):
 
 ```bash
@@ -146,10 +147,10 @@ brew install flyctl
 fly auth login
 
 # From the repo root
-fly launch --name codekg --region iad
+fly launch --name dockg --region iad
 
 # Add a persistent volume for SQLite + LanceDB
-fly volumes create codekg_data --size 10 --region iad
+fly volumes create dockg_data --size 10 --region iad
 
 # Deploy
 fly deploy
@@ -159,7 +160,7 @@ Add to `fly.toml`:
 
 ```toml
 [mounts]
-  source = "codekg_data"
+  source = "dockg_data"
   destination = "/data"
 
 [[services]]
@@ -186,47 +187,43 @@ poetry build
 
 # Create a GitHub release and attach artifacts
 gh release create v0.1.0 dist/* \
-  --title "CodeKG v0.1.0" \
+  --title "DocKG v0.1.0" \
   --notes "Initial release"
 ```
 
 Users install directly from the release:
 
 ```bash
-pip install https://github.com/Flux-Frontiers/code_kg/releases/download/v0.1.0/code_kg-0.1.0-py3-none-any.whl
+pip install https://github.com/Flux-Frontiers/doc_kg/releases/download/v0.1.0/doc_kg-0.1.0-py3-none-any.whl
 ```
 
 ---
 
 ## Option 5 — MCP Server (AI agent integration)
 
-CodeKG ships a production-ready MCP server (`codekg mcp`) that exposes the full hybrid query and snippet-pack pipeline as structured tools for any MCP-compatible agent — Claude Code, Kilo Code, GitHub Copilot, Claude Desktop, Cursor, Continue, or any custom agent.
+DocKG ships a production-ready MCP server (`dockg mcp`) that exposes the full hybrid query and document retrieval pipeline as structured tools for any MCP-compatible agent — Claude Code, Kilo Code, GitHub Copilot, Claude Desktop, Cursor, Continue, or any custom agent.
 
 ### Install
 
 ```bash
 # MCP server is included in the standard install — no extra needed
-poetry add 'code-kg @ git+https://github.com/Flux-Frontiers/code_kg.git'
+poetry add 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
 # or
-pip install 'code-kg @ git+https://github.com/Flux-Frontiers/code_kg.git'
-
-# With 3D visualizer (optional)
-poetry add 'code-kg[viz3d] @ git+https://github.com/Flux-Frontiers/code_kg.git'
+pip install 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
 ```
 
 ### Build the knowledge graph first
 
 ```bash
-codekg build-sqlite --repo /path/to/repo
-codekg build-lancedb
+dockg build docs --wipe
 ```
 
 ### Start the server manually
 
 ```bash
-codekg mcp \
+dockg mcp \
   --repo /path/to/repo \
-  --db   /path/to/repo/.codekg/graph.sqlite
+  --db   /path/to/repo/.dockg/graph.sqlite
 ```
 
 ### Exposed tools
@@ -234,42 +231,30 @@ codekg mcp \
 | Tool | Description |
 |---|---|
 | `graph_stats()` | Node and edge counts by kind/relation |
-| `query_codebase(q, ...)` | Hybrid semantic + structural query; returns JSON |
-| `pack_snippets(q, ...)` | Hybrid query + source-grounded snippets; returns Markdown |
+| `query_docs(q, ...)` | Hybrid semantic + structural query; returns JSON |
+| `pack_docs(q, ...)` | Hybrid query + document excerpts; returns Markdown |
 | `get_node(node_id)` | Fetch a single node by stable ID |
 
 ### Agent configuration quick reference
 
 | Agent | Config file | Key |
 |---|---|---|
-| **Claude Code** | `.claude/claude_code_config.json` (project root) | `"mcpServers"` |
+| **Claude Code** | `.mcp.json` (project root) | `"mcpServers"` |
 | **Kilo Code** | `.mcp.json` (project root) | `"mcpServers"` |
 | **GitHub Copilot** | `.vscode/mcp.json` (workspace root) | `"servers"` + `"type": "stdio"` |
 | **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` | `"mcpServers"` |
-| **Cline** | Global `cline_mcp_settings.json` only | `"mcpServers"` |
 
-**Claude Code** (`.claude/claude_code_config.json`):
+**Claude Code** (`.mcp.json`):
 ```json
 {
   "mcpServers": {
-    "codekg": {
-      "command": "codekg",
+    "dockg": {
+      "command": "/absolute/path/to/repo/.venv/bin/dockg",
       "args": ["mcp",
         "--repo", "/absolute/path/to/repo",
-        "--db",   "/absolute/path/to/repo/.codekg/graph.sqlite"
+        "--db",   "/absolute/path/to/repo/.dockg/graph.sqlite"
       ]
     }
-  }
-}
-```
-
-**Kilo Code** (`.mcp.json` — Copilot servers without CodeKG):
-```json
-{
-  "mcpServers": {
-    "copilot-memory": { "...": "configured by Claude Copilot" },
-    "skills-copilot": { "...": "configured by Claude Copilot" },
-    "task-copilot": { "...": "configured by Claude Copilot" }
   }
 }
 ```
@@ -278,14 +263,13 @@ codekg mcp \
 ```json
 {
   "servers": {
-    "codekg": {
+    "dockg": {
       "type": "stdio",
-      "command": "codekg",
+      "command": "/absolute/path/to/repo/.venv/bin/dockg",
       "args": ["mcp",
         "--repo", "/absolute/path/to/repo",
-        "--db",   "/absolute/path/to/repo/.codekg/graph.sqlite"
-      ],
-      "env": { "POETRY_VIRTUALENVS_IN_PROJECT": "false" }
+        "--db",   "/absolute/path/to/repo/.dockg/graph.sqlite"
+      ]
     }
   }
 }
@@ -293,25 +277,17 @@ codekg mcp \
 
 **Claude Desktop** — use the absolute venv binary path (Poetry not on PATH):
 ```bash
-poetry env info --path   # → /path/to/venv; binary at /path/to/venv/bin/codekg
+poetry env info --path   # → /path/to/venv; binary at /path/to/venv/bin/dockg
 ```
 ```json
 {
   "mcpServers": {
-    "codekg": {
-      "command": "/path/to/venv/bin/codekg",
-      "args": ["mcp", "--repo", "/abs/path", "--db", "/abs/path/.codekg/graph.sqlite"]
+    "dockg": {
+      "command": "/path/to/venv/bin/dockg",
+      "args": ["mcp", "--repo", "/abs/path", "--db", "/abs/path/.dockg/graph.sqlite"]
     }
   }
 }
-```
-
-### Automated setup
-
-The `/setup-mcp` command (available in Claude Code / Kilo Code) automates the full workflow — install, build, smoke-test, and write all config files:
-
-```
-/setup-mcp /path/to/repo
 ```
 
 See [`docs/MCP.md`](MCP.md) for the complete reference.
@@ -331,18 +307,18 @@ See [`docs/MCP.md`](MCP.md) for the complete reference.
 ### Suggested release order
 
 1. **PyPI first** — the `pyproject.toml` is already complete; `poetry build && poetry publish` is all it takes.
-2. **MCP server** — add as a CLI entry point so agent users get it automatically with `pip install code-kg`.
+2. **MCP server** — add as a CLI entry point so agent users get it automatically with `pip install doc-kg`.
 
 ---
 
 ## Pre-release Checklist
 
-- [ ] Bump `version` in `pyproject.toml` and `src/code_kg/__init__.py`
+- [ ] Bump `version` in `pyproject.toml`
 - [ ] Update `CHANGELOG.md`
 - [ ] Run `poetry run pytest` — all tests green
 - [ ] Run `poetry run ruff check src/` — no lint errors
 - [ ] Run `poetry build` — wheel and sdist build cleanly
-- [ ] Test install in a fresh venv: `pip install dist/code_kg-*.whl`
-- [ ] Smoke-test all `codekg` subcommands
+- [ ] Test install in a fresh venv: `pip install dist/doc_kg-*.whl`
+- [ ] Smoke-test all `dockg` subcommands
 - [ ] `git tag v0.1.0 && git push origin v0.1.0`
 - [ ] `poetry publish` (or let GitHub Actions do it)

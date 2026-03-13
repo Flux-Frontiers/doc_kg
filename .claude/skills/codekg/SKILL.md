@@ -1,6 +1,6 @@
 ---
 name: codekg
-description: Expert knowledge for installing, configuring, and using the CodeKG MCP server — a hybrid semantic + structural knowledge graph for Python codebases. Use this skill when the user asks about: setting up CodeKG in a project, adding code-kg as a Poetry dependency, building the SQLite or LanceDB knowledge graph, configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, configuring Cline MCP settings, using the codekg CLI (codekg build-sqlite, codekg build-lancedb, codekg mcp, codekg query, codekg pack, codekg analyze, codekg viz, codekg viz3d, codekg viz-timeline, codekg explain, codekg snapshot, codekg architecture, codekg download-model, codekg install-hooks), using the graph_stats / query_codebase / pack_snippets / get_node / callers MCP tools, or troubleshooting CodeKG errors.
+description: Expert knowledge for installing, configuring, and using the CodeKG MCP server — a hybrid semantic + structural knowledge graph for Python codebases. Use this skill when the user asks about: setting up CodeKG in a project, adding code-kg as a Poetry dependency, building the SQLite or LanceDB knowledge graph, configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, configuring Cline MCP settings, using the codekg CLI (codekg build, codekg build-sqlite, codekg build-lancedb, codekg mcp, codekg query, codekg pack, codekg analyze, codekg centrality, codekg viz, codekg viz3d, codekg viz-timeline, codekg explain, codekg snapshot, codekg architecture, codekg download-model, codekg install-hooks), using the graph_stats / query_codebase / pack_snippets / get_node / list_nodes / callers / explain / centrality / bridge_centrality / framework_nodes / analyze_repo / rank_nodes / query_ranked / explain_rank / snapshot_list / snapshot_show / snapshot_diff MCP tools, or troubleshooting CodeKG errors.
 ---
 
 # CodeKG Skill
@@ -86,6 +86,8 @@ Beyond build/query/viz, the full command set:
 
 | Command | Purpose |
 |---|---|
+| `codekg build` | Full pipeline: SQLite + LanceDB in one step |
+| `codekg centrality` | Compute Structural Importance Ranking (SIR) over the graph |
 | `codekg explain <NODE_ID>` | Natural-language explanation of a code node by ID |
 | `codekg snapshot save <version>` | Capture metrics snapshot (commit, branch, version) |
 | `codekg snapshot list` | List all snapshots in reverse chronological order |
@@ -105,7 +107,7 @@ If you need to use CodeKG without network access (e.g., in CI, air-gapped nets, 
 codekg download-model
 ```
 
-This saves the model to `.codekg/models/microsoft--codebert-base/` (479M). Subsequent runs of `build-lancedb` and `codekg query` will use the cached local copy without any network access.
+This saves the model to `.codekg/models/<model-name>/`. Subsequent runs of `build-lancedb` and `codekg query` will use the cached local copy without any network access.
 
 Alternatively, set `CODEKG_MODEL_DIR` to cache elsewhere:
 ```bash
@@ -194,10 +196,34 @@ This installs, builds, smoke-tests, and writes both config files automatically.
 | Tool | When to use |
 |---|---|
 | `graph_stats()` | First call — understand codebase size/shape |
-| `query_codebase(q)` | Explore graph structure, find relevant nodes |
-| `pack_snippets(q)` | Read actual source code (prefer over query_codebase) |
-| `get_node(node_id)` | Fetch metadata for a specific node by ID |
-| `callers(node_id)` | Find all callers of a node — fan-in lookup resolving cross-module sym: stubs |
+| `query_codebase(q)` | Explore graph structure, find relevant nodes; tune precision with `min_score` and result diversity with `max_per_module` |
+| `pack_snippets(q)` | Read actual source code (prefer over query_codebase); supports `min_score` and `max_per_module` |
+| `get_node(node_id, include_edges)` | Fetch node metadata; `include_edges=True` also returns outgoing edges + incoming callers |
+| `list_nodes(module_path, kind)` | List nodes filtered by module path prefix and/or kind |
+| `callers(node_id)` | Find all callers of a node — fan-in lookup resolving cross-module sym: stubs with import-aware filtering for ambiguous names |
+| `explain(node_id)` | Natural-language explanation of a node: role, docstring, callers, callees |
+| `centrality(top, kinds, group_by)` | SIR PageRank — rank nodes or modules by structural importance; use before refactoring or to prioritize test coverage |
+| `bridge_centrality(top, include_imports)` | Module connectivity ranking — identifies orchestrator/hub modules by how many other modules they interact with |
+| `framework_nodes(top)` | Identify framework-like hub modules: high SIR + high connectivity (0.6×SIR + 0.4×connectivity) |
+| `analyze_repo()` | Full architectural analysis — complexity, coupling, coverage, orphans |
+| `snapshot_list(limit)` | List saved metric snapshots newest-first (use `limit=0` for all) |
+| `snapshot_show(key)` | Full metrics for a snapshot key (tree hash) or `"latest"`; legacy snapshots backfill missing deltas |
+| `snapshot_diff(key_a, key_b)` | Compare two snapshots by key — node/edge/coverage/issues delta |
+
+## CodeRank Tools
+
+Structure-aware ranking that blends PageRank with semantic search.
+
+| Tool | When to use |
+|---|---|
+| `rank_nodes(top, rels, persist_metric, exclude_tests)` | Global weighted CodeRank (PageRank) — find the most structurally important nodes across the whole repo |
+| `query_ranked(q, k, mode, top, rels, radius, exclude_tests)` | CodeRank-enhanced query: `hybrid` mode (0.60×semantic + 0.25×centrality + 0.15×proximity) or `ppr` (0.70×personalized PageRank + 0.30×semantic) |
+| `explain_rank(node_id, q)` | Explain why a node ranked where it did — shows inbound counts, global rank, and query-conditioned scores |
+
+**CodeRank workflows:**
+- Find most important nodes globally: `rank_nodes(top=25)` → `explain_rank`
+- Persist global rank for later queries: `rank_nodes(persist_metric='coderank_global')`
+- Structure-aware query: `query_ranked(q='database connection', mode='hybrid')`
 
 ## Query Strategy Guide
 
@@ -223,12 +249,29 @@ This installs, builds, smoke-tests, and writes both config files automatically.
 ### Typical session workflow
 
 ```
-1. graph_stats()                                    → orientation
-2. query_codebase("auth flow", k=8, hop=1)          → find nodes
-3. pack_snippets("JWT validation", k=6, hop=1)      → read source
-4. get_node("fn:src/auth/jwt.py:JWTValidator.validate")  → node detail
-5. callers("fn:src/auth/jwt.py:JWTValidator.validate")   → all callers, cross-module included
+1. graph_stats()                                         → orientation
+2. query_codebase("auth flow", k=8, hop=1)               → find nodes
+3. explain("cls:src/auth/jwt.py:JWTValidator")           → understand before reading
+4. pack_snippets("JWT validation", k=6, hop=1)           → read source
+5. get_node("fn:src/auth/jwt.py:JWTValidator.validate", include_edges=True)
+                                                         → node detail + neighborhood in one call
 6. pack_snippets("error handling", k=4, hop=2, rels="CALLS")  → deeper
+7. snapshot_list() / snapshot_diff("a", "b")             → track codebase evolution
+```
+
+### Structural importance workflows
+
+```
+# Identify hotspots before refactoring
+centrality(top=20)                                       → SIR ranking by node
+centrality(top=10, group_by="module")                    → SIR ranking by module
+bridge_centrality(top=10)                                → hub modules by connectivity
+framework_nodes(top=10)                                  → most critical hub modules
+
+# CodeRank-enhanced search
+rank_nodes(top=25)                                       → global PageRank ranking
+query_ranked("database connection", mode="hybrid")       → structure-aware query
+explain_rank("fn:src/db/store.py:connect")               → why did this rank here?
 ```
 
 ## .gitignore Setup

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `dockg install-hooks` CLI command: installs a DocKG pre-commit hook that captures a metrics snapshot (keyed by tree hash) and stages it atomically — mirrors CodeKG hook pattern; skip with `DOCKG_SKIP_SNAPSHOT=1` env var
+- `src/doc_kg/cli/cmd_hooks.py`: hook installation module with embedded pre-commit hook script
+- Documentation updates:
+  - `docs/CHEATSHEET.md`: rewritten for DocKG MCP tools (`graph_stats`, `query_docs`, `pack_docs`, `get_node`)
+  - `docs/SNAPSHOTS.md`: updated from CodeKG to DocKG snapshots (metrics for document corpora, not code)
+  - `docs/deployment.md`: rewritten for DocKG deployment options (PyPI, Streamlit Cloud, Fly.io, MCP server)
+  - `docs/dockg_workflow.md`: new practical workflow guide showing `dockg build`, `query`, `pack`, `analyze`, `viz`, `snapshot` commands
 - `scripts/install-hooks.sh`: installs a DocKG pre-commit hook that captures a metrics snapshot (keyed by tree hash) and stages it atomically — mirrors CodeKG hook pattern; skip with `DOCKG_SKIP_SNAPSHOT=1`
 - `--exclude-dir` CLI option on `build` and `build-graph` commands: exclude directory names at every depth during file walk (repeatable, merged with config)
 - `src/doc_kg/config.py`: new module with `load_exclude_dirs()` to read `[tool.dockg].exclude` from pyproject.toml — mirrors CodeKG pattern
