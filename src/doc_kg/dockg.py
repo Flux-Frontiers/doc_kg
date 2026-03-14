@@ -131,13 +131,13 @@ EDGE_KINDS = {
 # or pass ``--exclude-dir`` on the CLI. Both are merged (unioned) with SKIP_DIRS —
 # there is no override, only additive exclusion.
 SKIP_DIRS = {
-    ".git",          # version control
-    ".venv",         # Python virtual environment (Poetry/pip)
-    "venv",          # Python virtual environment (legacy name)
-    "__pycache__",   # Python bytecode cache
-    ".dockg",        # DocKG graph artifacts (SQLite, LanceDB, snapshots)
-    ".mypy_cache",   # mypy type-check cache
-    ".pytest_cache", # pytest cache
+    ".git",  # version control
+    ".venv",  # Python virtual environment (Poetry/pip)
+    "venv",  # Python virtual environment (legacy name)
+    "__pycache__",  # Python bytecode cache
+    ".dockg",  # DocKG graph artifacts (SQLite, LanceDB, snapshots)
+    ".mypy_cache",  # mypy type-check cache
+    ".pytest_cache",  # pytest cache
     "node_modules",  # JS/Node dependencies
 }
 
@@ -290,7 +290,9 @@ def parse_corpus(
     :param topics_file: Optional topics catalog (JSON/YAML).
     :return: ``(nodes, edges)`` tuple.
     """
-    from doc_kg.chunker import TextChunker  # local import avoids circular dep
+    from doc_kg.chunker import (
+        TextChunker,  # local import avoids circular dep  # pylint: disable=import-outside-toplevel
+    )
 
     nodes: dict[str, DocNode] = {}
     edges: dict[tuple[str, str, str], DocEdge] = {}

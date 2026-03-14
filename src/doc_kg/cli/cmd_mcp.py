@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 from doc_kg.cli.options import repo_option
 from doc_kg.dockg import DEFAULT_MODEL
 
@@ -47,8 +47,9 @@ def mcp(repo: str, db: str, lancedb: str, model: str, transport: str) -> None:
 
         if importlib.util.find_spec("mcp") is None:
             raise ImportError
-    except ImportError:
-        raise click.ClickException("'mcp' package not found. Install with: pip install mcp")
+    except ImportError as exc:
+        msg = "'mcp' package not found. Install with: pip install mcp"
+        raise click.ClickException(msg) from exc
 
     argv = [
         "--repo",

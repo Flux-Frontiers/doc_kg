@@ -57,6 +57,7 @@ class BuildStats:
     similar_edges_added: int | None = None
 
     def to_dict(self) -> dict:
+        """Serialise build stats to a JSON-compatible dictionary."""
         return {
             "corpus_root": self.corpus_root,
             "db_path": self.db_path,
@@ -107,6 +108,7 @@ class QueryResult:
     edges: list[dict]
 
     def to_dict(self) -> dict:
+        """Serialise the query result to a JSON-compatible dictionary."""
         return {
             "query": self.query,
             "seeds": self.seeds,
@@ -119,6 +121,7 @@ class QueryResult:
         }
 
     def to_json(self, *, indent: int = 2) -> str:
+        """Serialise the query result to a JSON string."""
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
     def print_summary(self) -> None:
@@ -177,6 +180,7 @@ class TextPack:
     edges: list[dict]
 
     def to_dict(self) -> dict:
+        """Serialise the pack result to a JSON-compatible dictionary."""
         return {
             "query": self.query,
             "seeds": self.seeds,
@@ -190,6 +194,7 @@ class TextPack:
         }
 
     def to_json(self, *, indent: int = 2) -> str:
+        """Serialise the pack result to a JSON string."""
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
     def to_markdown(self) -> str:

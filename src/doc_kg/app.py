@@ -296,6 +296,7 @@ def _load_all_nodes_edges(store: GraphStore, max_nodes: int) -> tuple[list[dict]
 
 
 def main() -> None:
+    """Streamlit app entry point — initialise state, render sidebar and main view."""
     _init_state()
     cfg = _render_sidebar()
 
@@ -347,7 +348,8 @@ def main() -> None:
         if st.session_state.query_result:
             result = st.session_state.query_result
             st.write(
-                f"Seeds: {result.seeds} | Expanded: {result.expanded_nodes} | Returned: {result.returned_nodes}"
+                f"Seeds: {result.seeds} | Expanded: {result.expanded_nodes}"
+                f" | Returned: {result.returned_nodes}"
             )
             st.json(result.to_dict())
 

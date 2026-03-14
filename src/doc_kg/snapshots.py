@@ -88,6 +88,7 @@ class SnapshotManifest:
     snapshots: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the manifest to a JSON-compatible dictionary."""
         return {
             "format": self.format_version,
             "last_update": self.last_update,
@@ -96,6 +97,7 @@ class SnapshotManifest:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> SnapshotManifest:
+        """Deserialise a manifest from a JSON-compatible dictionary."""
         return SnapshotManifest(
             format_version=data.get("format", "1.0"),
             last_update=data.get("last_update", ""),

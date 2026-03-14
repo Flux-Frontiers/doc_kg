@@ -82,7 +82,10 @@ def extract_entities(text: str, *, max_entities: int = 8) -> list[str]:
     """
     # Multi-word titlecase entities, acronyms, and CamelCase identifiers.
     pattern = re.compile(
-        r"\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}|[A-Z]{2,}[A-Z0-9]*|[A-Z][a-z]+[A-Z][A-Za-z0-9]*|[A-Z]{2,}[a-z][A-Za-z0-9]*)\b"
+        r"\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}"
+        r"|[A-Z]{2,}[A-Z0-9]*"
+        r"|[A-Z][a-z]+[A-Z][A-Za-z0-9]*"
+        r"|[A-Z]{2,}[a-z][A-Za-z0-9]*)\b"
     )
     found = [m.group(0).strip() for m in pattern.finditer(text)]
 
@@ -114,7 +117,7 @@ def cooccur_pairs(items: list[str]) -> list[tuple[str, str]]:
     :return: Sorted unique tuple pairs.
     """
     uniq = sorted(set(items))
-    return [(a, b) for a, b in itertools.combinations(uniq, 2)]
+    return list(itertools.combinations(uniq, 2))
 
 
 def _slug(value: str) -> str:

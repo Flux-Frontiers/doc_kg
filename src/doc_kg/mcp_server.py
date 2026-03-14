@@ -19,7 +19,11 @@ from doc_kg import DocKG
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.store import DEFAULT_RELS
 
-_kg: DocKG | None = None
+_kg: DocKG | None = None  # pylint: disable=invalid-name
+
+_ALL_RELS = (
+    "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"
+)
 
 
 def _get_kg() -> DocKG:
@@ -43,7 +47,7 @@ def query_docs(
     q: str,
     k: int = 8,
     hop: int = 1,
-    rels: str = "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH",
+    rels: str = "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH",  # noqa: E501
     max_nodes: int = 25,
 ) -> str:
     """Run hybrid semantic + graph query over DocKG and return JSON."""
@@ -63,7 +67,7 @@ def pack_docs(
     q: str,
     k: int = 8,
     hop: int = 1,
-    rels: str = "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH",
+    rels: str = "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH",  # noqa: E501
     max_chars: int = 2000,
     max_nodes: int = 15,
 ) -> str:

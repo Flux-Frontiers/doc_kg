@@ -16,7 +16,7 @@ from pathlib import Path
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 from doc_kg.cli.options import sqlite_option
 from doc_kg.dockg_thorough_analysis import DocKGAnalyzer
 from doc_kg.kg import DocKG
@@ -163,7 +163,8 @@ def list_snapshots(snapshots_dir: str | None, limit: int | None, output_json: bo
         click.echo(json.dumps(snapshots, indent=2))
     else:
         click.echo(
-            f"{'Commit':<10} {'Branch':<12} {'Version':<10} {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
+            f"{'Commit':<10} {'Branch':<12} {'Version':<10}"
+            f" {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
         )
         click.echo("-" * 65)
         for snap in snapshots:

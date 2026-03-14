@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 from doc_kg.cli.options import repo_option
 from doc_kg.dockg_thorough_analysis import main as run_analysis
 

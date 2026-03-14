@@ -36,31 +36,29 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Build DocKG database
-        run: |
-          poetry run dockg-build-graph --wipe
-          poetry run dockg-build-index
+        run: poetry run dockg build --wipe
 
       - name: Get version and commit info
         id: version
         run: |
           VERSION=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
-          SHORT_COMMIT=$(git rev-parse --short HEAD)
+          TREE_HASH=$(git write-tree)
           BRANCH=$(git rev-parse --abbrev-ref HEAD)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "commit=${SHORT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "tree_hash=${TREE_HASH}" >> $GITHUB_OUTPUT
           echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
 
-      - name: Run DocKG analysis
+      - name: Capture DocKG snapshot
         run: |
-          poetry run dockg-analyze . \
-            --output "analysis/doc_kg_analysis_snapshot.md" \
-            --quiet
+          poetry run dockg snapshot save "${{ steps.version.outputs.version }}" \
+            --repo . \
+            --commit "${{ steps.version.outputs.tree_hash }}" \
+            --branch "${{ steps.version.outputs.branch }}"
 
-      - name: Upload snapshot artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dockg-snapshots-${{ steps.version.outputs.commit }}
-          path: |
-            .dockg/
-            analysis/doc_kg_analysis_snapshot.md
-          retention-days: 90
+      - name: Commit snapshot to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .dockg/snapshots/
+          git diff --cached --quiet || git commit -m "chore(snapshot): capture DocKG metrics snapshot [skip ci]"
+          git push

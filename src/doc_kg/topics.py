@@ -21,7 +21,7 @@ from pathlib import Path
 try:
     import yaml
 except Exception:  # pragma: no cover - optional dependency at runtime
-    yaml = None  # type: ignore[assignment]
+    yaml = None  # type: ignore[assignment]  # pylint: disable=invalid-name
 
 
 _DEFAULT_TOPICS: dict[str, list[str]] = {

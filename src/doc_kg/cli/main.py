@@ -19,21 +19,9 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
-import click
-
-
-@click.group()
-@click.version_option(package_name="doc-kg", prog_name="dockg")
-def cli() -> None:
-    """DocKG - Document Knowledge Graph builder and query tool.
-
-    Builds a semantically searchable knowledge graph from .md and .txt files.
-    """
-
-
 # Import subcommands so they register against `cli`.
 # pylint: disable=unused-import
-from doc_kg.cli import (  # noqa: E402, F401
+from doc_kg.cli import (  # noqa: F401
     cmd_analyze,
     cmd_build,
     cmd_hooks,
@@ -42,3 +30,4 @@ from doc_kg.cli import (  # noqa: E402, F401
     cmd_snapshot,
     cmd_viz,
 )
+from doc_kg.cli.group import cli  # noqa: F401  # pylint: disable=unused-import

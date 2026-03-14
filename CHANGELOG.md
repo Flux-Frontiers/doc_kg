@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- VS Code workspace file (`src/doc_kg/doc_kg.code-workspace`) for IDE integration
+- `src/doc_kg/cli/group.py`: new module that houses the root Click group, extracted from `main.py` to eliminate circular imports between the entry-point and `cmd_*` submodules
+- `pylint ^4.0.5` dev dependency with full `[tool.pylint.*]` configuration in `pyproject.toml` (design/format/similarities/messages_control sections)
+- `code-kg` (git) dependency added to `pyproject.toml` for CodeKG integration
+
+### Changed
+- All `cmd_*` CLI modules (`cmd_analyze`, `cmd_build`, `cmd_hooks`, `cmd_mcp`, `cmd_query`, `cmd_snapshot`, `cmd_viz`) now import `cli` from `doc_kg.cli.group` instead of `doc_kg.cli.main`, resolving circular import issues
+- `src/doc_kg/cli/main.py`: reduced to re-exporting `cli` from `group.py` and registering submodule imports
+- `src/doc_kg/cli/cmd_hooks.py`: Enhanced pre-commit hook with quality checks integration
+  - Hook now runs `.pre-commit-config.yaml` checks (ruff, mypy, detect-secrets, etc.) before snapshot capture
+  - Hook rebuilds local DocKG index (`dockg build --wipe`) to keep it in sync with commits
+  - Changed success message from `✓` emoji to `OK` prefix
+- `.github/workflows/snapshots.yml`: Refactored snapshot workflow for consistency
+  - Simplified build phase to use unified `dockg build --wipe` instead of separate `build-graph` and `build-index` commands
+  - Changed snapshot keying from short commit hash (`SHORT_COMMIT`) to full tree hash (`TREE_HASH` via `git write-tree`)
+  - Replaced ad-hoc `dockg analyze` output with structured `dockg snapshot save` command
+  - Workflow now commits and pushes snapshots directly to repository instead of uploading as artifacts
+- `.pre-commit-config.yaml`: Fixed pylint hook to run via `poetry run` for access to project dependencies (was failing with import errors)
+- `pyproject.toml`: Updated `pre-commit` dependency to `^4.5.1`
+- `src/doc_kg/relations.py`: split overlong regex literal across multiple lines; simplified `cooccur_pairs` to `list(itertools.combinations(...))` directly
+- Code quality: added missing public-method docstrings in `kg.py`, `snapshots.py`, `app.py`; added targeted `pylint: disable` annotations in `dockg.py`, `index.py`, `mcp_server.py`, `topics.py`; fixed bare `except ImportError` chain in `cmd_mcp.py`
+
 ## [0.3.0] - 2026-03-12
 
 ### Added

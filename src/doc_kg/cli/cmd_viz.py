@@ -15,7 +15,7 @@ from pathlib import Path
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 
 _VIZ_EXTRA = 'pip install "doc-kg[viz]"'
 

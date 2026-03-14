@@ -16,7 +16,7 @@ from pathlib import Path
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 
 # ---------------------------------------------------------------------------
 # Hook script content (embedded so this module is self-contained when
@@ -25,7 +25,7 @@ from doc_kg.cli.main import cli
 
 _PRE_COMMIT_HOOK = """\
 #!/usr/bin/env bash
-# DocKG pre-commit hook — captures a metrics snapshot keyed by tree hash.
+# DocKG pre-commit hook — runs quality checks, rebuilds the index, captures snapshot.
 # Installed by: dockg install-hooks
 # Skip with: DOCKG_SKIP_SNAPSHOT=1 git commit ...
 set -euo pipefail
@@ -33,11 +33,24 @@ set -euo pipefail
 [ "${DOCKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Run pre-commit framework checks (ruff, mypy, detect-secrets, etc.)
+# Delegates to .pre-commit-config.yaml so quality checks stay in one place.
+PRECOMMIT="$REPO_ROOT/.venv/bin/pre-commit"
+if [ -x "$PRECOMMIT" ]; then
+    "$PRECOMMIT" run || exit 1
+elif command -v pre-commit &>/dev/null; then
+    pre-commit run || exit 1
+fi
+
 cd "$REPO_ROOT"
 
 VERSION=$(grep '^version' pyproject.toml 2>/dev/null | head -1 | cut -d'"' -f2)
 TREE_HASH=$(git write-tree)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Rebuild local DocKG index to keep it in sync
+"$REPO_ROOT/.venv/bin/dockg" build --wipe || exit 1
 
 "$REPO_ROOT/.venv/bin/dockg" snapshot save "${VERSION:-unknown}" \\
     --repo . \\
@@ -94,6 +107,6 @@ def install_hooks(repo: str, force: bool) -> None:
     mode = hook_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
     hook_path.chmod(mode)
 
-    click.echo(f"✓ Installed pre-commit hook: {hook_path}")
+    click.echo(f"OK Installed pre-commit hook: {hook_path}")
     click.echo("  Snapshots will be captured automatically before each commit.")
     click.echo("  Run 'dockg build' first if you haven't built the graph yet.")

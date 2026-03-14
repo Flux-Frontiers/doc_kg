@@ -348,7 +348,7 @@ class SemanticIndex:
         *,
         k: int,
         threshold: float,
-        quiet: bool,
+        quiet: bool,  # pylint: disable=unused-argument
     ) -> int:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 

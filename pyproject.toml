@@ -40,6 +40,8 @@ click = ">=8.1.0"
 pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
+code-kg = { git = "https://github.com/Flux-Frontiers/code_kg.git" }
+
 
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
@@ -50,6 +52,9 @@ pytest-cov = ">=5.0.0"
 ruff = ">=0.4.0"
 mypy = ">=1.10.0"
 types-pyyaml = "^6.0.12.20250915"
+pre-commit = "^4.5.1"
+pylint = "^4.0.5"
+
 
 [tool.poetry.scripts]
 dockg          = "doc_kg.cli.main:cli"
@@ -91,3 +96,25 @@ pythonpath = ["src"]
 exclude = ["tests"]
 include = ["src"]
 
+[tool.pylint.design]
+max-args = 20
+max-positional-arguments = 20
+max-locals = 60
+max-attributes = 25
+max-branches = 25
+max-statements = 80
+min-public-methods = 1
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.similarities]
+ignore-imports = true
+
+[tool.pylint.messages_control]
+disable = [
+    "duplicate-code",
+    "protected-access",
+    "global-statement",
+    "broad-exception-caught",
+]

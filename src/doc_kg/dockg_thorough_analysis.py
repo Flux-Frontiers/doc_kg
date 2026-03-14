@@ -195,8 +195,9 @@ class DocKGAnalyzer:
               n.file_path,
               COALESCE(n.title, n.name, n.id) AS label,
                             SUM(CASE WHEN e.rel = 'REFERENCES' THEN 1 ELSE 0 END) AS refs_count,
-              SUM(CASE WHEN e.rel IN ('HAS_TOPIC', 'MENTIONS_ENTITY', 'HAS_KEYWORD', 'SIMILAR_TO', 'CO_OCCURS_WITH')
-                THEN 1 ELSE 0 END) AS semantic_links,
+              SUM(CASE WHEN e.rel IN (
+                  'HAS_TOPIC', 'MENTIONS_ENTITY', 'HAS_KEYWORD', 'SIMILAR_TO', 'CO_OCCURS_WITH'
+              ) THEN 1 ELSE 0 END) AS semantic_links,
               COUNT(*) AS total_links
             FROM edges e
             JOIN nodes n ON n.id = e.src
@@ -230,7 +231,8 @@ class DocKGAnalyzer:
             )
         else:
             self.issues.append(
-                "Chunk density appears low; consider reducing --chunk-size or reviewing corpus content."
+                "Chunk density appears low; consider reducing --chunk-size"
+                " or reviewing corpus content."
             )
 
         for key, label in [
@@ -241,7 +243,8 @@ class DocKGAnalyzer:
             cov = self.semantic_coverage.get(key, 0.0)
             if cov < 0.25:
                 self.issues.append(
-                    f"Low {label} coverage ({cov:.1%}); consider enabling extraction and tuning thresholds."
+                    f"Low {label} coverage ({cov:.1%}); consider enabling extraction"
+                    " and tuning thresholds."
                 )
             elif cov >= 0.6:
                 self.strengths.append(f"Strong {label} coverage ({cov:.1%}) across chunks.")
@@ -250,7 +253,8 @@ class DocKGAnalyzer:
             self.strengths.append("No orphaned topic nodes detected.")
         if any(v > 0 for v in self.orphan_semantic_nodes.values()):
             self.issues.append(
-                "Orphan semantic nodes detected; graph may contain stale topic/entity/keyword nodes."
+                "Orphan semantic nodes detected; graph may contain stale"
+                " topic/entity/keyword nodes."
             )
 
     def _compile_results(self, *, elapsed_seconds: float) -> dict:
@@ -298,7 +302,8 @@ class DocKGAnalyzer:
         lines.append("|---|---:|---:|---:|---:|")
         for m in result["document_metrics"][:15]:
             lines.append(
-                f"| `{m['file_path']}` | {m['chunks']} | {m['sections']} | {m['refs_out']} | {m['semantic_links']} |"
+                f"| `{m['file_path']}` | {m['chunks']} | {m['sections']}"
+                f" | {m['refs_out']} | {m['semantic_links']} |"
             )
         lines.append("")
 

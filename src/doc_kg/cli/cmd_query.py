@@ -15,7 +15,7 @@ from pathlib import Path
 
 import click
 
-from doc_kg.cli.main import cli
+from doc_kg.cli.group import cli
 from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
 from doc_kg.kg import DocKG
 from doc_kg.store import DEFAULT_RELS
