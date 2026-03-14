@@ -1,0 +1,117 @@
+{
+  "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
+  "branch": "main",
+  "timestamp": "2026-03-14T23:30:31.727388+00:00",
+  "version": "0.3.0",
+  "metrics": {
+    "total_nodes": 1967,
+    "total_edges": 11689,
+    "meaningful_nodes": 1951,
+    "coverage_score": 0.8848797250859106,
+    "node_counts": {
+      "chunk": 388,
+      "document": 16,
+      "entity": 492,
+      "keyword": 472,
+      "section": 318,
+      "topic": 281
+    },
+    "edge_counts": {
+      "CONTAINS": 706,
+      "CO_OCCURS_WITH": 7740,
+      "HAS_KEYWORD": 1410,
+      "HAS_TOPIC": 387,
+      "MENTIONS_ENTITY": 1276,
+      "NEXT": 61,
+      "REFERENCES": 8,
+      "SIMILAR_TO": 101
+    },
+    "issues_count": 0,
+    "complexity_median": 14.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:README.md:0046",
+      "file_path": "README.md",
+      "label": "CLI Reference",
+      "references": 0,
+      "semantic_links": 17,
+      "total_links": 17
+    },
+    {
+      "id": "chunk:CHANGELOG.md:0004",
+      "file_path": "CHANGELOG.md",
+      "label": "Added",
+      "references": 0,
+      "semantic_links": 16,
+      "total_links": 16
+    },
+    {
+      "id": "chunk:README.md:0049",
+      "file_path": "README.md",
+      "label": "`dockg build-graph` \u2014 SQLite only",
+      "references": 0,
+      "semantic_links": 15,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0031",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Data Persistence Storage Database",
+      "references": 0,
+      "semantic_links": 15,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0026",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Documentation",
+      "references": 4,
+      "semantic_links": 14,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:CHANGELOG.md:0002",
+      "file_path": "CHANGELOG.md",
+      "label": "Changed",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:README.md:0053",
+      "file_path": "README.md",
+      "label": "`dockg analyze` \u2014 Corpus health report",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:README.md:0062",
+      "file_path": "README.md",
+      "label": "Edge types",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0020",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Architecture",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    },
+    {
+      "id": "chunk:docs/SNAPSHOTS.md:0043",
+      "file_path": "docs/SNAPSHOTS.md",
+      "label": "Best Practices",
+      "references": 0,
+      "semantic_links": 14,
+      "total_links": 15
+    }
+  ],
+  "issues": [],
+  "vs_previous": null,
+  "vs_baseline": null
+}

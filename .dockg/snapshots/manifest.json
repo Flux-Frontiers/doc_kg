@@ -1,0 +1,43 @@
+{
+  "format": "1.0",
+  "last_update": "2026-03-14T23:30:31.727835+00:00",
+  "snapshots": [
+    {
+      "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
+      "branch": "main",
+      "timestamp": "2026-03-14T23:30:31.727388+00:00",
+      "version": "0.3.0",
+      "file": "80f3e6c13e30126c69472146f3a1d4fae8a33d95.json",
+      "metrics": {
+        "total_nodes": 1967,
+        "total_edges": 11689,
+        "meaningful_nodes": 1951,
+        "coverage_score": 0.8848797250859106,
+        "node_counts": {
+          "chunk": 388,
+          "document": 16,
+          "entity": 492,
+          "keyword": 472,
+          "section": 318,
+          "topic": 281
+        },
+        "edge_counts": {
+          "CONTAINS": 706,
+          "CO_OCCURS_WITH": 7740,
+          "HAS_KEYWORD": 1410,
+          "HAS_TOPIC": 387,
+          "MENTIONS_ENTITY": 1276,
+          "NEXT": 61,
+          "REFERENCES": 8,
+          "SIMILAR_TO": 101
+        },
+        "issues_count": 0,
+        "complexity_median": 14.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": null
+      }
+    }
+  ]
+}
