@@ -290,9 +290,7 @@ def parse_corpus(
     :param topics_file: Optional topics catalog (JSON/YAML).
     :return: ``(nodes, edges)`` tuple.
     """
-    from doc_kg.chunker import (
-        TextChunker,  # local import avoids circular dep  # pylint: disable=import-outside-toplevel
-    )
+    from doc_kg.chunker import TextChunker  # pylint: disable=import-outside-toplevel
 
     nodes: dict[str, DocNode] = {}
     edges: dict[tuple[str, str, str], DocEdge] = {}

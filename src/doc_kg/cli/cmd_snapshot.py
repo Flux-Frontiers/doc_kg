@@ -46,10 +46,10 @@ def snapshot() -> None:
     help="Snapshots directory (default: .dockg/snapshots).",
 )
 @click.option(
-    "--commit",
+    "--tree-hash",
     default=None,
     type=str,
-    help="Commit hash; auto-detected if not provided.",
+    help="Git tree hash; auto-detected if not provided.",
 )
 @click.option(
     "--branch",
@@ -62,7 +62,7 @@ def save_snapshot(
     repo: str,
     sqlite: str,
     snapshots_dir: str | None,
-    commit: str | None,
+    tree_hash: str | None,
     branch: str | None,
 ) -> None:
     """Capture current DocKG metrics and save as a temporal snapshot."""
@@ -95,7 +95,7 @@ def save_snapshot(
         ]
         coverage_score = sum(coverage_values) / len(coverage_values)
 
-        issues_count = len(analysis.get("issues", []))
+        issues = analysis.get("issues", [])
         hotspots = analysis.get("hot_chunks", [])[:10]
 
         complexity_values = [int(h.get("semantic_links", 0)) for h in hotspots]
@@ -110,21 +110,22 @@ def save_snapshot(
     mgr = SnapshotManager(snapshots_path)
     snapshot_obj = mgr.capture(
         version=version,
-        commit=commit,
+        tree_hash=tree_hash or "",
         branch=branch,
         graph_stats_dict=stats,
         coverage_score=coverage_score,
-        issues_count=issues_count,
+        issues_count=len(issues),
         complexity_median=complexity_median,
         hotspots=hotspots,
+        issues=[str(i) for i in issues],
     )
 
     snapshot_file = mgr.save_snapshot(snapshot_obj)
     click.echo(f"Snapshot saved: {snapshot_file}")
-    click.echo(f"  Commit:  {snapshot_obj.commit}")
-    click.echo(f"  Version: {snapshot_obj.version}")
-    click.echo(f"  Nodes:   {snapshot_obj.metrics.total_nodes}")
-    click.echo(f"  Edges:   {snapshot_obj.metrics.total_edges}")
+    click.echo(f"  Key:      {snapshot_obj.key}")
+    click.echo(f"  Version:  {snapshot_obj.version}")
+    click.echo(f"  Nodes:    {snapshot_obj.metrics.total_nodes}")
+    click.echo(f"  Edges:    {snapshot_obj.metrics.total_edges}")
     click.echo(f"  Coverage: {snapshot_obj.metrics.coverage_score:.1%}")
 
 
@@ -142,18 +143,26 @@ def save_snapshot(
     help="Max snapshots to show.",
 )
 @click.option(
+    "--branch",
+    default=None,
+    type=str,
+    help="Filter by branch name.",
+)
+@click.option(
     "--json",
     "output_json",
     is_flag=True,
     help="Output as JSON.",
 )
-def list_snapshots(snapshots_dir: str | None, limit: int | None, output_json: bool) -> None:
+def list_snapshots(
+    snapshots_dir: str | None, limit: int | None, branch: str | None, output_json: bool
+) -> None:
     """List all temporal snapshots in reverse chronological order."""
     snapshots_path = (
         Path(snapshots_dir).resolve() if snapshots_dir else (Path.cwd() / ".dockg" / "snapshots")
     )
     mgr = SnapshotManager(snapshots_path)
-    snapshots = mgr.list_snapshots(limit=limit)
+    snapshots = mgr.list_snapshots(limit=limit, branch=branch)
 
     if not snapshots:
         click.echo("No snapshots found.")
@@ -163,43 +172,40 @@ def list_snapshots(snapshots_dir: str | None, limit: int | None, output_json: bo
         click.echo(json.dumps(snapshots, indent=2))
     else:
         click.echo(
-            f"{'Commit':<10} {'Branch':<12} {'Version':<10}"
-            f" {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
+            f"{'Key':<10} {'Branch':<12} {'Version':<10} {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
         )
         click.echo("-" * 65)
         for snap in snapshots:
-            commit = snap["commit"][:10]
-            branch = snap["branch"][:12]
+            key = snap["key"][:10]
+            br = snap["branch"][:12]
             version = snap["version"][:10]
-            nodes = snap["metrics"]["nodes"]
-            edges = snap["metrics"]["edges"]
-            coverage = snap["metrics"]["coverage"]
-            click.echo(
-                f"{commit:<10} {branch:<12} {version:<10} {nodes:<6} {edges:<6} {coverage:>6.1%}"
-            )
+            nodes = snap["metrics"]["total_nodes"]
+            edges = snap["metrics"]["total_edges"]
+            coverage = snap["metrics"]["coverage_score"]
+            click.echo(f"{key:<10} {br:<12} {version:<10} {nodes:<6} {edges:<6} {coverage:>6.1%}")
 
 
 @snapshot.command("show")
-@click.argument("commit", metavar="COMMIT")
+@click.argument("key", metavar="KEY")
 @click.option(
     "--snapshots-dir",
     default=None,
     type=click.Path(exists=True),
     help="Snapshots directory (default: .dockg/snapshots).",
 )
-def show_snapshot(commit: str, snapshots_dir: str | None) -> None:
-    """Display full details for a single snapshot by commit hash."""
+def show_snapshot(key: str, snapshots_dir: str | None) -> None:
+    """Display full details for a single snapshot by tree hash key."""
     snapshots_path = (
         Path(snapshots_dir).resolve() if snapshots_dir else (Path.cwd() / ".dockg" / "snapshots")
     )
     mgr = SnapshotManager(snapshots_path)
-    snapshot_obj = mgr.load_snapshot(commit)
+    snapshot_obj = mgr.load_snapshot(key)
 
     if not snapshot_obj:
-        click.echo(f"Snapshot not found: {commit}", err=True)
+        click.echo(f"Snapshot not found: {key}", err=True)
         raise click.Abort()
 
-    click.echo(f"Commit:    {snapshot_obj.commit}")
+    click.echo(f"Key:       {snapshot_obj.key}")
     click.echo(f"Branch:    {snapshot_obj.branch}")
     click.echo(f"Timestamp: {snapshot_obj.timestamp}")
     click.echo(f"Version:   {snapshot_obj.version}")
@@ -233,24 +239,24 @@ def show_snapshot(commit: str, snapshots_dir: str | None) -> None:
     if snapshot_obj.vs_previous:
         delta = snapshot_obj.vs_previous
         click.echo("Delta vs. Previous:")
-        click.echo(f"  Nodes:       {delta.nodes:+d}")
-        click.echo(f"  Edges:       {delta.edges:+d}")
-        click.echo(f"  Coverage:    {delta.coverage_delta:+.1%}")
-        click.echo(f"  Issues:      {delta.issues_delta:+d}")
+        click.echo(f"  Nodes:    {delta.nodes:+d}")
+        click.echo(f"  Edges:    {delta.edges:+d}")
+        click.echo(f"  Coverage: {delta.coverage_delta:+.1%}")
+        click.echo(f"  Issues:   {delta.issues_delta:+d}")
         click.echo()
 
     if snapshot_obj.vs_baseline:
         delta = snapshot_obj.vs_baseline
         click.echo("Delta vs. Baseline:")
-        click.echo(f"  Nodes:       {delta.nodes:+d}")
-        click.echo(f"  Edges:       {delta.edges:+d}")
-        click.echo(f"  Coverage:    {delta.coverage_delta:+.1%}")
-        click.echo(f"  Issues:      {delta.issues_delta:+d}")
+        click.echo(f"  Nodes:    {delta.nodes:+d}")
+        click.echo(f"  Edges:    {delta.edges:+d}")
+        click.echo(f"  Coverage: {delta.coverage_delta:+.1%}")
+        click.echo(f"  Issues:   {delta.issues_delta:+d}")
 
 
 @snapshot.command("diff")
-@click.argument("commit_a", metavar="COMMIT_A")
-@click.argument("commit_b", metavar="COMMIT_B")
+@click.argument("key_a", metavar="KEY_A")
+@click.argument("key_b", metavar="KEY_B")
 @click.option(
     "--snapshots-dir",
     default=None,
@@ -263,15 +269,13 @@ def show_snapshot(commit: str, snapshots_dir: str | None) -> None:
     is_flag=True,
     help="Output as JSON.",
 )
-def diff_snapshots(
-    commit_a: str, commit_b: str, snapshots_dir: str | None, output_json: bool
-) -> None:
+def diff_snapshots(key_a: str, key_b: str, snapshots_dir: str | None, output_json: bool) -> None:
     """Compare two snapshots side-by-side."""
     snapshots_path = (
         Path(snapshots_dir).resolve() if snapshots_dir else (Path.cwd() / ".dockg" / "snapshots")
     )
     mgr = SnapshotManager(snapshots_path)
-    diff_result = mgr.diff_snapshots(commit_a, commit_b)
+    diff_result = mgr.diff_snapshots(key_a, key_b)
 
     if "error" in diff_result:
         click.echo(f"Error: {diff_result['error']}", err=True)
@@ -283,7 +287,7 @@ def diff_snapshots(
 
     a = diff_result["a"]
     b = diff_result["b"]
-    click.echo(f"Comparing {a['commit'][:10]} vs {b['commit'][:10]}")
+    click.echo(f"Comparing {a['key'][:10]} vs {b['key'][:10]}")
     click.echo()
     click.echo(f"{'Metric':<20} {'A':<12} {'B':<12} {'Delta':<12}")
     click.echo("-" * 56)
@@ -291,11 +295,11 @@ def diff_snapshots(
     metrics_a = a["metrics"]
     metrics_b = b["metrics"]
 
-    for key in ["total_nodes", "total_edges", "meaningful_nodes"]:
-        val_a = metrics_a[key]
-        val_b = metrics_b[key]
+    for field in ["total_nodes", "total_edges", "meaningful_nodes"]:
+        val_a = metrics_a[field]
+        val_b = metrics_b[field]
         delta_val = val_b - val_a
-        click.echo(f"{key:<20} {val_a:<12} {val_b:<12} {delta_val:+d}")
+        click.echo(f"{field:<20} {val_a:<12} {val_b:<12} {delta_val:+d}")
 
     cov_a = metrics_a["coverage_score"]
     cov_b = metrics_b["coverage_score"]

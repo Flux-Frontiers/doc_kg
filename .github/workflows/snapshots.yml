@@ -52,7 +52,7 @@ jobs:
         run: |
           poetry run dockg snapshot save "${{ steps.version.outputs.version }}" \
             --repo . \
-            --commit "${{ steps.version.outputs.tree_hash }}" \
+            --tree-hash "${{ steps.version.outputs.tree_hash }}" \
             --branch "${{ steps.version.outputs.branch }}"
 
       - name: Commit snapshot to repo

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - VS Code workspace file (`src/doc_kg/doc_kg.code-workspace`) for IDE integration
+- `analysis/doc_kg_analysis_20260314.md`: CodeKG architectural analysis report (2026-03-14)
+- `Snapshot.issues` field: list of issue-description strings now stored per snapshot
+- `Snapshot.key` property: stable alias for `tree_hash`, used as the file key throughout
+
+### Changed
+- `src/doc_kg/snapshots.py`: replaced `commit` field with `tree_hash` as the stable snapshot key
+  - `Snapshot.commit` removed; `Snapshot.tree_hash` is the new primary identifier
+  - `Snapshot.key` property returns `tree_hash` for use as file key and manifest lookup
+  - `SnapshotManager._get_current_commit()` renamed to `_get_current_tree_hash()`
+  - `capture()` accepts `tree_hash` kwarg (was `commit`); auto-detects via `git write-tree` if omitted
+  - `from_dict()` silently drops legacy `commit` field for backward-compatible loading
+  - `load_snapshot()` now backfills `vs_previous` from manifest ordering when absent in the JSON file
+  - Updated module docstring with full usage example and field-level inline comments
+- `src/doc_kg/cli/cmd_snapshot.py`: `--commit` CLI option renamed to `--tree-hash`; issues list forwarded to `capture()`
+- `.github/workflows/snapshots.yml`: updated `dockg snapshot save` invocation from `--commit` to `--tree-hash`
+- `tests/test_snapshots.py`: full test suite rewrite — all tests ported to `tree_hash`-based API, helper `_make_snapshot` replaced by `_make_dockg_snapshot`, added new tests for git helpers, `vs_previous` backfill, and `issues` field
 - `src/doc_kg/cli/group.py`: new module that houses the root Click group, extracted from `main.py` to eliminate circular imports between the entry-point and `cmd_*` submodules
 - `pylint ^4.0.5` dev dependency with full `[tool.pylint.*]` configuration in `pyproject.toml` (design/format/similarities/messages_control sections)
 - `code-kg` (git) dependency added to `pyproject.toml` for CodeKG integration
