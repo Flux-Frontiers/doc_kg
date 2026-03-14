@@ -50,9 +50,7 @@ def corpus_with_pyproject(tmp_path: Path) -> Path:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_notes.md").write_text("# Test Notes\n")
 
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.dockg]\nexclude = ["archive", "vendor"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.dockg]\nexclude = ["archive", "vendor"]\n')
     return tmp_path
 
 
@@ -93,9 +91,7 @@ def test_load_exclude_dirs_multiple_values(tmp_path: Path):
 
 
 def test_load_exclude_dirs_strips_trailing_slashes(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.dockg]\nexclude = ["archive/", "vendor/"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.dockg]\nexclude = ["archive/", "vendor/"]\n')
     result = load_exclude_dirs(tmp_path)
     assert result == {"archive", "vendor"}
 
@@ -197,8 +193,13 @@ def test_iter_text_files_skips_venv_even_without_explicit_exclude(tmp_path: Path
 
 def test_iter_text_files_skips_all_builtin_skip_dirs(tmp_path: Path):
     skip_dirs = [
-        ".git", "venv", "__pycache__", ".dockg",
-        ".mypy_cache", ".pytest_cache", "node_modules",
+        ".git",
+        "venv",
+        "__pycache__",
+        ".dockg",
+        ".mypy_cache",
+        ".pytest_cache",
+        "node_modules",
     ]
     for d in skip_dirs:
         (tmp_path / d).mkdir()
