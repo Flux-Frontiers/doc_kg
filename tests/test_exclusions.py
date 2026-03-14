@@ -9,7 +9,6 @@ import pytest
 from doc_kg.config import load_exclude_dirs
 from doc_kg.dockg import iter_text_files
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
