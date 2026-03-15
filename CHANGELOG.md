@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.4.0] - 2026-03-14
+
+### Added
 - VS Code workspace file (`src/doc_kg/doc_kg.code-workspace`) for IDE integration
 - `analysis/doc_kg_analysis_20260314.md`: CodeKG architectural analysis report (2026-03-14)
 - `Snapshot.issues` field: list of issue-description strings now stored per snapshot
@@ -28,8 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/doc_kg/cli/group.py`: new module that houses the root Click group, extracted from `main.py` to eliminate circular imports between the entry-point and `cmd_*` submodules
 - `pylint ^4.0.5` dev dependency with full `[tool.pylint.*]` configuration in `pyproject.toml` (design/format/similarities/messages_control sections)
 - `code-kg` (git) dependency added to `pyproject.toml` for CodeKG integration
-
-### Changed
 - All `cmd_*` CLI modules (`cmd_analyze`, `cmd_build`, `cmd_hooks`, `cmd_mcp`, `cmd_query`, `cmd_snapshot`, `cmd_viz`) now import `cli` from `doc_kg.cli.group` instead of `doc_kg.cli.main`, resolving circular import issues
 - `src/doc_kg/cli/main.py`: reduced to re-exporting `cli` from `group.py` and registering submodule imports
 - `src/doc_kg/cli/cmd_hooks.py`: Enhanced pre-commit hook with quality checks integration

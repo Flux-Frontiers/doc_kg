@@ -1,0 +1,126 @@
+{
+  "key": "07e2c5e71c02b0e3b84ecfd01d19105c49295acc",
+  "branch": "main",
+  "timestamp": "2026-03-15T00:20:04.106213+00:00",
+  "version": "v0.4.0",
+  "metrics": {
+    "total_nodes": 2592,
+    "total_edges": 2583,
+    "meaningful_nodes": 217,
+    "docstring_coverage": 0.76,
+    "node_counts": {
+      "class": 23,
+      "function": 65,
+      "method": 103,
+      "module": 26,
+      "symbol": 2375
+    },
+    "edge_counts": {
+      "ATTR_ACCESS": 777,
+      "CALLS": 881,
+      "CONTAINS": 191,
+      "IMPORTS": 179,
+      "INHERITS": 1,
+      "RESOLVES_TO": 554
+    },
+    "critical_issues": 3,
+    "complexity_median": 4,
+    "module_node_counts": {
+      "src/doc_kg/__init__.py": 3,
+      "src/doc_kg/__main__.py": 1,
+      "src/doc_kg/app.py": 148,
+      "src/doc_kg/chunker.py": 152,
+      "src/doc_kg/cli/__init__.py": 1,
+      "src/doc_kg/cli/cmd_analyze.py": 8,
+      "src/doc_kg/cli/cmd_build.py": 99,
+      "src/doc_kg/cli/cmd_hooks.py": 22,
+      "src/doc_kg/cli/cmd_mcp.py": 13,
+      "src/doc_kg/cli/cmd_query.py": 56,
+      "src/doc_kg/cli/cmd_snapshot.py": 134,
+      "src/doc_kg/cli/cmd_viz.py": 21,
+      "src/doc_kg/cli/group.py": 2,
+      "src/doc_kg/cli/main.py": 1,
+      "src/doc_kg/cli/options.py": 10,
+      "src/doc_kg/config.py": 16,
+      "src/doc_kg/dockg.py": 144,
+      "src/doc_kg/dockg_thorough_analysis.py": 170,
+      "src/doc_kg/graph.py": 67,
+      "src/doc_kg/index.py": 228,
+      "src/doc_kg/kg.py": 307,
+      "src/doc_kg/mcp_server.py": 73,
+      "src/doc_kg/relations.py": 46,
+      "src/doc_kg/snapshots.py": 216,
+      "src/doc_kg/store.py": 133,
+      "src/doc_kg/topics.py": 80
+    }
+  },
+  "hotspots": [
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.close",
+      "callers": 10,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/store.py:GraphStore.close",
+      "callers": 10,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/store.py:GraphStore.con",
+      "callers": 9,
+      "callees": 4,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.store",
+      "callers": 6,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:TextPack.to_dict",
+      "callers": 5,
+      "callees": 0,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/snapshots.py:SnapshotManager.load_manifest",
+      "callers": 5,
+      "callees": 5,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/mcp_server.py:_get_kg",
+      "callers": 4,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/snapshots.py:SnapshotManager.load_snapshot",
+      "callers": 4,
+      "callees": 15,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.index",
+      "callers": 4,
+      "callees": 2,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:TextPack.to_json",
+      "callers": 4,
+      "callees": 2,
+      "risk_level": "low"
+    }
+  ],
+  "issues": [
+    "[WARN] Moderate docstring coverage (76.0%) \u2014 semantic retrieval quality is degraded for undocumented nodes; BM25 is as effective as embeddings without docstrings",
+    "[WARN] 2 orphaned functions found (`main`, `_silent_init`) -- consider archiving or documenting",
+    "[WARN] 1 functions with high fan-out -- potential orchestrators or god objects"
+  ],
+  "vs_previous": null,
+  "vs_baseline": null
+}

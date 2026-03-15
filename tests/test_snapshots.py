@@ -208,9 +208,7 @@ def test_snapshot_with_deltas() -> None:
     assert restored.vs_previous.nodes == 10
 
 
-def test_snapshot_from_dict_drops_legacy_commit_field(
-    sample_metrics: SnapshotMetrics,
-) -> None:
+def test_snapshot_from_dict_drops_legacy_commit_field() -> None:
     """from_dict silently discards the legacy 'commit' field."""
     snap_dict = {
         "key": "newhash123",
@@ -343,7 +341,7 @@ def test_snapshot_manager_manifest_created(snapshot_dir: Path, sample_snapshot: 
     mgr.save_snapshot(sample_snapshot)
 
     assert mgr.manifest_path.exists()
-    with open(mgr.manifest_path) as f:
+    with open(mgr.manifest_path, encoding="utf-8") as f:
         manifest_data = json.load(f)
 
     assert manifest_data["format"] == "1.0"
@@ -359,7 +357,7 @@ def test_save_snapshot_manifest_has_full_metrics(
     mgr = SnapshotManager(snapshot_dir)
     mgr.save_snapshot(sample_snapshot)
 
-    with open(mgr.manifest_path) as f:
+    with open(mgr.manifest_path, encoding="utf-8") as f:
         manifest_data = json.load(f)
 
     metrics = manifest_data["snapshots"][0]["metrics"]
@@ -424,7 +422,7 @@ def test_save_snapshot_same_key_updates_manifest_entry(
     )
     mgr.save_snapshot(snap_v2)
 
-    with open(mgr.manifest_path) as f:
+    with open(mgr.manifest_path, encoding="utf-8") as f:
         manifest_data = json.load(f)
 
     assert len(manifest_data["snapshots"]) == 1
