@@ -27,6 +27,7 @@ from doc_kg.cli import (  # noqa: F401
     cmd_hooks,
     cmd_mcp,
     cmd_query,
+    cmd_semantic_analyze,
     cmd_snapshot,
     cmd_viz,
 )
