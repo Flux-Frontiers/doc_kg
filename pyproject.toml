@@ -71,6 +71,7 @@ dockg-viz      = "doc_kg.cli.cmd_viz:viz"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
