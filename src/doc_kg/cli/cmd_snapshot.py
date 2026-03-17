@@ -12,6 +12,7 @@ Click subcommands for managing temporal snapshots of DocKG metrics:
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -122,11 +123,12 @@ def save_snapshot(
 
     snapshot_file = mgr.save_snapshot(snapshot_obj)
     click.echo(f"Snapshot saved: {snapshot_file}")
-    click.echo(f"  Key:      {snapshot_obj.key}")
-    click.echo(f"  Version:  {snapshot_obj.version}")
-    click.echo(f"  Nodes:    {snapshot_obj.metrics.total_nodes}")
-    click.echo(f"  Edges:    {snapshot_obj.metrics.total_edges}")
-    click.echo(f"  Coverage: {snapshot_obj.metrics.coverage_score:.1%}")
+    click.echo(f"  Key:       {snapshot_obj.key}")
+    click.echo(f"  Timestamp: {snapshot_obj.timestamp}")
+    click.echo(f"  Version:   {snapshot_obj.version}")
+    click.echo(f"  Nodes:     {snapshot_obj.metrics.total_nodes}")
+    click.echo(f"  Edges:     {snapshot_obj.metrics.total_edges}")
+    click.echo(f"  Coverage:  {snapshot_obj.metrics.coverage_score:.1%}")
 
 
 @snapshot.command("list")
@@ -171,18 +173,29 @@ def list_snapshots(
     if output_json:
         click.echo(json.dumps(snapshots, indent=2))
     else:
-        click.echo(
-            f"{'Key':<10} {'Branch':<12} {'Version':<10} {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
+        header = (
+            f"{'Date':<12} {'Key':<10} {'Branch':<12}"
+            f" {'Version':<10} {'Nodes':<6} {'Edges':<6} {'Coverage':<9}"
         )
-        click.echo("-" * 65)
+        click.echo(header)
+        click.echo("-" * 79)
         for snap in snapshots:
+            ts = snap.get("timestamp", "")
+            try:
+                date = datetime.fromisoformat(ts).strftime("%Y-%m-%d")
+            except (ValueError, TypeError):
+                date = ts[:10] if ts else "unknown"
             key = snap["key"][:10]
             br = snap["branch"][:12]
             version = snap["version"][:10]
             nodes = snap["metrics"]["total_nodes"]
             edges = snap["metrics"]["total_edges"]
             coverage = snap["metrics"]["coverage_score"]
-            click.echo(f"{key:<10} {br:<12} {version:<10} {nodes:<6} {edges:<6} {coverage:>6.1%}")
+            row = (
+                f"{date:<12} {key:<10} {br:<12}"
+                f" {version:<10} {nodes:<6} {edges:<6} {coverage:>6.1%}"
+            )
+            click.echo(row)
 
 
 @snapshot.command("show")
@@ -287,7 +300,17 @@ def diff_snapshots(key_a: str, key_b: str, snapshots_dir: str | None, output_jso
 
     a = diff_result["a"]
     b = diff_result["b"]
-    click.echo(f"Comparing {a['key'][:10]} vs {b['key'][:10]}")
+
+    def _fmt_date(ts: str) -> str:
+        try:
+            return datetime.fromisoformat(ts).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            return ts[:10] if ts else "unknown"
+
+    click.echo(
+        f"Comparing {a['key'][:10]} ({_fmt_date(a.get('timestamp', ''))})"
+        f" vs {b['key'][:10]} ({_fmt_date(b.get('timestamp', ''))})"
+    )
     click.echo()
     click.echo(f"{'Metric':<20} {'A':<12} {'B':<12} {'Delta':<12}")
     click.echo("-" * 56)

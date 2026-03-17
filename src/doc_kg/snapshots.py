@@ -389,8 +389,20 @@ class SnapshotManager:
             return {"error": "One or both snapshots not found"}
 
         return {
-            "a": {"key": key_a, "metrics": asdict(snap_a.metrics)},
-            "b": {"key": key_b, "metrics": asdict(snap_b.metrics)},
+            "a": {
+                "key": key_a,
+                "branch": snap_a.branch,
+                "timestamp": snap_a.timestamp,
+                "version": snap_a.version,
+                "metrics": asdict(snap_a.metrics),
+            },
+            "b": {
+                "key": key_b,
+                "branch": snap_b.branch,
+                "timestamp": snap_b.timestamp,
+                "version": snap_b.version,
+                "metrics": asdict(snap_b.metrics),
+            },
             "delta": asdict(self._compute_delta(snap_b, snap_a)),
         }
 
