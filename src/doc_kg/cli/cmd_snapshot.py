@@ -31,7 +31,7 @@ def snapshot() -> None:
 
 
 @snapshot.command("save")
-@click.argument("version", metavar="VERSION")
+@click.argument("version", metavar="VERSION", default="", required=False)
 @click.option(
     "--repo",
     default=".",
@@ -59,7 +59,7 @@ def snapshot() -> None:
     help="Branch name; auto-detected if not provided.",
 )
 def save_snapshot(
-    version: str,
+    version: str | None,
     repo: str,
     sqlite: str,
     snapshots_dir: str | None,

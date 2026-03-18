@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.4.1] - 2026-03-18
+
+### Added
+- `snapshots.py`: `_package_version()` helper that auto-detects the installed `doc-kg` version via `importlib.metadata`
+
+### Changed
+- `snapshots.py`: `Snapshot.version` field is now optional (default `""`); auto-populated from the installed package when not explicitly supplied
+- `snapshots.py`: `SnapshotManager.capture()` `version` parameter is now optional (`None` by default); falls back to `_package_version()` when omitted
+- `snapshots.py`: `Snapshot.from_dict()` now calls `data.setdefault("version", "")` for backward-compatible loading of snapshots that predate the optional field
+- `cli/cmd_snapshot.py`: `VERSION` CLI argument for `dockg snapshot save` is now optional (default `""`)
+- `cli/cmd_hooks.py`: pre-commit hook no longer reads version from `pyproject.toml`; calls `dockg snapshot save` without a version argument, relying on auto-detection
+- `cli/cmd_hooks.py`: skip env var renamed from `DOCKG_SKIP_SNAPSHOT` to `CODEKG_SKIP_SNAPSHOT` for consistency with CodeKG convention
+- `pyproject.toml`: `code-kg` (git) dependency moved from `main` to `dev` group; `ftree-kg` (git) dev dependency added
+
 ## [0.4.0] - 2026-03-14
 
 ### Added

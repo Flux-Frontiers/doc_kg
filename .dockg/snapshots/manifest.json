@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-03-17T04:36:54.635300+00:00",
+  "last_update": "2026-03-18T22:48:05.120241+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -161,6 +161,48 @@
           "nodes": -166,
           "edges": -1295,
           "coverage_delta": -0.0082683070380285,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "1bb9dda240639320f423921787d3a6c20c54fefd",
+      "branch": "main",
+      "timestamp": "2026-03-18T22:48:05.119465+00:00",
+      "version": "0.4.1",
+      "file": "1bb9dda240639320f423921787d3a6c20c54fefd.json",
+      "metrics": {
+        "total_nodes": 1802,
+        "total_edges": 10430,
+        "meaningful_nodes": 1785,
+        "coverage_score": 0.8769513314967861,
+        "node_counts": {
+          "chunk": 363,
+          "document": 17,
+          "entity": 430,
+          "keyword": 431,
+          "section": 302,
+          "topic": 259
+        },
+        "edge_counts": {
+          "CONTAINS": 665,
+          "CO_OCCURS_WITH": 6786,
+          "HAS_KEYWORD": 1306,
+          "HAS_TOPIC": 363,
+          "MENTIONS_ENTITY": 1144,
+          "NEXT": 51,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 106
+        },
+        "issues_count": 0,
+        "complexity_median": 15.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": -165,
+          "edges": -1259,
+          "coverage_delta": -0.00792839358912456,
           "issues_delta": 0
         }
       }

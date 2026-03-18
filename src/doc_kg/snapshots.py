@@ -25,12 +25,21 @@ Usage
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+
+def _package_version() -> str:
+    """Return the installed doc-kg package version, or 'unknown'."""
+    try:
+        return importlib.metadata.version("doc-kg")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 
 @dataclass
@@ -63,8 +72,8 @@ class Snapshot:
 
     branch: str  # git branch name
     timestamp: str  # ISO 8601 UTC
-    version: str  # e.g., "0.3.0"
     metrics: SnapshotMetrics
+    version: str = ""  # e.g., "0.3.0"; auto-detected from package if not supplied
     hotspots: list[dict[str, Any]] = field(default_factory=list)  # top hot chunks
     issues: list[str] = field(default_factory=list)  # issue description strings
     vs_previous: SnapshotDelta | None = None
@@ -104,6 +113,7 @@ class Snapshot:
 
         key = data.pop("key", "")
         data.pop("commit", None)  # drop legacy commit field
+        data.setdefault("version", "")
 
         return Snapshot(
             tree_hash=key,
@@ -150,7 +160,7 @@ class SnapshotManager:
 
     def capture(
         self,
-        version: str,
+        version: str | None = None,
         branch: str | None = None,
         graph_stats_dict: dict[str, Any] | None = None,
         coverage_score: float = 0.0,
@@ -173,6 +183,8 @@ class SnapshotManager:
         :param tree_hash: Git tree hash; auto-detected if not provided.
         :return: New Snapshot instance.
         """
+        if not version:
+            version = _package_version()
         if branch is None:
             branch = self._get_current_branch()
         if not tree_hash:

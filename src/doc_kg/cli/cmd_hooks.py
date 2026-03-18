@@ -27,10 +27,10 @@ _PRE_COMMIT_HOOK = """\
 #!/usr/bin/env bash
 # DocKG pre-commit hook — runs quality checks, rebuilds the index, captures snapshot.
 # Installed by: dockg install-hooks
-# Skip with: DOCKG_SKIP_SNAPSHOT=1 git commit ...
+# Skip with: CODEKG_SKIP_SNAPSHOT=1 git commit ...
 set -euo pipefail
 
-[ "${DOCKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
+[ "${CODEKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
@@ -45,14 +45,14 @@ fi
 
 cd "$REPO_ROOT"
 
-VERSION=$(grep '^version' pyproject.toml 2>/dev/null | head -1 | cut -d'"' -f2)
 TREE_HASH=$(git write-tree)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Rebuild local DocKG index to keep it in sync
 "$REPO_ROOT/.venv/bin/dockg" build --wipe || exit 1
 
-"$REPO_ROOT/.venv/bin/dockg" snapshot save "${VERSION:-unknown}" \\
+# Snapshot DocKG (version auto-detected from installed package)
+"$REPO_ROOT/.venv/bin/dockg" snapshot save \\
     --repo . \\
     --tree-hash "$TREE_HASH" \\
     --branch "$BRANCH" \\
@@ -80,9 +80,13 @@ exit 0
 def install_hooks(repo: str, force: bool) -> None:
     """Install the DocKG pre-commit git hook.
 
-    After installation, a metrics snapshot is captured automatically before
-    each commit, keyed by the commit hash. The snapshot file is staged
-    and included in the commit atomically.
+    After installation, before each commit:
+      1. Runs pre-commit framework checks (ruff, mypy, detect-secrets)
+      2. Rebuilds local DocKG index (--wipe)
+      3. Captures a metrics snapshot (version auto-detected from installed package)
+      4. Stages .dockg/snapshots/ atomically
+
+    Skip with: CODEKG_SKIP_SNAPSHOT=1 git commit ...
 
     Example:
         dockg install-hooks --repo .
