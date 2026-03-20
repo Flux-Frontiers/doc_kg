@@ -25,40 +25,44 @@ from doc_kg.cli.group import cli
 
 _PRE_COMMIT_HOOK = """\
 #!/usr/bin/env bash
-# DocKG pre-commit hook — runs quality checks, rebuilds the index, captures snapshot.
+# DocKG pre-commit hook — keeps local index in sync and captures metrics
+# snapshots BEFORE quality checks run.
 # Installed by: dockg install-hooks
-# Skip with: CODEKG_SKIP_SNAPSHOT=1 git commit ...
+# Skip with: DOCKG_SKIP_SNAPSHOT=1 git commit ...
 set -euo pipefail
 
-[ "${CODEKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
+[ "${DOCKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-# Run pre-commit framework checks (ruff, mypy, detect-secrets, etc.)
-# Delegates to .pre-commit-config.yaml so quality checks stay in one place.
+cd "$REPO_ROOT"
+
+# Capture the tree hash of the staged index NOW — before any tool modifies files.
+TREE_HASH=$(git write-tree)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Rebuild local DocKG index to keep it in sync with staged content.
+"$REPO_ROOT/.venv/bin/dockg" build --wipe || exit 1
+
+# Snapshot DocKG (version auto-detected from installed package).
+"$REPO_ROOT/.venv/bin/dockg" snapshot save \\
+    --repo . \\
+    --tree-hash "$TREE_HASH" \\
+    --branch "$BRANCH" \\
+  || { echo "[dockg] snapshot skipped (run 'dockg build' to initialize)" >&2; }
+
+# Stage snapshot directory so it is included in the commit.
+git add .dockg/snapshots/ 2>/dev/null || true
+
+# Run pre-commit framework checks (ruff, mypy, detect-secrets, etc.) AFTER
+# snapshots are captured and staged. Delegates to .pre-commit-config.yaml so
+# quality checks stay in one place.
 PRECOMMIT="$REPO_ROOT/.venv/bin/pre-commit"
 if [ -x "$PRECOMMIT" ]; then
     "$PRECOMMIT" run || exit 1
 elif command -v pre-commit &>/dev/null; then
     pre-commit run || exit 1
 fi
-
-cd "$REPO_ROOT"
-
-TREE_HASH=$(git write-tree)
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-# Rebuild local DocKG index to keep it in sync
-"$REPO_ROOT/.venv/bin/dockg" build --wipe || exit 1
-
-# Snapshot DocKG (version auto-detected from installed package)
-"$REPO_ROOT/.venv/bin/dockg" snapshot save \\
-    --repo . \\
-    --tree-hash "$TREE_HASH" \\
-    --branch "$BRANCH" \\
-  || { echo "[dockg] snapshot skipped (run 'dockg build' to initialize)" >&2; exit 0; }
-
-git add .dockg/snapshots/ 2>/dev/null || true
 
 exit 0
 """
@@ -86,7 +90,7 @@ def install_hooks(repo: str, force: bool) -> None:
       3. Captures a metrics snapshot (version auto-detected from installed package)
       4. Stages .dockg/snapshots/ atomically
 
-    Skip with: CODEKG_SKIP_SNAPSHOT=1 git commit ...
+    Skip with: DOCKG_SKIP_SNAPSHOT=1 git commit ...
 
     Example:
         dockg install-hooks --repo .

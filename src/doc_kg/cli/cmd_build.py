@@ -15,11 +15,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
+from rich.console import Console
+from rich.rule import Rule
 
 from doc_kg.cli.group import cli
 from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
 from doc_kg.config import load_exclude_dirs
 from doc_kg.kg import DocKG
+
+_console = Console()
 
 
 @cli.command("build")
@@ -174,35 +178,50 @@ def build(
     if extensions:
         kg.graph.extensions = extensions
 
-    click.echo(f"Building DocKG from: {repo}")
-    click.echo(f"  model    : {model}")
-    click.echo(f"  sqlite   : {sqlite}")
-    click.echo(f"  lancedb  : {lancedb}")
-    click.echo(f"  ext      : {', '.join(sorted(extensions))}")
-    click.echo(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
-    click.echo(f"  topics   : {'on' if enable_topics else 'off'}")
-    click.echo(f"  entities : {'on' if enable_entities else 'off'}")
-    click.echo(f"  keywords : {'on' if enable_keywords else 'off'}")
+    features = (
+        "  ".join(
+            f
+            for f, on in [
+                ("topics", enable_topics),
+                ("entities", enable_entities),
+                ("keywords", enable_keywords),
+            ]
+            if on
+        )
+        or "(none)"
+    )
+
+    _console.print(Rule(f"DocKG build — {Path(repo).name}", style="bold blue"))
+    _console.print(f"  corpus   : {repo}")
+    _console.print(f"  model    : {model}")
+    _console.print(f"  sqlite   : {sqlite}")
+    _console.print(f"  lancedb  : {lancedb}")
+    _console.print(f"  ext      : {', '.join(sorted(extensions))}")
+    _console.print(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
+    _console.print(f"  features : {features}")
 
     # Step 1: Parse corpus → SQLite
-    click.echo("\n[1/2] Parsing corpus → SQLite …")
+    _console.print("\n[bold][1/2][/bold] Parsing corpus \u2192 SQLite \u2026")
     graph_stats = kg.build_graph(wipe=wipe)
-    click.echo(f"      nodes: {graph_stats.total_nodes}  {graph_stats.node_counts}")
-    click.echo(f"      edges: {graph_stats.total_edges}  {graph_stats.edge_counts}")
+    for kind, count in sorted(graph_stats.node_counts.items()):
+        _console.print(f"  {kind:<12} {count:>6}")
+    _console.print(f"  {'─' * 19}")
+    _console.print(f"  {'nodes':<12} {graph_stats.total_nodes:>6}  edges {graph_stats.total_edges}")
 
     # Step 2: SQLite → LanceDB + SIMILAR_TO
-    click.echo("\n[2/2] Embedding nodes → LanceDB …")
-    # Pass discover_similar flag through index.build()
+    _console.print("\n[bold][2/2][/bold] Embedding nodes \u2192 LanceDB \u2026")
     idx_stats = kg.index.build(
         kg.store,
         wipe=wipe,
         discover_similar=not no_similar,
+        quiet=False,
     )
-    click.echo(f"      indexed: {idx_stats['indexed_rows']} vectors  dim={idx_stats['dim']}")
+    _console.print(f"  model    : {idx_stats['model_name']}  dim={idx_stats['dim']}")
+    _console.print(f"  indexed  : {idx_stats['indexed_rows']} vectors")
     if not no_similar:
-        click.echo(f"      SIMILAR_TO edges: {idx_stats.get('similar_edges_added', 0)}")
+        _console.print(f"  SIMILAR_TO: {idx_stats.get('similar_edges_added', 0)} edges")
 
-    click.echo("\nOK: DocKG build complete.")
+    _console.print("\n[green]Build complete.[/green]")
     kg.close()
 
 
@@ -339,14 +358,18 @@ def build_graph(
     if extensions:
         kg.graph.extensions = extensions
 
-    click.echo(f"Building DocKG graph from: {repo}")
-    click.echo(f"  sqlite   : {sqlite}")
-    click.echo(f"  model    : {model}")
-    click.echo(f"  ext      : {', '.join(sorted(extensions))}")
-    click.echo(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
+    _console.print(Rule(f"DocKG build-graph — {Path(repo).name}", style="bold blue"))
+    _console.print(f"  corpus  : {repo}")
+    _console.print(f"  sqlite  : {sqlite}")
+    _console.print(f"  ext     : {', '.join(sorted(extensions))}")
+    _console.print(f"  exclude : {', '.join(sorted(exclude)) if exclude else '(none)'}")
 
     stats = kg.build_graph(wipe=wipe)
-    click.echo(f"OK: nodes={stats.total_nodes} edges={stats.total_edges} db={sqlite}")
+    for kind, count in sorted(stats.node_counts.items()):
+        _console.print(f"  {kind:<12} {count:>6}")
+    _console.print(f"  {'─' * 19}")
+    _console.print(f"  {'nodes':<12} {stats.total_nodes:>6}  edges {stats.total_edges}")
+    _console.print("\n[green]Build complete.[/green]")
     kg.close()
 
 
@@ -399,24 +422,22 @@ def build_index(
         table=table,
     )
 
-    click.echo(f"Building DocKG index from SQLite: {sqlite}")
-    click.echo(f"  lancedb  : {lancedb}")
-    click.echo(f"  model    : {model}")
-    click.echo(f"  table    : {table}")
+    _console.print(Rule(f"DocKG build-index — {Path(sqlite).name}", style="bold blue"))
+    _console.print(f"  sqlite  : {sqlite}")
+    _console.print(f"  lancedb : {lancedb}")
+    _console.print(f"  table   : {table}")
 
+    _console.print("\nEmbedding nodes \u2192 LanceDB \u2026")
     idx_stats = kg.index.build(
         kg.store,
         wipe=wipe,
         batch_size=batch,
         discover_similar=not no_similar,
+        quiet=False,
     )
-    click.echo(
-        "OK: "
-        f"indexed_rows={idx_stats['indexed_rows']} "
-        f"dim={idx_stats['dim']} "
-        f"table={idx_stats['table']} "
-        f"lancedb_dir={idx_stats['lancedb_dir']}"
-    )
+    _console.print(f"  model    : {idx_stats['model_name']}  dim={idx_stats['dim']}")
+    _console.print(f"  indexed  : {idx_stats['indexed_rows']} vectors")
     if not no_similar:
-        click.echo(f"SIMILAR_TO edges: {idx_stats.get('similar_edges_added', 0)}")
+        _console.print(f"  SIMILAR_TO: {idx_stats.get('similar_edges_added', 0)} edges")
+    _console.print("\n[green]Build complete.[/green]")
     kg.close()

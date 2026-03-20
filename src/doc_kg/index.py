@@ -23,6 +23,7 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -286,32 +287,54 @@ class SemanticIndex:
         all_ids: list[str] = []
         all_vecs: list[list[float]] = []
 
-        for i in range(0, len(nodes), batch_size):
-            chunk = nodes[i : i + batch_size]
-            texts = [_build_index_text(n) for n in chunk]
-            vecs = self.embedder.embed_texts(texts)
+        if not quiet:
+            from rich.progress import (  # pylint: disable=import-outside-toplevel
+                BarColumn,
+                MofNCompleteColumn,
+                Progress,
+                TimeElapsedColumn,
+            )
 
-            ids = [n["id"] for n in chunk]
-            if ids:
-                pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
-                tbl.delete(pred)
+            _progress_ctx: contextlib.AbstractContextManager = Progress(
+                "[progress.description]{task.description}",
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                transient=True,
+            )
+        else:
+            _progress_ctx = contextlib.nullcontext()
 
-            rows = [
-                {
-                    "id": n["id"],
-                    "kind": n["kind"],
-                    "name": n["name"],
-                    "title": n.get("title") or "",
-                    "file_path": n.get("file_path") or "",
-                    "text": text,
-                    "vector": vec,
-                }
-                for n, text, vec in zip(chunk, texts, vecs)
-            ]
-            tbl.add(rows)
-            indexed += len(rows)
-            all_ids.extend(ids)
-            all_vecs.extend(vecs)
+        with _progress_ctx as prog:
+            task_id = prog.add_task("  Embedding", total=len(nodes)) if prog is not None else None
+            for i in range(0, len(nodes), batch_size):
+                chunk = nodes[i : i + batch_size]
+                texts = [_build_index_text(n) for n in chunk]
+                vecs = self.embedder.embed_texts(texts)
+
+                ids = [n["id"] for n in chunk]
+                if ids:
+                    pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
+                    tbl.delete(pred)
+
+                rows = [
+                    {
+                        "id": n["id"],
+                        "kind": n["kind"],
+                        "name": n["name"],
+                        "title": n.get("title") or "",
+                        "file_path": n.get("file_path") or "",
+                        "text": text,
+                        "vector": vec,
+                    }
+                    for n, text, vec in zip(chunk, texts, vecs)
+                ]
+                tbl.add(rows)
+                indexed += len(rows)
+                all_ids.extend(ids)
+                all_vecs.extend(vecs)
+                if task_id is not None:
+                    prog.advance(task_id, len(rows))
 
         self._tbl = tbl
 
@@ -330,6 +353,7 @@ class SemanticIndex:
         return {
             "indexed_rows": indexed,
             "dim": self.embedder.dim,
+            "model_name": getattr(self.embedder, "model_name", repr(self.embedder)),
             "table": self.table_name,
             "lancedb_dir": str(self.lancedb_dir),
             "kinds": list(self.index_kinds),
