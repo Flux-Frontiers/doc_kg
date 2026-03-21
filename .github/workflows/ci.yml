@@ -1,10 +1,9 @@
 name: CI
 
+# Disabled: kgrag dependency is a private git repo not accessible in CI.
+# Re-enable once kgrag is published to PyPI.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   lint:
