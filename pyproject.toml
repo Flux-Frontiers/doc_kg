@@ -40,6 +40,7 @@ click = ">=8.1.0"
 pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
+einops = "^0.8.2"
 
 
 [tool.poetry.extras]
@@ -119,4 +120,5 @@ disable = [
     "protected-access",
     "global-statement",
     "broad-exception-caught",
+    "no-member",
 ]

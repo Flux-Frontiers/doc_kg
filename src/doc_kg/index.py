@@ -138,18 +138,34 @@ class SentenceTransformerEmbedder(Embedder):
     """
 
     def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
+        import os  # pylint: disable=import-outside-toplevel
+
         from sentence_transformers import (  # pylint: disable=import-outside-toplevel
             SentenceTransformer,
         )
+        from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
+        hf_logging.set_verbosity_error()
+
+        trust_remote = "nomic-ai/" in model_name
         local_path = _local_model_path(model_name)
-        if local_path.exists():
-            self.model = SentenceTransformer(str(local_path))
-        else:
-            try:
-                self.model = SentenceTransformer(model_name, local_files_only=True)
-            except OSError:
-                self.model = SentenceTransformer(model_name)
+        _prev_tqdm = os.environ.get("TQDM_DISABLE")
+        os.environ["TQDM_DISABLE"] = "1"
+        try:
+            if local_path.exists():
+                self.model = SentenceTransformer(str(local_path), trust_remote_code=trust_remote)
+            else:
+                try:
+                    self.model = SentenceTransformer(
+                        model_name, local_files_only=True, trust_remote_code=trust_remote
+                    )
+                except OSError:
+                    self.model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
+        finally:
+            if _prev_tqdm is None:
+                os.environ.pop("TQDM_DISABLE", None)
+            else:
+                os.environ["TQDM_DISABLE"] = _prev_tqdm
         self.model_name = model_name
         self.dim: int = self.model.get_sentence_embedding_dimension() or 384
 

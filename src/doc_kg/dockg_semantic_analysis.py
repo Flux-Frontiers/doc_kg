@@ -19,7 +19,7 @@ import datetime
 import json
 import re
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
@@ -254,9 +254,7 @@ class DocKGSemanticAnalyzer:
         self.global_keywords = [
             (r[0], r[1])
             for r in rows
-            if len(r[0]) > 1
-            and not r[0].isdigit()
-            and r[0].lower() not in _STOP
+            if len(r[0]) > 1 and not r[0].isdigit() and r[0].lower() not in _STOP
         ]
 
     def _analyze_language(self) -> None:
@@ -348,7 +346,8 @@ class DocKGSemanticAnalyzer:
 
         for r in self.store.con.execute(
             """
-            SELECT file_path, COUNT(*), SUM(LENGTH(COALESCE(text,'')) - LENGTH(REPLACE(COALESCE(text,''), ' ', '')) + 1)
+            SELECT file_path, COUNT(*),
+                   SUM(LENGTH(COALESCE(text,'')) - LENGTH(REPLACE(COALESCE(text,''), ' ', '')) + 1)
             FROM nodes WHERE kind='chunk' AND file_path IS NOT NULL
             GROUP BY file_path
             """
@@ -665,7 +664,9 @@ def _print_summary(console: Console, result: dict) -> None:
 
     top_entities = [e["name"] for e in result.get("global_entities", [])[:5]]
     table.add_row("Top entities", ", ".join(top_entities))
-    readable = [t["name"] for t in result.get("global_themes", []) if not _ID_PATTERN.match(t["name"])][:5]
+    readable = [
+        t["name"] for t in result.get("global_themes", []) if not _ID_PATTERN.match(t["name"])
+    ][:5]
     table.add_row("Top themes", ", ".join(readable))
 
     console.print(table)

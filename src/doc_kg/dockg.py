@@ -55,7 +55,7 @@ from doc_kg.topics import TopicExtractor
 #: Default sentence-transformer model for general text (not code).
 #: Mirrors personal_agent's sentence-transformer default.
 #: Override via the ``DOCKG_MODEL`` environment variable.
-DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "all-mpnet-base-v2")
+DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "nomic-ai/nomic-embed-text-v1")
 
 # ============================================================================
 # Graph primitives (LOCKED v0 CONTRACT)

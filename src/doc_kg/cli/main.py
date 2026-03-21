@@ -5,14 +5,15 @@ DocKG CLI entry point.
 
 Usage::
 
-    dockg build       [OPTIONS] [CORPUS_ROOT]
-    dockg build-graph [OPTIONS] [CORPUS_ROOT]
-    dockg build-index [OPTIONS] [CORPUS_ROOT]
-    dockg query       [OPTIONS] QUERY
-    dockg pack        [OPTIONS] QUERY
-    dockg analyze     [OPTIONS] [CORPUS_ROOT]
-    dockg snapshot    [COMMAND]
-    dockg viz         [OPTIONS]
+    dockg build          [OPTIONS] [CORPUS_ROOT]
+    dockg build-graph    [OPTIONS] [CORPUS_ROOT]
+    dockg build-index    [OPTIONS] [CORPUS_ROOT]
+    dockg query          [OPTIONS] QUERY
+    dockg pack           [OPTIONS] QUERY
+    dockg analyze        [OPTIONS] [CORPUS_ROOT]
+    dockg download-model [OPTIONS]
+    dockg snapshot       [COMMAND]
+    dockg viz            [OPTIONS]
 
 Author: Eric G. Suchanek, PhD
 """
@@ -26,6 +27,7 @@ from doc_kg.cli import (  # noqa: F401
     cmd_build,
     cmd_hooks,
     cmd_mcp,
+    cmd_model,
     cmd_query,
     cmd_semantic_analyze,
     cmd_snapshot,

@@ -270,7 +270,7 @@ class SnapshotManager(_BaseSnapshotManager):
     # capture — backwards-compat wrapper
     # ------------------------------------------------------------------
 
-    def capture(
+    def capture(  # pylint: disable=arguments-renamed,arguments-differ
         self,
         version: str | None = None,
         branch: str | None = None,

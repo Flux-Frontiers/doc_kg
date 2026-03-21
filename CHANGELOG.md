@@ -11,15 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/generate_wiki.py`: Script to generate and publish GitHub wiki pages from `docs/` markdown files
 - `pyproject.toml`: `kg-rag` git dependency added to `dev` group
 - `poetry.toml`: `in-project = true` Poetry virtualenv configuration
+- `src/doc_kg/__init__.py`: Package-level `__init__` exporting `DocKG` for cleaner imports
+- `cli/cmd_model.py`: `dockg download-model` command to download and cache embedding models for offline use; supports `--force` re-download and `trust_remote_code` for `nomic-ai/*` models
+- `pyproject.toml`: `einops` dependency added (required by `nomic-embed-text-v1`)
+- `generate_wiki.py`: Wiki generation script added to project root
+- `analysis/doc_kg_analysis_20260320.md`: DocKG architectural analysis report (2026-03-20)
 
 ### Changed
 - `cli/cmd_build.py`: Build output redesigned with Rich — section `Rule` headers, per-kind node counts (no raw Python dict dumps), features listed inline; embedder model name and dimension shown in summary; all three build commands (`build`, `build-graph`, `build-index`) updated consistently
 - `index.py`: `SemanticIndex.build()` now shows a Rich progress bar (transient, with count and elapsed time) during batch embedding when `quiet=False`; `build()` stats dict now includes `model_name`
 - `cli/cmd_hooks.py`: Pre-commit hook reordered — snapshot capture now runs *before* quality checks so the tree hash reflects staged content; snapshot failure is now non-fatal (warning only, does not abort commit); skip env var renamed from `CODEKG_SKIP_SNAPSHOT` to `DOCKG_SKIP_SNAPSHOT`
-
-### Removed
+- `cli/main.py`: Registered `cmd_model` subcommand; updated usage docstring with `download-model`
+- `index.py`: `SentenceTransformerEmbedder.__init__` now suppresses HF logging via `hf_logging.set_verbosity_error()`, wraps model load with `TQDM_DISABLE=1`, and passes `trust_remote_code=True` for `nomic-ai/*` models
+- `analysis/CodeKG_Agent_instructions.md` renamed to `analysis/DocKG_Agent_instructions.md`
 
 ### Fixed
+- `dockg.py`: Changed `DEFAULT_MODEL` from `all-mpnet-base-v2` to `nomic-ai/nomic-embed-text-v1`; fixed the HuggingFace 404 error caused by the nonexistent `sentence-transformers/nomic-embed-text` model ID
 
 ## [0.4.1] - 2026-03-18
 
