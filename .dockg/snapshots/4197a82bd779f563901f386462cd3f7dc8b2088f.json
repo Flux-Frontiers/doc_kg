@@ -1,0 +1,123 @@
+{
+  "key": "4197a82bd779f563901f386462cd3f7dc8b2088f",
+  "branch": "main",
+  "timestamp": "2026-03-23T01:45:59.352210+00:00",
+  "version": "0.4.1",
+  "metrics": {
+    "db_path": ".dockg/graph.sqlite",
+    "total_nodes": 1836,
+    "total_edges": 11414,
+    "node_counts": {
+      "chunk": 373,
+      "document": 18,
+      "entity": 439,
+      "keyword": 435,
+      "section": 308,
+      "topic": 263
+    },
+    "edge_counts": {
+      "CONTAINS": 681,
+      "CO_OCCURS_WITH": 6914,
+      "HAS_KEYWORD": 1343,
+      "HAS_TOPIC": 373,
+      "MENTIONS_ENTITY": 1188,
+      "NEXT": 52,
+      "REFERENCES": 9,
+      "SIMILAR_TO": 854
+    },
+    "meaningful_nodes": 1818,
+    "coverage_score": 0.8802502234137624,
+    "issues_count": 0,
+    "complexity_median": 18.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:README.md:0004",
+      "file_path": "README.md",
+      "label": "Features",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 19
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0004",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Core Features",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 19
+    },
+    {
+      "id": "chunk:docs/SNAPSHOTS.md:0043",
+      "file_path": "docs/SNAPSHOTS.md",
+      "label": "Best Practices",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 19
+    },
+    {
+      "id": "chunk:docs/deployment.md:0030",
+      "file_path": "docs/deployment.md",
+      "label": "Agent configuration quick reference",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 19
+    },
+    {
+      "id": "chunk:CHANGELOG.md:0008",
+      "file_path": "CHANGELOG.md",
+      "label": "Added",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:README.md:0046",
+      "file_path": "README.md",
+      "label": "CLI Reference",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0002",
+      "file_path": "announcements/GITHUB.md",
+      "label": "What is CodeKG?",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0003",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Key Principles",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0027",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Repository",
+      "references": 0,
+      "semantic_links": 18,
+      "total_links": 18
+    },
+    {
+      "id": "chunk:announcements/GITHUB.md:0026",
+      "file_path": "announcements/GITHUB.md",
+      "label": "Documentation",
+      "references": 4,
+      "semantic_links": 17,
+      "total_links": 21
+    }
+  ],
+  "issues": [],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": -131,
+    "edges": -275,
+    "coverage_delta": -0.004629501672148262,
+    "issues_delta": 0
+  }
+}
