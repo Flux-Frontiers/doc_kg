@@ -63,12 +63,15 @@ def query(
     max_nodes: int,
 ) -> None:
     """Run a hybrid semantic + graph query and print a ranked result summary."""
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
 
     kg = DocKG(
-        corpus_root=Path(repo),
-        db_path=Path(sqlite),
-        lancedb_dir=Path(lancedb),
+        corpus_root=repo_root,
+        db_path=db_path,
+        lancedb_dir=lancedb_dir,
         model=model,
         table=table,
     )
@@ -146,12 +149,15 @@ def pack(
     fmt: str,
 ) -> None:
     """Run a hybrid query and emit text excerpt packs."""
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
 
     kg = DocKG(
-        corpus_root=Path(repo),
-        db_path=Path(sqlite),
-        lancedb_dir=Path(lancedb),
+        corpus_root=repo_root,
+        db_path=db_path,
+        lancedb_dir=lancedb_dir,
         model=model,
         table=table,
     )

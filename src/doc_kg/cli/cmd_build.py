@@ -108,7 +108,12 @@ _console = Console()
     default=False,
     help="Skip SIMILAR_TO edge discovery after indexing.",
 )
-@click.option("--wipe", is_flag=True, default=False, help="Wipe existing data before building.")
+@click.option(
+    "--update",
+    is_flag=True,
+    default=False,
+    help="Incremental update — keep existing data instead of wiping.",
+)
 @click.option(
     "--ext",
     multiple=True,
@@ -142,7 +147,7 @@ def build(
     topic_threshold: float,
     topics_file: str | None,
     no_similar: bool,
-    wipe: bool,
+    update: bool,
     ext: tuple[str, ...],
     exclude_dir: tuple[str, ...],
 ) -> None:
@@ -152,14 +157,18 @@ def build(
     and semantic graph, persists it to SQLite, and indexes it in LanceDB.
     Also discovers SIMILAR_TO edges between semantically related chunks.
     """
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
+    wipe = not update
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
-    exclude = load_exclude_dirs(repo) | set(exclude_dir)
+    exclude = load_exclude_dirs(repo_root) | set(exclude_dir)
 
     kg = DocKG(
-        corpus_root=Path(repo),
+        corpus_root=repo_root,
         exclude=exclude or None,
-        db_path=Path(sqlite),
-        lancedb_dir=Path(lancedb),
+        db_path=db_path,
+        lancedb_dir=lancedb_dir,
         model=model,
         table=table,
         chunk_size=chunk_size,
@@ -191,11 +200,11 @@ def build(
         or "(none)"
     )
 
-    _console.print(Rule(f"DocKG build — {Path(repo).name}", style="bold blue"))
-    _console.print(f"  corpus   : {repo}")
+    _console.print(Rule(f"DocKG build — {repo_root.name}", style="bold blue"))
+    _console.print(f"  corpus   : {repo_root}")
     _console.print(f"  model    : {model}")
-    _console.print(f"  sqlite   : {sqlite}")
-    _console.print(f"  lancedb  : {lancedb}")
+    _console.print(f"  sqlite   : {db_path}")
+    _console.print(f"  lancedb  : {lancedb_dir}")
     _console.print(f"  ext      : {', '.join(sorted(extensions))}")
     _console.print(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
     _console.print(f"  features : {features}")
@@ -295,10 +304,10 @@ def build(
     help="Optional JSON/YAML topic catalog file.",
 )
 @click.option(
-    "--wipe",
+    "--update",
     is_flag=True,
     default=False,
-    help="Wipe existing SQLite graph before building.",
+    help="Incremental update — keep existing SQLite graph instead of wiping.",
 )
 @click.option(
     "--ext",
@@ -330,17 +339,20 @@ def build_graph(
     cooccur_window: int,
     topic_threshold: float,
     topics_file: str | None,
-    wipe: bool,
+    update: bool,
     ext: tuple[str, ...],
     exclude_dir: tuple[str, ...],
 ) -> None:
     """Build only the SQLite graph from a corpus directory."""
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    wipe = not update
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
-    exclude = load_exclude_dirs(repo) | set(exclude_dir)
+    exclude = load_exclude_dirs(repo_root) | set(exclude_dir)
 
     kg = DocKG(
-        corpus_root=Path(repo),
-        db_path=Path(sqlite),
+        corpus_root=repo_root,
+        db_path=db_path,
         exclude=exclude or None,
         model=model,
         chunk_size=chunk_size,
@@ -358,9 +370,9 @@ def build_graph(
     if extensions:
         kg.graph.extensions = extensions
 
-    _console.print(Rule(f"DocKG build-graph — {Path(repo).name}", style="bold blue"))
-    _console.print(f"  corpus  : {repo}")
-    _console.print(f"  sqlite  : {sqlite}")
+    _console.print(Rule(f"DocKG build-graph — {repo_root.name}", style="bold blue"))
+    _console.print(f"  corpus  : {repo_root}")
+    _console.print(f"  sqlite  : {db_path}")
     _console.print(f"  ext     : {', '.join(sorted(extensions))}")
     _console.print(f"  exclude : {', '.join(sorted(exclude)) if exclude else '(none)'}")
 
@@ -385,10 +397,10 @@ def build_graph(
     help="LanceDB table name.",
 )
 @click.option(
-    "--wipe",
+    "--update",
     is_flag=True,
     default=False,
-    help="Delete existing vectors before indexing.",
+    help="Incremental update — keep existing vectors instead of wiping.",
 )
 @click.option(
     "--no-similar",
@@ -409,22 +421,26 @@ def build_index(
     lancedb: str,
     model: str,
     table: str,
-    wipe: bool,
+    update: bool,
     no_similar: bool,
     batch: int,
 ) -> None:
     """Build only the LanceDB semantic index from an existing SQLite graph."""
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
+    wipe = not update
     kg = DocKG(
-        corpus_root=Path(repo),
-        db_path=Path(sqlite),
-        lancedb_dir=Path(lancedb),
+        corpus_root=repo_root,
+        db_path=db_path,
+        lancedb_dir=lancedb_dir,
         model=model,
         table=table,
     )
 
-    _console.print(Rule(f"DocKG build-index — {Path(sqlite).name}", style="bold blue"))
-    _console.print(f"  sqlite  : {sqlite}")
-    _console.print(f"  lancedb : {lancedb}")
+    _console.print(Rule(f"DocKG build-index — {db_path.name}", style="bold blue"))
+    _console.print(f"  sqlite  : {db_path}")
+    _console.print(f"  lancedb : {lancedb_dir}")
     _console.print(f"  table   : {table}")
 
     _console.print("\nEmbedding nodes \u2192 LanceDB \u2026")

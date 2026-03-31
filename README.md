@@ -66,8 +66,11 @@ dockg build-graph docs/
 # Build only the LanceDB index from an existing graph
 dockg build-index
 
-# Wipe and rebuild from scratch
-dockg build docs/ --wipe
+# Rebuild from scratch (wipe is the default)
+dockg build docs/
+
+# Incremental update — keep existing data
+dockg build docs/ --update
 
 # Exclude specific directories
 dockg build docs/ --exclude-dir dir1 --exclude-dir dir2
@@ -220,7 +223,7 @@ Every subcommand also ships as a dedicated `dockg-<name>` script — useful for 
 
 ```bash
 dockg build CORPUS_ROOT [--db PATH] [--lancedb PATH] [--model NAME]
-            [--wipe] [--no-similar] [--exclude-dir DIR]...
+            [--update] [--no-similar] [--exclude-dir DIR]...
 ```
 
 | Option | Default | Description |
@@ -229,14 +232,14 @@ dockg build CORPUS_ROOT [--db PATH] [--lancedb PATH] [--model NAME]
 | `--db` | `.dockg/graph.sqlite` | SQLite database path |
 | `--lancedb` | `.dockg/lancedb` | LanceDB index directory |
 | `--model` | `all-MiniLM-L6-v2` | Sentence-transformer embedding model |
-| `--wipe` | off | Drop and recreate database before build |
+| `--update` | off | Incremental update — keep existing data instead of wiping |
 | `--no-similar` | off | Skip computing `SIMILAR_TO` edges |
 | `--exclude-dir` | — | Exclude a directory at every depth (repeatable); merged with `[tool.dockg].exclude` |
 
 ### `dockg build-graph` — SQLite only
 
 ```bash
-dockg build-graph CORPUS_ROOT [--db PATH] [--wipe] [--exclude-dir DIR]...
+dockg build-graph CORPUS_ROOT [--db PATH] [--update] [--exclude-dir DIR]...
 ```
 
 Parses documents, extracts nodes (documents, sections, chunks, topics, entities, keywords), and writes the SQLite graph. No embedding model required.

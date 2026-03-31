@@ -215,7 +215,7 @@ pip install 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
 ### Build the knowledge graph first
 
 ```bash
-dockg build docs --wipe
+dockg build docs
 ```
 
 ### Start the server manually

@@ -23,14 +23,17 @@ Once configured, agents get these tools:
 3. Restart the client.
 
 ```bash
-# From repo root
-dockg build docs --wipe
+# From repo root (wipe is the default)
+dockg build docs
 
 # Or build any corpus directory
-# dockg build /absolute/path/to/corpus --wipe
+# dockg build /absolute/path/to/corpus
 
 # Exclude specific directories during build
-# dockg build docs --wipe --exclude-dir archive --exclude-dir vendor
+# dockg build docs --exclude-dir archive --exclude-dir vendor
+
+# Incremental update — keep existing data
+# dockg build docs --update
 ```
 
 ## Start Server Manually

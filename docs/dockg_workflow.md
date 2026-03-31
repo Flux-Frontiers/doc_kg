@@ -6,20 +6,21 @@ Document-centric knowledge graph building and querying.
 ## Build the Graph
 
 ```bash
-dockg build docs --wipe
+dockg build docs
 ```
 
 Build the authoritative SQLite knowledge graph from your documentation corpus (`.md` and `.txt` files).
 This runs corpus parsing, SQLite persistence, and LanceDB vector indexing in one step.
+Existing data is wiped by default; pass `--update` to keep existing data instead.
 
 **Granular steps (for large corpora):**
 
 ```bash
 # Step 1 — parse corpus and write SQLite graph
-dockg build-graph docs --wipe
+dockg build-graph docs
 
 # Step 2 — build LanceDB vector index from existing SQLite
-dockg build-index --wipe
+dockg build-index
 ```
 
 ## Query the Graph
@@ -101,7 +102,7 @@ Start the MCP server (stdio transport) for use with Claude Code, GitHub Copilot,
 
 ```bash
 # 1. Build the graph from documentation
-dockg build docs --wipe
+dockg build docs
 
 # 2. Analyze coverage before publishing
 dockg analyze docs

@@ -323,7 +323,7 @@ exclude = ["archive", "vendor", "drafts"]
 **CLI flags (per-command override):**
 
 ```bash
-dockg build docs --wipe --exclude-dir archive --exclude-dir vendor
+dockg build docs --exclude-dir archive --exclude-dir vendor
 ```
 
 Both options are additive — CLI flags extend `pyproject.toml` excludes.
@@ -339,4 +339,4 @@ DB:    .dockg/graph.sqlite
 Model: all-mpnet-base-v2
 ```
 
-*Rebuild after significant content changes: `dockg build docs --wipe`*
+*Rebuild after significant content changes: `dockg build docs`*

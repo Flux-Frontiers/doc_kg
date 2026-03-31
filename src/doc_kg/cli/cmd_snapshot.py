@@ -68,7 +68,7 @@ def save_snapshot(
 ) -> None:
     """Capture current DocKG metrics and save as a temporal snapshot."""
     repo_root = Path(repo).resolve()
-    db_path = Path(sqlite)
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
     snapshots_path = (
         Path(snapshots_dir).resolve() if snapshots_dir else (repo_root / ".dockg" / "snapshots")
     )

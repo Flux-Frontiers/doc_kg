@@ -12,18 +12,18 @@ from doc_kg.dockg import DEFAULT_MODEL
 
 sqlite_option = click.option(
     "--sqlite",
-    default=".dockg/graph.sqlite",
-    show_default=True,
+    default=None,
+    show_default=False,
     type=click.Path(),
-    help="Path to SQLite database.",
+    help="Path to SQLite database (default: <repo>/.dockg/graph.sqlite).",
 )
 
 lancedb_option = click.option(
     "--lancedb",
-    default=".dockg/lancedb",
-    show_default=True,
+    default=None,
+    show_default=False,
     type=click.Path(),
-    help="Path to LanceDB directory.",
+    help="Path to LanceDB directory (default: <repo>/.dockg/lancedb).",
 )
 
 model_option = click.option(

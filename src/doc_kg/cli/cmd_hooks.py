@@ -42,7 +42,7 @@ TREE_HASH=$(git write-tree)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Rebuild local DocKG index to keep it in sync with staged content.
-"$REPO_ROOT/.venv/bin/dockg" build --wipe || exit 1
+"$REPO_ROOT/.venv/bin/dockg" build || exit 1
 
 # Snapshot DocKG (version auto-detected from installed package).
 "$REPO_ROOT/.venv/bin/dockg" snapshot save \\
@@ -86,7 +86,7 @@ def install_hooks(repo: str, force: bool) -> None:
 
     After installation, before each commit:
       1. Runs pre-commit framework checks (ruff, mypy, detect-secrets)
-      2. Rebuilds local DocKG index (--wipe)
+      2. Rebuilds local DocKG index (wipe by default)
       3. Captures a metrics snapshot (version auto-detected from installed package)
       4. Stages .dockg/snapshots/ atomically
 
