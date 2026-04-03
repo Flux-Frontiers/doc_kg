@@ -1067,6 +1067,20 @@ reference = "HEAD"
 resolved_reference = "6180e7a0510da4a3bf52112514ba6ad6effc31ce"
 
 [[package]]
+name = "kg-snapshot"
+version = "0.1.0"
+description = "Shared snapshot infrastructure for KG modules — zero stdlib-only deps."
+optional = false
+python-versions = ">=3.12,<3.14"
+groups = ["main"]
+files = []
+develop = true
+
+[package.source]
+type = "directory"
+url = "../kg_snapshot"
+
+[[package]]
 name = "lance-namespace"
 version = "0.5.2"
 description = "Lance Namespace interface and plugin registry"
@@ -3577,4 +3591,4 @@ viz = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "525542a08f4d7dfde85184bbd8d289a68284a45fae6ccc33b53b6a18d948857c"
+content-hash = "c8a5a056ff112afa557f33e791393d8d6d404ba7099699428a9fa1b43c6a4688"

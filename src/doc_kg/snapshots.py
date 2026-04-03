@@ -1,7 +1,7 @@
 """
 snapshots.py — Temporal Snapshots of DocKG Metrics
 
-Thin compatibility layer over the shared ``kg_rag.snapshots`` module.
+Thin compatibility layer over the shared ``kg_snapshot`` module.
 
 The shared module provides canonical ``Snapshot``, ``SnapshotManifest``, and
 ``SnapshotManager`` backed by free-form dicts.  This module re-exports those
@@ -41,9 +41,9 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # Re-export shared base types (backwards-compat public API)
 # ---------------------------------------------------------------------------
-from kg_rag.snapshots import Snapshot as _BaseSnapshot
-from kg_rag.snapshots import SnapshotManager as _BaseSnapshotManager
-from kg_rag.snapshots import SnapshotManifest  # noqa: F401  re-exported
+from kg_snapshot.snapshots import Snapshot as _BaseSnapshot
+from kg_snapshot.snapshots import SnapshotManager as _BaseSnapshotManager
+from kg_snapshot.snapshots import SnapshotManifest  # noqa: F401  re-exported
 
 __all__ = [
     "SnapshotMetrics",

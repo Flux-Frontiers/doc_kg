@@ -41,6 +41,7 @@ pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
 einops = "^0.8.2"
+kg-snapshot = {path = "../kg_snapshot", develop = true}
 
 
 [tool.poetry.extras]
