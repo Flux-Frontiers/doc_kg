@@ -13,7 +13,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "doc-kg"
-version = "0.6.0"
+version = "0.7.0"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
 license = "Elastic-2.0"
@@ -41,7 +41,7 @@ pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
 einops = "^0.8.2"
-kg-snapshot = {path = "../kg_snapshot", develop = true}
+kg-snapshot = { git = "https://github.com/Flux-Frontiers/kg_snapshot.git"}
 
 
 [tool.poetry.extras]
@@ -57,7 +57,6 @@ pre-commit = "^4.5.1"
 pylint = "^4.0.5"
 code-kg = { git = "https://github.com/Flux-Frontiers/code_kg.git" }
 ftree-kg = { git = "https://github.com/Flux-Frontiers/FTree_kg.git" }
-kg-rag = { git = "https://github.com/Flux-Frontiers/KGRAG.git" }
 
 [tool.poetry.scripts]
 dockg          = "doc_kg.cli.main:cli"

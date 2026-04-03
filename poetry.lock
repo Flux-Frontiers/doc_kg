@@ -1027,46 +1027,6 @@ files = [
 referencing = ">=0.31.0"
 
 [[package]]
-name = "kg-rag"
-version = "0.3.3"
-description = "Orchestration layer for the KGRAG(tm) components."
-optional = false
-python-versions = ">=3.12,<3.14"
-groups = ["dev"]
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.1.0"
-code-kg = {git = "https://github.com/Flux-Frontiers/code_kg.git"}
-doc-kg = {git = "https://github.com/Flux-Frontiers/doc_kg.git"}
-lancedb = ">=0.29.0"
-mcp = ">=1.0.0"
-numpy = ">=1.24.0"
-pandas = ">=2.0.0"
-pip = "^26.0.1"
-rich = "^14.3.3"
-safetensors = "^0.5.0"
-sentence-transformers = "^5.2.0"
-torch = ">=2.5.1"
-transformers = "^4.57.6"
-
-[package.extras]
-diary-kg = []
-ftree-kg = []
-metabo-kg = []
-qt = ["PyQt5 (>=5.15.0)"]
-viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
-viz2d = ["PyQt5 (>=5.15.0)"]
-viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/KGRAG.git"
-reference = "HEAD"
-resolved_reference = "6180e7a0510da4a3bf52112514ba6ad6effc31ce"
-
-[[package]]
 name = "kg-snapshot"
 version = "0.1.0"
 description = "Shared snapshot infrastructure for KG modules — zero stdlib-only deps."
@@ -1074,11 +1034,13 @@ optional = false
 python-versions = ">=3.12,<3.14"
 groups = ["main"]
 files = []
-develop = true
+develop = false
 
 [package.source]
-type = "directory"
-url = "../kg_snapshot"
+type = "git"
+url = "https://github.com/Flux-Frontiers/kg_snapshot.git"
+reference = "HEAD"
+resolved_reference = "a55fdd44070c899dd2c08831a873082ca7068423"
 
 [[package]]
 name = "lance-namespace"
@@ -1976,18 +1938,6 @@ hyperscan = ["hyperscan (>=0.7)"]
 optional = ["typing-extensions (>=4)"]
 re2 = ["google-re2 (>=1.1)"]
 tests = ["pytest (>=9)", "typing-extensions (>=4.15)"]
-
-[[package]]
-name = "pip"
-version = "26.0.1"
-description = "The PyPA recommended tool for installing Python packages."
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "pip-26.0.1-py3-none-any.whl", hash = "sha256:bdb1b08f4274833d62c1aa29e20907365a2ceb950410df15fc9521bad440122b"},
-    {file = "pip-26.0.1.tar.gz", hash = "sha256:c4037d8a277c89b320abe636d59f91e6d0922d08a05b60e85e53b296613346d8"},
-]
 
 [[package]]
 name = "platformdirs"
@@ -3591,4 +3541,4 @@ viz = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "c8a5a056ff112afa557f33e791393d8d6d404ba7099699428a9fa1b43c6a4688"
+content-hash = "31f94eb5e671efe2748f52e8b2506cbb73eedcc6cd5e4aa9f613d98f5fc74b13"
