@@ -18,7 +18,15 @@ from pathlib import Path
 import click
 
 from doc_kg.cli.group import cli
-from doc_kg.cli.options import model_option, repo_option
+from doc_kg.cli.options import repo_option
+from doc_kg.embedder_worker import PIPELINE_MODEL
+
+pipeline_model_option = click.option(
+    "--model",
+    default=PIPELINE_MODEL,
+    show_default=True,
+    help="Sentence-transformer model for pipeline embedding.",
+)
 
 
 @cli.group()
@@ -95,7 +103,7 @@ def pipeline() -> None:
     type=click.Path(),
     help="Output directory (default: <repo>/.dockg/pipeline).",
 )
-@model_option
+@pipeline_model_option
 @click.option("--quiet", is_flag=True, help="Suppress progress output.")
 def pipeline_run(
     repo: str,
@@ -182,7 +190,7 @@ def pipeline_run(
 
 @pipeline.command("embed")
 @repo_option
-@model_option
+@pipeline_model_option
 @click.option("--workers", default=None, type=int, help="Number of parallel workers.")
 @click.option("--batch-size", default=64, show_default=True, help="Per-worker batch size.")
 @click.option("--sample-n", default=None, type=int, help="Evenly sample N texts before embedding.")

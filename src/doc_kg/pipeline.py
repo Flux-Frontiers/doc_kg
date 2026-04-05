@@ -43,7 +43,8 @@ from pathlib import Path
 from typing import Literal
 
 from doc_kg.chunker import SentenceGroupChunker, TextChunker, chunker_for
-from doc_kg.dockg import DEFAULT_MODEL, iter_text_files
+from doc_kg.dockg import iter_text_files
+from doc_kg.embedder_worker import PIPELINE_MODEL
 from doc_kg.entry_chunk import EntryChunk, SourceProvenance, make_chunk_id
 from doc_kg.relations import extract_entities
 from doc_kg.sampler import CorpusSampler, SampleResult
@@ -93,7 +94,7 @@ class PipelineConfig:
     n_topic_clusters: int = 8
     topics_file: str | None = None
     output_dir: Path | None = None
-    embedding_model: str = DEFAULT_MODEL
+    embedding_model: str = PIPELINE_MODEL
     seed: int = 42
     run_id: str = ""
     max_chunks_per_doc: int = 0  # 0 = unlimited

@@ -37,6 +37,10 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+#: Default embedding model for the multipass pipeline.
+#: Matches diary_kg: nomic-embed-text-v1 (768-d, asymmetric retrieval).
+PIPELINE_MODEL: str = "nomic-ai/nomic-embed-text-v1"
+
 
 # ============================================================================
 # Spawn-safe top-level worker function
@@ -63,6 +67,10 @@ def _embed_shard(args: tuple) -> list[list[float]]:
 
     trust_remote = "nomic-ai/" in model_name
     model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
+
+    # Nomic v1 requires a task prefix for asymmetric retrieval mode
+    if "nomic-ai/" in model_name:
+        texts = [f"search_document: {t}" for t in texts]
 
     vecs = model.encode(
         texts,
@@ -123,7 +131,7 @@ class CorpusEmbedder:
 
     def __init__(
         self,
-        model_name: str = "all-mpnet-base-v2",
+        model_name: str = PIPELINE_MODEL,
         *,
         n_workers: int | None = None,
         batch_size: int = 64,
