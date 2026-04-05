@@ -232,6 +232,8 @@ __marimo__/
 .dockg/*.sqlite-shm
 .dockg/*.sqlite-wal
 .dockg/models
+.dockg/cache/
+.dockg/pipeline/
 
 # Local MCP configuration (contains absolute paths)
 .mcp.json
