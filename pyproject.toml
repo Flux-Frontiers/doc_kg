@@ -69,6 +69,7 @@ dockg-query    = "doc_kg.cli.cmd_query:query"
 dockg-pack     = "doc_kg.cli.cmd_query:pack"
 dockg-analyze  = "doc_kg.cli.cmd_analyze:analyze"
 dockg-viz      = "doc_kg.cli.cmd_viz:viz"
+dockg-pipeline = "doc_kg.cli.cmd_pipeline:pipeline"
 
 [tool.ruff]
 line-length = 100
