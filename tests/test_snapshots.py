@@ -479,7 +479,9 @@ def test_list_snapshots_limit_zero_returns_all(snapshot_dir: Path) -> None:
     """limit=0 is falsy — manager returns all snapshots, not an empty list."""
     mgr = SnapshotManager(snapshot_dir)
     for i in range(3):
-        mgr.save_snapshot(_make_dockg_snapshot(f"hash{i}", f"2026-03-0{i + 1}T12:00:00+00:00"))
+        mgr.save_snapshot(
+            _make_dockg_snapshot(f"hash{i}", f"2026-03-0{i + 1}T12:00:00+00:00", nodes=10 + i)
+        )
     assert len(mgr.list_snapshots(limit=0)) == 3
 
 
@@ -654,8 +656,8 @@ def test_snapshot_manager_get_previous(snapshot_dir: Path) -> None:
     """get_previous returns the snapshot immediately before by timestamp."""
     mgr = SnapshotManager(snapshot_dir)
 
-    snap1 = _make_dockg_snapshot("treehash1", "2026-03-07T10:00:00+00:00")
-    snap2 = _make_dockg_snapshot("treehash2", "2026-03-07T12:00:00+00:00")
+    snap1 = _make_dockg_snapshot("treehash1", "2026-03-07T10:00:00+00:00", nodes=10)
+    snap2 = _make_dockg_snapshot("treehash2", "2026-03-07T12:00:00+00:00", nodes=20)
     mgr.save_snapshot(snap1)
     mgr.save_snapshot(snap2)
 
@@ -682,8 +684,8 @@ def test_snapshot_manager_get_baseline(snapshot_dir: Path) -> None:
     """get_baseline returns the oldest snapshot."""
     mgr = SnapshotManager(snapshot_dir)
 
-    snap1 = _make_dockg_snapshot("treehash1", "2026-03-07T10:00:00+00:00")
-    snap2 = _make_dockg_snapshot("treehash2", "2026-03-07T12:00:00+00:00")
+    snap1 = _make_dockg_snapshot("treehash1", "2026-03-07T10:00:00+00:00", nodes=10)
+    snap2 = _make_dockg_snapshot("treehash2", "2026-03-07T12:00:00+00:00", nodes=20)
     mgr.save_snapshot(snap1)
     mgr.save_snapshot(snap2)
 

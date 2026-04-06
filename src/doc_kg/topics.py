@@ -17,6 +17,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 try:
     import yaml
@@ -97,6 +98,8 @@ class TopicExtractor:
 
     def __init__(self, topics_file: str | None = None) -> None:
         self.topic_map = self._load_topic_map(topics_file)
+        self._kmeans: Any = None
+        self._cluster_labels: list[str] = []
 
     def classify(
         self,
@@ -208,7 +211,6 @@ class TopicExtractor:
             raise ValueError("No valid topics found in topics file")
         return topic_map
 
-
     # ------------------------------------------------------------------
     # Unsupervised K-means fallback (Phase 3 hybrid classification)
     # ------------------------------------------------------------------
@@ -242,12 +244,12 @@ class TopicExtractor:
 
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        X = np.asarray(embeddings, dtype="float32")
-        X = normalize(X)
+        embeddings_arr = np.asarray(embeddings, dtype="float32")
+        embeddings_arr = normalize(embeddings_arr)
 
-        actual_k = min(n_clusters, len(X))
+        actual_k = min(n_clusters, len(embeddings_arr))
         self._kmeans = KMeans(n_clusters=actual_k, random_state=42, n_init=10)
-        self._kmeans.fit(X)
+        self._kmeans.fit(embeddings_arr)
 
         if labels and len(labels) == actual_k:
             self._cluster_labels = labels
@@ -280,11 +282,7 @@ class TopicExtractor:
             return supervised, "supervised"
 
         # Try unsupervised if K-means is fitted and we have an embedding
-        if (
-            embedding is not None
-            and hasattr(self, "_kmeans")
-            and self._kmeans is not None
-        ):
+        if embedding is not None and hasattr(self, "_kmeans") and self._kmeans is not None:
             try:
                 return self._classify_unsupervised(embedding), "unsupervised"
             except Exception:

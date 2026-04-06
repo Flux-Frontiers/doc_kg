@@ -148,6 +148,7 @@ def pipeline_run(
         sentences_per_chunk=sentences,
         n_diversity_clusters=n_clusters,
         batch_size=batch,
+        sampling_strategy=sampling,
         supervised_threshold=supervised_threshold,
         n_topic_clusters=n_clusters,
         topics_file=topics_file,
@@ -171,13 +172,17 @@ def pipeline_run(
     if not quiet:
         console.print("\n[bold green]Pipeline complete[/bold green]")
         console.print(f"  Run ID:    {result.run_id}")
-        console.print(f"  Files:     {result.stats.get('sampled_files', 0)} / "
-                       f"{result.stats.get('total_files', 0)}")
+        console.print(
+            f"  Files:     {result.stats.get('sampled_files', 0)} / "
+            f"{result.stats.get('total_files', 0)}"
+        )
         console.print(f"  Chunks:    {result.stats.get('total_chunks', 0)}")
         methods = result.stats.get("classification_methods", {})
-        console.print(f"  Topics:    supervised={methods.get('supervised', 0)}, "
-                       f"unsupervised={methods.get('unsupervised', 0)}, "
-                       f"fallback={methods.get('fallback', 0)}")
+        console.print(
+            f"  Topics:    supervised={methods.get('supervised', 0)}, "
+            f"unsupervised={methods.get('unsupervised', 0)}, "
+            f"fallback={methods.get('fallback', 0)}"
+        )
         console.print(f"  Time:      {result.elapsed_seconds:.1f}s")
         if result.output_path:
             console.print(f"  Output:    {result.output_path}")

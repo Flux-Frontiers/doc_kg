@@ -332,39 +332,6 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
-name = "code-kg"
-version = "0.9.3"
-description = "A tool to build a searchable knowledge graph from Python repositories"
-optional = false
-python-versions = ">=3.12,<3.14"
-groups = ["dev"]
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.1.0"
-lancedb = ">=0.29.0"
-mcp = ">=1.0.0"
-numpy = ">=1.24.0"
-pandas = ">=2.0.0"
-rich = "^14.3.3"
-safetensors = "^0.5.0"
-sentence-transformers = "^5.2.0"
-torch = ">=2.5.1"
-transformers = "^4.57.6"
-
-[package.extras]
-kg = []
-viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
-viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/code_kg.git"
-reference = "HEAD"
-resolved_reference = "91dc6f3ceaa5c7ffdc21f57d5ff9db2d8ed2c2b3"
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -1028,7 +995,7 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kg-snapshot"
-version = "0.1.0"
+version = "0.3.0"
 description = "Shared snapshot infrastructure for KG modules — zero stdlib-only deps."
 optional = false
 python-versions = ">=3.12,<3.14"
@@ -1040,7 +1007,7 @@ develop = false
 type = "git"
 url = "https://github.com/Flux-Frontiers/kg_snapshot.git"
 reference = "HEAD"
-resolved_reference = "a55fdd44070c899dd2c08831a873082ca7068423"
+resolved_reference = "2fbdf488b55b382ae625300b1cbbfc4cf32296c2"
 
 [[package]]
 name = "lance-namespace"
@@ -2045,6 +2012,39 @@ files = [
     {file = "pyarrow-23.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:527e8d899f14bd15b740cd5a54ad56b7f98044955373a17179d5956ddb93d9ce"},
     {file = "pyarrow-23.0.1.tar.gz", hash = "sha256:b8c5873e33440b2bc2f4a79d2b47017a89c5a24116c055625e6f2ee50523f019"},
 ]
+
+[[package]]
+name = "pycode-kg"
+version = "0.11.0"
+description = "A tool to build a searchable knowledge graph from Python repositories"
+optional = false
+python-versions = ">=3.12,<3.14"
+groups = ["dev"]
+files = []
+develop = false
+
+[package.dependencies]
+click = ">=8.1.0"
+kg-snapshot = ">=0.3.0"
+lancedb = ">=0.29.0"
+mcp = ">=1.0.0"
+numpy = ">=1.24.0"
+pandas = ">=2.0.0"
+rich = "^14.3.3"
+safetensors = "^0.5.0"
+sentence-transformers = "^5.2.0"
+torch = ">=2.5.1"
+transformers = "^4.57.6"
+
+[package.extras]
+viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
+viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/Flux-Frontiers/pycode_kg.git"
+reference = "HEAD"
+resolved_reference = "b492a6f27757501e59d15b31da8b3fe407454e9f"
 
 [[package]]
 name = "pycparser"
@@ -3541,4 +3541,4 @@ viz = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "31f94eb5e671efe2748f52e8b2506cbb73eedcc6cd5e4aa9f613d98f5fc74b13"
+content-hash = "64f4d71ac7821ff2a41fc8454f84179ece5ed8f1d4f5a7d67224023e06b02bd1"

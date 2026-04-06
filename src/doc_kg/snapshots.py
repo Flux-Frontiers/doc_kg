@@ -413,7 +413,7 @@ class SnapshotManager(_BaseSnapshotManager):
     # save_snapshot — normalise typed properties back to raw dicts first
     # ------------------------------------------------------------------
 
-    def save_snapshot(self, snapshot: _BaseSnapshot) -> Any:  # type: ignore[override]
+    def save_snapshot(self, snapshot: _BaseSnapshot, *, force: bool = False) -> Any:
         """Persist snapshot, normalising any typed-property values to raw dicts.
 
         The base ``save_snapshot`` inspects ``snapshot.metrics`` (expects a
@@ -436,8 +436,8 @@ class SnapshotManager(_BaseSnapshotManager):
                 vs_baseline=snapshot.__dict__["vs_baseline"],
                 tree_hash=snapshot.tree_hash,
             )
-            return super().save_snapshot(raw)
-        return super().save_snapshot(snapshot)
+            return super().save_snapshot(raw, force=force)
+        return super().save_snapshot(snapshot, force=force)
 
     # ------------------------------------------------------------------
     # Load helpers — re-wrap base Snapshot instances as doc_kg Snapshots

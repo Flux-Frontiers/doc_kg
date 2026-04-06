@@ -132,9 +132,9 @@ class CorpusSampler:
                 try:
                     text = abs_path.read_text(encoding="utf-8", errors="ignore")
                 except OSError:
-                    features.append(DocFeatures(
-                        file_path=str(abs_path), file_hash="", temporal_index=idx
-                    ))
+                    features.append(
+                        DocFeatures(file_path=str(abs_path), file_hash="", temporal_index=idx)
+                    )
                     continue
 
             content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
@@ -213,13 +213,13 @@ class CorpusSampler:
 
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        X = np.asarray([f.to_vector() for f in features], dtype="float32")
+        features_arr = np.asarray([f.to_vector() for f in features], dtype="float32")
         scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        features_scaled = scaler.fit_transform(features_arr)
 
-        actual_k = min(self.n_clusters, len(X))
+        actual_k = min(self.n_clusters, len(features_arr))
         km = KMeans(n_clusters=actual_k, random_state=self.seed, n_init=10)
-        labels = km.fit_predict(X_scaled).tolist()
+        labels = km.fit_predict(features_scaled).tolist()
 
         # Sample proportionally from each cluster
         rng = random.Random(self.seed)

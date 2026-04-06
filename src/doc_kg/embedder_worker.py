@@ -113,6 +113,7 @@ class EmbeddingCache:
 
     @property
     def n_vectors(self) -> int:
+        """Return the number of embedding vectors in this batch."""
         return len(self.vectors)
 
 
@@ -159,10 +160,7 @@ class CorpusEmbedder:
 
         # Temporal sampling if requested
         if sample_n and sample_n < len(texts):
-            indices = [
-                round(i * (len(texts) - 1) / (sample_n - 1))
-                for i in range(sample_n)
-            ]
+            indices = [round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)]
             indices = sorted(set(indices))
             texts = [texts[i] for i in indices]
             metadata = [metadata[i] for i in indices]
@@ -183,7 +181,10 @@ class CorpusEmbedder:
 
         logger.info(
             "Embedded %d texts (%d-dim) in %.1fs with %d workers",
-            len(texts), dim, elapsed, self.n_workers,
+            len(texts),
+            dim,
+            elapsed,
+            self.n_workers,
         )
 
         return EmbeddingCache(
@@ -208,9 +209,7 @@ class CorpusEmbedder:
             start = i * shard_size
             end = min(start + shard_size, len(texts))
             if start < len(texts):
-                shards.append(
-                    (texts[start:end], self.model_name, self.batch_size, i)
-                )
+                shards.append((texts[start:end], self.model_name, self.batch_size, i))
 
         # Use spawn to avoid fork-unsafe tokenizer/CUDA issues
         ctx = multiprocessing.get_context("spawn")
@@ -222,9 +221,7 @@ class CorpusEmbedder:
                 for shard_vecs in results:
                     all_vectors.extend(shard_vecs)
         except Exception as exc:
-            logger.warning(
-                "Multiprocessing failed (%s), falling back to sequential", exc
-            )
+            logger.warning("Multiprocessing failed (%s), falling back to sequential", exc)
             all_vectors = self._embed_sequential(texts)
 
         return all_vectors

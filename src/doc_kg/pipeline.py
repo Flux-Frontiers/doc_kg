@@ -40,7 +40,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from doc_kg.chunker import SentenceGroupChunker, TextChunker, chunker_for
 from doc_kg.dockg import iter_text_files
@@ -49,6 +49,9 @@ from doc_kg.entry_chunk import EntryChunk, SourceProvenance, make_chunk_id
 from doc_kg.relations import extract_entities
 from doc_kg.sampler import CorpusSampler, SampleResult
 from doc_kg.topics import TopicExtractor
+
+if TYPE_CHECKING:
+    from doc_kg.index import SentenceTransformerEmbedder
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +93,7 @@ class PipelineConfig:
     similarity_threshold: float = 0.75
     n_diversity_clusters: int = 8
     batch_size: int = 20
+    sampling_strategy: str = "diversity"
     supervised_threshold: float = 0.3
     n_topic_clusters: int = 8
     topics_file: str | None = None
@@ -142,7 +146,7 @@ class AnalysisPipeline:
         self.config = config
         self._run_id = config.run_id or uuid.uuid4().hex[:12]
         self._topic_extractor: TopicExtractor | None = None
-        self._embedder = None
+        self._embedder: SentenceTransformerEmbedder | None = None
 
     def run(self, paths: list[Path] | None = None) -> PipelineResult:
         """Execute the full 5-phase pipeline.
@@ -171,9 +175,7 @@ class AnalysisPipeline:
 
         # Phase 1: Diversity Sampling
         sample_result = self._phase1_sample(all_paths, corpus_root)
-        selected_paths = [
-            corpus_root / p for p in sample_result.selected_paths
-        ]
+        selected_paths = [corpus_root / p for p in sample_result.selected_paths]
         logger.info("Phase 1: sampled %d / %d files", len(selected_paths), len(all_paths))
 
         # Phase 2: Chunking
@@ -223,9 +225,7 @@ class AnalysisPipeline:
     # Phase 1: Diversity Sampling
     # ------------------------------------------------------------------
 
-    def _phase1_sample(
-        self, all_paths: list[Path], corpus_root: Path
-    ) -> SampleResult:
+    def _phase1_sample(self, all_paths: list[Path], corpus_root: Path) -> SampleResult:
         """Phase 1: extract features, cluster, sample."""
         sampler = CorpusSampler(
             corpus_root,
@@ -235,16 +235,14 @@ class AnalysisPipeline:
         return sampler.sample(
             all_paths,
             batch_size=self.config.batch_size,
-            strategy="diversity",
+            strategy=self.config.sampling_strategy,
         )
 
     # ------------------------------------------------------------------
     # Phase 2: Chunking
     # ------------------------------------------------------------------
 
-    def _phase2_chunk(
-        self, selected_paths: list[Path], corpus_root: Path
-    ) -> list[dict]:
+    def _phase2_chunk(self, selected_paths: list[Path], corpus_root: Path) -> list[dict]:
         """Phase 2: chunk selected documents.
 
         Returns a list of dicts with chunk text plus provenance metadata.
@@ -321,9 +319,7 @@ class AnalysisPipeline:
 
             # Extract keywords and entities
             if cfg.enable_keywords:
-                chunk["_keywords"] = self._topic_extractor.extract_keywords(
-                    text, max_keywords=4
-                )
+                chunk["_keywords"] = self._topic_extractor.extract_keywords(text, max_keywords=4)
             if cfg.enable_entities:
                 chunk["_entities"] = extract_entities(text, max_entities=8)
 
@@ -340,9 +336,10 @@ class AnalysisPipeline:
             suppress_ingestion_logging()
             if self._embedder is None:
                 self._embedder = SentenceTransformerEmbedder(self.config.embedding_model)
+            embedder = self._embedder
 
             texts = [c["text"] for c in chunks]
-            embeddings = self._embedder.embed_texts(texts)
+            embeddings = embedder.embed_texts(texts)
 
             # Store embeddings on chunks for later use
             for chunk, emb in zip(chunks, embeddings):
@@ -401,9 +398,7 @@ class AnalysisPipeline:
     # Phase 5: Structured Output
     # ------------------------------------------------------------------
 
-    def _phase5_output(
-        self, entries: list[EntryChunk], sample: SampleResult
-    ) -> Path | None:
+    def _phase5_output(self, entries: list[EntryChunk], sample: SampleResult) -> Path | None:
         """Phase 5: write pipe-delimited output with run parameters."""
         cfg = self.config
         output_dir = cfg.output_dir or (Path(cfg.corpus_root) / ".dockg" / "pipeline")
@@ -468,9 +463,7 @@ class AnalysisPipeline:
             f.write(f"# Supervised classifications: {method_counts['supervised']}\n")
             f.write(f"# Unsupervised classifications: {method_counts['unsupervised']}\n")
             f.write(f"# Fallback classifications: {method_counts['fallback']}\n")
-            supervised_pct = (
-                method_counts["supervised"] / max(1, len(entries)) * 100
-            )
+            supervised_pct = method_counts["supervised"] / max(1, len(entries)) * 100
             f.write(f"# Supervised rate: {supervised_pct:.1f}%\n")
 
         return output_path
