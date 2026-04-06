@@ -234,6 +234,8 @@ __marimo__/
 .dockg/models
 .dockg/cache/
 .dockg/pipeline/
+# Also ignore .dockg/ nested under subdirectories (e.g. docs/.dockg/)
+**/.dockg/
 
 # Local MCP configuration (contains absolute paths)
 .mcp.json
