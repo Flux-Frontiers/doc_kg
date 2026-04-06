@@ -98,7 +98,7 @@ pythonpath = ["src"]
 # SKIP_DIRS already covers: .dockg, .git, .venv, venv, __pycache__, node_modules, etc.
 # Example: exclude = ["archive", "vendor", "generated"]
 
-[tool.codekg]
+[tool.pycodekg]
 # Exclude test directories from the knowledge graph.
 # Tests skew architectural metrics (fan-in, public API surface, docstring coverage)
 exclude = ["tests"]
