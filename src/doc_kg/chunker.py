@@ -38,7 +38,7 @@ Author: Eric G. Suchanek, PhD
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from doc_kg.index import Embedder
@@ -400,3 +400,145 @@ def _extract_links(text: str) -> list[str]:
     for m in _REF_LINK.finditer(text):
         hrefs.append(m.group(1).strip())
     return hrefs
+
+
+# ---------------------------------------------------------------------------
+# Sentence-group chunker (diary-transformer Phase 2 strategy)
+# ---------------------------------------------------------------------------
+
+
+class SentenceGroupChunker:
+    """Chunk text by grouping a fixed number of consecutive sentences.
+
+    This is the sentence-group strategy from diary_kg's multipass pipeline:
+    group exactly *sentences_per_chunk* sentences into each chunk, respecting
+    Markdown section boundaries as hard split points.
+
+    No embedder is required — this strategy is fast and produces predictable
+    chunk sizes (~400-500 chars with default settings).
+
+    :param sentences_per_chunk: Number of sentences per chunk (default: 4).
+    :param min_chunk_chars: Minimum characters before a chunk is emitted.
+    """
+
+    def __init__(
+        self,
+        *,
+        sentences_per_chunk: int = 4,
+        min_chunk_chars: int = 50,
+    ) -> None:
+        self.sentences_per_chunk = sentences_per_chunk
+        self.min_chunk_chars = min_chunk_chars
+
+    def chunk(self, text: str, *, file_path: str = "") -> list[dict]:
+        """Chunk *text* into sentence-group segments.
+
+        :param text: Raw document text.
+        :param file_path: Corpus-relative path (used for plain-text detection).
+        :return: List of chunk dicts (same schema as ``TextChunker.chunk()``).
+        """
+        ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
+        if ext in ("md", "markdown"):
+            return self._chunk_markdown(text)
+        return self._chunk_plain(text)
+
+    def _chunk_markdown(self, text: str) -> list[dict]:
+        """Parse Markdown heading structure and sentence-group within each section."""
+        sections = _split_by_headings(text)
+        chunks: list[dict] = []
+
+        for section in sections:
+            section_text = section["text"]
+            section_title = section["title"]
+            section_level = section["level"]
+            section_start = section["char_start"]
+
+            if not section_text.strip():
+                continue
+
+            sub_chunks = self._sentence_group_chunks(
+                section_text, base_offset=section_start
+            )
+            for sc in sub_chunks:
+                refs = _extract_links(sc["text"])
+                chunks.append(
+                    {
+                        "text": sc["text"],
+                        "section_title": section_title,
+                        "section_level": section_level,
+                        "char_start": sc["char_start"],
+                        "char_end": sc["char_end"],
+                        "references": refs,
+                    }
+                )
+
+        return chunks
+
+    def _chunk_plain(self, text: str) -> list[dict]:
+        """Chunk plain text (no heading structure)."""
+        sub_chunks = self._sentence_group_chunks(text, base_offset=0)
+        result: list[dict] = []
+        for sc in sub_chunks:
+            refs = _extract_links(sc["text"])
+            result.append(
+                {
+                    "text": sc["text"],
+                    "section_title": None,
+                    "section_level": None,
+                    "char_start": sc["char_start"],
+                    "char_end": sc["char_end"],
+                    "references": refs,
+                }
+            )
+        return result
+
+    def _sentence_group_chunks(
+        self, text: str, *, base_offset: int = 0
+    ) -> list[dict]:
+        """Group consecutive sentences into fixed-count chunks.
+
+        :param text: Section or document text.
+        :param base_offset: Character offset of *text* in the source file.
+        :return: List of ``{"text", "char_start", "char_end"}`` dicts.
+        """
+        sentences = _split_sentences(text)
+        if not sentences:
+            return []
+
+        groups: list[list[str]] = []
+        for i in range(0, len(sentences), self.sentences_per_chunk):
+            group = sentences[i : i + self.sentences_per_chunk]
+            groups.append(group)
+
+        return _groups_to_chunks(groups, text, base_offset, self.min_chunk_chars)
+
+
+# ---------------------------------------------------------------------------
+# Chunker factory
+# ---------------------------------------------------------------------------
+
+
+def chunker_for(
+    strategy: Literal["semantic", "sentence_group", "fixed"] = "semantic",
+    **kwargs,
+) -> TextChunker | SentenceGroupChunker:
+    """Factory: create the appropriate chunker for *strategy*.
+
+    :param strategy: ``"semantic"`` (embedding-based), ``"sentence_group"``
+                     (fixed N sentences), or ``"fixed"`` (size-based).
+    :param kwargs: Forwarded to the chosen chunker's ``__init__``.
+    :return: A chunker instance.
+    """
+    if strategy == "sentence_group":
+        return SentenceGroupChunker(
+            sentences_per_chunk=kwargs.get("sentences_per_chunk", 4),
+            min_chunk_chars=kwargs.get("min_chunk_chars", 50),
+        )
+    # "semantic" and "fixed" both use TextChunker; "fixed" just omits the embedder
+    return TextChunker(
+        chunk_size=kwargs.get("chunk_size", 512),
+        chunk_overlap=kwargs.get("chunk_overlap", 64),
+        similarity_threshold=kwargs.get("similarity_threshold", 0.75),
+        embedder=kwargs.get("embedder"),
+        min_chunk_chars=kwargs.get("min_chunk_chars", 1),
+    )

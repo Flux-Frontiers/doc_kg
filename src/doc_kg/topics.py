@@ -209,5 +209,122 @@ class TopicExtractor:
         return topic_map
 
 
+    # ------------------------------------------------------------------
+    # Unsupervised K-means fallback (Phase 3 hybrid classification)
+    # ------------------------------------------------------------------
+
+    def fit_clusters(
+        self,
+        embeddings: list[list[float]],
+        *,
+        n_clusters: int = 8,
+        labels: list[str] | None = None,
+    ) -> None:
+        """Fit K-means on a set of chunk embeddings for unsupervised fallback.
+
+        Must be called before ``classify_hybrid()`` can use the unsupervised
+        path.  Requires ``scikit-learn``.
+
+        :param embeddings: List of float32 vectors (one per chunk).
+        :param n_clusters: Number of clusters.
+        :param labels: Optional human-readable cluster labels (length == n_clusters).
+        """
+        try:
+            from sklearn.cluster import KMeans  # pylint: disable=import-outside-toplevel
+            from sklearn.preprocessing import (  # pylint: disable=import-outside-toplevel
+                normalize,
+            )
+        except ImportError as exc:
+            raise ImportError(
+                "scikit-learn is required for unsupervised topic clustering. "
+                "Install it with: pip install scikit-learn"
+            ) from exc
+
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        X = np.asarray(embeddings, dtype="float32")
+        X = normalize(X)
+
+        actual_k = min(n_clusters, len(X))
+        self._kmeans = KMeans(n_clusters=actual_k, random_state=42, n_init=10)
+        self._kmeans.fit(X)
+
+        if labels and len(labels) == actual_k:
+            self._cluster_labels = labels
+        else:
+            self._cluster_labels = [f"cluster_{i}" for i in range(actual_k)]
+
+    def classify_hybrid(
+        self,
+        text: str,
+        embedding: list[float] | None = None,
+        *,
+        supervised_threshold: float = 0.3,
+        top_k: int = 3,
+    ) -> tuple[list[TopicMatch], str]:
+        """Hybrid classification: supervised first, unsupervised fallback.
+
+        Returns the topic matches and a method tag indicating which classifier
+        produced the result.
+
+        :param text: Chunk text.
+        :param embedding: Pre-computed embedding vector (required for unsupervised path).
+        :param supervised_threshold: Minimum confidence to accept supervised result.
+        :param top_k: Max topics returned.
+        :return: ``(matches, method)`` where method is ``"supervised"``,
+                 ``"unsupervised"``, or ``"fallback"``.
+        """
+        # Try supervised first
+        supervised = self.classify(text, threshold=supervised_threshold, top_k=top_k)
+        if supervised and supervised[0].score >= supervised_threshold:
+            return supervised, "supervised"
+
+        # Try unsupervised if K-means is fitted and we have an embedding
+        if (
+            embedding is not None
+            and hasattr(self, "_kmeans")
+            and self._kmeans is not None
+        ):
+            try:
+                return self._classify_unsupervised(embedding), "unsupervised"
+            except Exception:
+                pass
+
+        # Final fallback: return whatever supervised gave us (even low confidence)
+        if supervised:
+            return supervised, "fallback"
+
+        return [], "fallback"
+
+    def _classify_unsupervised(self, embedding: list[float]) -> list[TopicMatch]:
+        """Assign a cluster-based topic using the fitted K-means model.
+
+        :param embedding: Float32 embedding vector.
+        :return: Single-element list with the cluster topic.
+        """
+        import numpy as np  # pylint: disable=import-outside-toplevel
+        from sklearn.preprocessing import (  # pylint: disable=import-outside-toplevel
+            normalize,
+        )
+
+        vec = normalize(np.asarray([embedding], dtype="float32"))
+        cluster_idx = int(self._kmeans.predict(vec)[0])
+
+        # Compute confidence from distance to centroid (closer = higher)
+        centroid = self._kmeans.cluster_centers_[cluster_idx]
+        dist = float(np.linalg.norm(vec[0] - centroid))
+        # Map distance to [0, 1] confidence (inverse, capped)
+        confidence = max(0.1, min(1.0, 1.0 / (1.0 + dist)))
+
+        label = self._cluster_labels[cluster_idx]
+        return [
+            TopicMatch(
+                topic=f"cluster:{label}",
+                score=round(confidence, 4),
+                matched_terms=[],
+            )
+        ]
+
+
 def _tokenize(text: str) -> list[str]:
     return [m.group(0).lower() for m in re.finditer(r"[A-Za-z][A-Za-z0-9_\-]{1,30}", text)]

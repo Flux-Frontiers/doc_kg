@@ -1,6 +1,6 @@
 ---
 name: dockg
-description: Expert knowledge for installing, configuring, and using the DocKG MCP server — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or LanceDB knowledge graph from documents, configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg viz, dockg mcp, dockg snapshot), using the graph_stats / query_docs / pack_docs / get_node MCP tools, or troubleshooting DocKG errors.
+description: Expert knowledge for installing, configuring, and using DocKG — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or LanceDB knowledge graph from documents, running the multipass analysis pipeline (dockg pipeline run/embed/manifold), configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg semantic-analyze, dockg pipeline, dockg viz, dockg mcp, dockg snapshot), using the graph_stats / query_docs / pack_docs / get_node MCP tools, or troubleshooting DocKG errors.
 ---
 
 # DocKG Skill
@@ -9,7 +9,7 @@ description: Expert knowledge for installing, configuring, and using the DocKG M
 >
 > Text search finds strings. DocKG understands documents. It knows which sections contain which chunks, how topics and entities cross-reference across files, and surfaces the most semantically relevant excerpts in a single query. One `pack_docs` call replaces five rounds of search-and-read and gives the agent real structural insight into the corpus — not just keyword matches.
 
-DocKG indexes `.md` and `.txt` document corpora into a hybrid knowledge graph (SQLite + LanceDB) and exposes it as MCP tools for AI agents.
+DocKG indexes `.md` and `.txt` document corpora into a hybrid knowledge graph (SQLite + LanceDB) and exposes it as MCP tools for AI agents. It also provides a **multipass analysis pipeline** (diary_kg-style) for deep NLP transformation with diversity sampling, hybrid topic classification, corpus embedding, and manifold analysis.
 
 ## Installation (Poetry)
 
@@ -85,13 +85,73 @@ The knowledge graph is a snapshot of the corpus at build time. It does **not** u
 |---|---|
 | `dockg query <QUERY>` | Hybrid semantic + graph query, prints ranked result summary |
 | `dockg pack <QUERY>` | Hybrid query + text excerpt pack, outputs Markdown or JSON |
-| `dockg analyze` | Full corpus analysis — topic coverage, entity density, orphaned nodes |
+| `dockg analyze` | Structural analysis — metrics, coverage, hotspots, orphaned nodes |
+| `dockg semantic-analyze` | Semantic analysis — themes, entities, language metrics, cohesion |
 | `dockg viz` | Launch Streamlit graph visualizer (PyVis network) |
 | `dockg snapshot save <version>` | Capture metrics snapshot (commit, branch, version) |
 | `dockg snapshot list` | List all snapshots in reverse chronological order |
 | `dockg snapshot show <commit>` | Full details for a single snapshot |
 | `dockg snapshot diff <a> <b>` | Compare two snapshots side-by-side |
 | `dockg mcp` | Start the MCP server (stdio transport) |
+
+## Multipass Analysis Pipeline
+
+DocKG includes a diary_kg-style multipass analysis pipeline for deep NLP transformation. This is complementary to the core build — use it for corpus-level analysis, embedding quality evaluation, and structured provenance tracking.
+
+### Pipeline Commands
+
+| Command | Purpose |
+|---|---|
+| `dockg pipeline run` | 5-phase analysis: sampling → chunking → classification → memory → output |
+| `dockg pipeline embed` | Multi-process corpus embedding (nomic-embed-text-v1, 768-d) |
+| `dockg pipeline manifold` | Intrinsic dimensionality, PCA elbow, MRL truncation quality |
+
+### The 5 Phases
+
+1. **Diversity Sampling** — NLP feature extraction, K-means clustering, representative batch selection
+2. **Sentence-Group Chunking** — N sentences per chunk (default: 4), natural boundaries, fast
+3. **Hybrid Topic Classification** — supervised keyword matching (primary) + unsupervised K-means (fallback)
+4. **Memory Creation** — `EntryChunk` objects with full source provenance, confidence scores, entities
+5. **Structured Output** — pipe-delimited `.psv` with run parameters, source tracking, statistics
+
+### Quick Start
+
+```bash
+# Run full pipeline on a corpus (samples 20 docs by default)
+dockg pipeline run --repo docs --batch 20 --strategy sentence_group
+
+# Embed full corpus for manifold analysis
+dockg pipeline embed --repo docs --workers 4
+
+# Analyze embedding geometry
+dockg pipeline manifold
+```
+
+### Key Options
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--strategy` | `sentence_group` | Chunking strategy (`sentence_group` or `semantic`) |
+| `--sentences` | `4` | Sentences per chunk (sentence_group strategy) |
+| `--batch` | `20` | Documents to sample per run |
+| `--sampling` | `diversity` | Sampling strategy (`diversity`, `random`, `temporal`) |
+| `--n-clusters` | `8` | K-means clusters for diversity sampling and topic fallback |
+| `--supervised-threshold` | `0.3` | Min confidence to accept supervised classification |
+| `--topics-file` | built-in | Custom topic catalog (YAML/JSON) |
+| `--model` | `nomic-ai/nomic-embed-text-v1` | Embedding model for pipeline |
+
+### Pipeline Output
+
+Output files are written to `.dockg/pipeline/`:
+- `PipelineRun_<id>_<timestamp>.psv` — pipe-delimited analysis results
+- `embeddings.json` — corpus embedding cache (from `pipeline embed`)
+
+### Embedding Models
+
+| Pipeline | Model | Dims | Notes |
+|---|---|---|---|
+| Core build (`dockg build`) | `all-mpnet-base-v2` | 768 | General-text, SIMILAR_TO discovery |
+| Multipass (`dockg pipeline`) | `nomic-ai/nomic-embed-text-v1` | 768 | Asymmetric retrieval with `search_document:` prefix, matches diary_kg |
 
 ## Configure Claude Code / Kilo Code (.mcp.json)
 
@@ -256,8 +316,11 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 
 - `k=8, hop=1, rels="CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"`
 - `max_chars=2000` (pack_docs), `max_nodes=15` (pack_docs), `max_nodes=25` (query_docs)
-- Default embedding model: `all-mpnet-base-v2`
+- Core build embedding model: `all-mpnet-base-v2` (768-d)
+- Pipeline embedding model: `nomic-ai/nomic-embed-text-v1` (768-d)
 - Storage: `.dockg/graph.sqlite` (SQLite) + `.dockg/lancedb/` (LanceDB)
+- Pipeline output: `.dockg/pipeline/` (`.psv` runs, `embeddings.json` cache)
+- Feature cache: `.dockg/cache/` (pickle, per-file with SHA-256 invalidation)
 - Transport: `stdio` (Claude Code/Desktop), `sse` (HTTP clients)
 
 ## .gitignore Setup
@@ -266,7 +329,7 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 .dockg/
 ```
 
-The `.dockg/` directory holds the SQLite graph, LanceDB vector index, and snapshots. All are local reproducible artifacts. Add this to `.gitignore` when installing DocKG in a new repo.
+The `.dockg/` directory holds the SQLite graph, LanceDB vector index, snapshots, pipeline outputs, feature caches, and embedding caches. All are local reproducible artifacts. Add this to `.gitignore` when installing DocKG in a new repo.
 
 ## Offline Setup
 
@@ -295,3 +358,4 @@ export DOCKG_MODEL_DIR=/path/to/shared/models
 ## Full Reference
 
 See `docs/MCP.md` for complete MCP config templates and tool semantics.
+See `docs/ingestion.md` for the complete ingestion architecture (core build + multipass pipeline).

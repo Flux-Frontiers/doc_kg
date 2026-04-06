@@ -18,3 +18,10 @@ def test_cli_includes_expected_commands():
     assert "snapshot" in result.output
     assert "viz" in result.output
     assert "mcp" in result.output
+
+
+def test_cli_includes_pipeline_command():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "pipeline" in result.output
