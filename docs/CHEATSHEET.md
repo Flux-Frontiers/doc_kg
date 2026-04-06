@@ -330,13 +330,52 @@ Both options are additive — CLI flags extend `pyproject.toml` excludes.
 
 ---
 
-## 9. This Corpus Live Stats
+## 9. Multipass Analysis Pipeline
+
+DocKG also includes a diary_kg-style multipass pipeline for deep NLP analysis. This is complementary to the core build and MCP tools.
+
+### Pipeline Commands
+
+```bash
+# 5-phase analysis: sampling → chunking → classification → memory → output
+dockg pipeline run --repo docs --batch 20
+
+# Multi-process corpus embedding (nomic-embed-text-v1, 768-d)
+dockg pipeline embed --repo docs --workers 4
+
+# Manifold analysis (PCA, TwoNN, MRL truncation quality)
+dockg pipeline manifold
+```
+
+### Key Differences from Core Build
+
+| Aspect | Core Build (`dockg build`) | Pipeline (`dockg pipeline run`) |
+|---|---|---|
+| Purpose | Searchable graph for MCP/CLI | Deep NLP analysis with provenance |
+| Embedding model | `all-mpnet-base-v2` | `nomic-ai/nomic-embed-text-v1` |
+| Chunking | Semantic (embedding-based) | Sentence-group (4 sentences) |
+| Topic classification | Supervised only | Hybrid: supervised + unsupervised K-means |
+| Sampling | All files | Diversity sampling (K-means on features) |
+| Output | SQLite + LanceDB | Pipe-delimited `.psv` + JSON embedding cache |
+
+### Pipeline Output
+
+```
+# .dockg/pipeline/PipelineRun_<id>_<ts>.psv
+pchunk:docs/auth.md:3f8a2b1c | authentication | 0.44 | supervised | oauth,token | The OAuth2 flow...
+```
+
+See `docs/ingestion.md` for the full ingestion architecture.
+
+---
+
+## 10. This Corpus Live Stats
 
 ```
 Nodes: 1,500   (document: 12 · section: 48 · chunk: 850 · topic: 120 · entity: 200 · keyword: 270)
 Edges: 2,100   (CONTAINS: 900 · NEXT: 450 · SIMILAR_TO: 350 · HAS_TOPIC: 200 · MENTIONS_ENTITY: 150 · HAS_KEYWORD: 50)
 DB:    .dockg/graph.sqlite
-Model: all-mpnet-base-v2
+Model: all-mpnet-base-v2 (core build) · nomic-ai/nomic-embed-text-v1 (pipeline)
 ```
 
 *Rebuild after significant content changes: `dockg build docs`*

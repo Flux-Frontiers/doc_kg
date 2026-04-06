@@ -90,6 +90,42 @@ dockg snapshot diff abc1234 def5678
 
 Compare two snapshots side-by-side.
 
+## Multipass Analysis Pipeline
+
+```bash
+dockg pipeline run --repo docs --batch 20
+```
+
+Run the diary_kg-style 5-phase NLP transformation pipeline:
+1. **Diversity Sampling** — K-means clustering on NLP features, representative batch
+2. **Sentence-Group Chunking** — 4 sentences per chunk, natural boundaries
+3. **Hybrid Topic Classification** — supervised keyword matching + unsupervised K-means fallback
+4. **Memory Creation** — EntryChunk objects with full source provenance
+5. **Structured Output** — pipe-delimited `.psv` with run parameters and statistics
+
+Output: `.dockg/pipeline/PipelineRun_<id>_<timestamp>.psv`
+
+### Corpus Embedding
+
+```bash
+dockg pipeline embed --repo docs --workers 4
+```
+
+Multi-process corpus embedding using `nomic-ai/nomic-embed-text-v1` (768-d).
+Produces a JSON cache at `.dockg/pipeline/embeddings.json`.
+
+### Manifold Analysis
+
+```bash
+dockg pipeline manifold
+```
+
+Analyze embedding geometry:
+- PCA elbow (90/95/99% explained variance)
+- Participation Ratio (effective dimensionality)
+- TwoNN intrinsic dimensionality
+- MRL truncation quality (MRR@10 at 32/64/128/256/512/768 dims)
+
 ## MCP Server
 
 ```bash
@@ -116,9 +152,22 @@ dockg query "API authentication methods"
 # 5. Extract markdown pack for a topic
 dockg pack "error handling patterns" --top 5
 
-# 6. Capture a snapshot at a milestone
+# 6. Run multipass analysis pipeline
+dockg pipeline run --repo docs --batch 30
+
+# 7. Embed corpus for manifold analysis
+dockg pipeline embed --repo docs
+
+# 8. Analyze embedding quality
+dockg pipeline manifold
+
+# 9. Capture a snapshot at a milestone
 dockg snapshot save "documentation-v1.0"
 
-# 7. Start MCP server for IDE integration
+# 10. Start MCP server for IDE integration
 dockg mcp --repo .
 ```
+
+## Full Ingestion Architecture
+
+See `docs/ingestion.md` for the complete ingestion path documentation covering both the core build pipeline and the multipass analysis pipeline.
