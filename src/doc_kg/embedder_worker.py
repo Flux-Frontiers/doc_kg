@@ -220,7 +220,7 @@ class CorpusEmbedder:
                 results = pool.map(_embed_shard, shards)
                 for shard_vecs in results:
                     all_vectors.extend(shard_vecs)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Multiprocessing failed (%s), falling back to sequential", exc)
             all_vectors = self._embed_sequential(texts)
 

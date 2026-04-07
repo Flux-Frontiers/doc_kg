@@ -6,6 +6,13 @@
 # but for natural-language documents instead of Python source code.
 #
 # Author: Eric G. Suchanek, PhD
+# Last Revision: 2026-04-07
+#
+
+[[tool.poetry.source]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
@@ -41,26 +48,29 @@ pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
 einops = "^0.8.2"
-kg-snapshot = { git = "https://github.com/Flux-Frontiers/kg_snapshot.git"}
+kg-snapshot = { version = ">=0.3.0", source = "testpypi" }
 
 
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
 
-[tool.poetry.group.dev]
+[tool.poetry.group.kgdeps]
 optional = true
+
+[tool.poetry.group.kgdeps.dependencies]
+pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git" }
+ftree-kg = { git = "https://github.com/Flux-Frontiers/FTree_kg.git" }
+agent-kg = { git = "https://github.com/Flux-Frontiers/agent_kg.git" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 pytest-cov = ">=5.0.0"
 ruff = ">=0.4.0"
 mypy = ">=1.10.0"
-types-pyyaml = "^6.0.12.20250915"
 pre-commit = "^4.5.1"
+detect-secrets = "^1.5.0"
 pylint = "^4.0.5"
-pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git" }
-ftree-kg = { git = "https://github.com/Flux-Frontiers/FTree_kg.git" }
-agent-kg = { git = "https://github.com/Flux-Frontiers/agent_kg.git" }
+pdoc = ">=14.0.0"
 
 [tool.poetry.scripts]
 dockg          = "doc_kg.cli.main:cli"
@@ -82,21 +92,29 @@ exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = false
 ignore_missing_imports = true
+mypy_path = "src"
+explicit_package_bases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
 pythonpath = ["src"]
 
-[tool.dockg]
-# Add extra directories to exclude beyond the built-in SKIP_DIRS.
-# SKIP_DIRS already covers: .dockg, .git, .venv, venv, __pycache__, node_modules, etc.
-# Example: exclude = ["archive", "vendor", "generated"]
+[tool.pylint.messages_control]
+disable = ["all"]
+enable = [
+    "cyclic-import",           # R0401
+    "broad-exception-caught",  # W0718
+    "cell-var-from-loop",      # W0640
+    "undefined-variable",      # E0602
+    "import-outside-toplevel", # C0415
+]
 
 [tool.pycodekg]
 # Exclude test directories from the knowledge graph.
@@ -104,27 +122,13 @@ pythonpath = ["src"]
 exclude = ["tests"]
 include = ["src"]
 
-[tool.pylint.design]
-max-args = 20
-max-positional-arguments = 20
-max-locals = 60
-max-attributes = 25
-max-branches = 25
-max-statements = 80
-min-public-methods = 1
+[tool.dockg]
+# Exclude directories from the knowledge graph by default.
+exclude = [".dockg", ".pycodekg", "src", ".git", ".venv", "venv", "__pycache__",
+".mypy_cache", ".pytest_cache", "bundles", "dist"]
 
-[tool.pylint.format]
-max-line-length = 120
-
-[tool.pylint.similarities]
-ignore-imports = true
-
-[tool.pylint.messages_control]
-disable = [
-    "duplicate-code",
-    "protected-access",
-    "global-statement",
-    "broad-exception-caught",
-    "invalid-name",
-    "no-member",
+[tool.poe.tasks.docs]
+help = "Generate project documentation and user guide PDFs"
+sequence = [
+  { shell = "cd src && pdoc --o ../docs --logo ./logo.png doc_kg" },
 ]

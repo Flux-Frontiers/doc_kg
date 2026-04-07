@@ -565,7 +565,7 @@ def _resolve_reference(href: str, source_file: str, path_to_doc_id: dict[str, st
         for known in path_to_doc_id:
             if resolved.endswith(known) or known.endswith(href):
                 return known
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
 
     # Direct match

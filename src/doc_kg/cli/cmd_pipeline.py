@@ -14,6 +14,7 @@ Author: Eric G. Suchanek, PhD
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal, cast
 
 import click
 
@@ -144,7 +145,7 @@ def pipeline_run(
 
     config = PipelineConfig(
         corpus_root=Path(repo),
-        chunk_strategy=strategy,
+        chunk_strategy=cast(Literal["sentence_group", "semantic"], strategy),
         sentences_per_chunk=sentences,
         n_diversity_clusters=n_clusters,
         batch_size=batch,

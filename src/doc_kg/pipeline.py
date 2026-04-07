@@ -351,7 +351,7 @@ class AnalysisPipeline:
                     embeddings, n_clusters=self.config.n_topic_clusters
                 )
 
-        except (ImportError, Exception) as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Could not fit unsupervised clusters: %s", exc)
 
     # ------------------------------------------------------------------

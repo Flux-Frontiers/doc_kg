@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import yaml
-except Exception:  # pragma: no cover - optional dependency at runtime
+    import yaml  # type: ignore[import-untyped]
+except Exception:  # pylint: disable=broad-exception-caught  # pragma: no cover - optional dependency at runtime
     yaml = None  # type: ignore[assignment]  # pylint: disable=invalid-name
 
 
@@ -285,7 +285,7 @@ class TopicExtractor:
         if embedding is not None and hasattr(self, "_kmeans") and self._kmeans is not None:
             try:
                 return self._classify_unsupervised(embedding), "unsupervised"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
         # Final fallback: return whatever supervised gave us (even low confidence)

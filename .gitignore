@@ -237,8 +237,10 @@ __marimo__/
 # Also ignore .dockg/ nested under subdirectories (e.g. docs/.dockg/)
 **/.dockg/
 
+.agentkg/
+
 # Local MCP configuration (contains absolute paths)
-.mcp.json
+#.mcp.json
 
 # MacOS
 .DS_Store

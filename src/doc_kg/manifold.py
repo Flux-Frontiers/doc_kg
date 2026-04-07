@@ -98,25 +98,25 @@ class ManifoldAnalyzer:
         # PCA analysis
         try:
             self._pca_analysis(X, report)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("PCA analysis failed: %s", exc)
 
         # Participation Ratio
         try:
             report.participation_ratio = self._participation_ratio(X)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Participation ratio failed: %s", exc)
 
         # TwoNN
         try:
             report.twinn_dim = self._twinn(X)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("TwoNN failed: %s", exc)
 
         # MRL truncation quality
         try:
             report.mrl_mrr = self._mrl_mrr(X)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("MRL analysis failed: %s", exc)
 
         return report

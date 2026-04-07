@@ -206,7 +206,7 @@ class TextChunker:
         # Batch-embed all sentences
         try:
             vecs = self.embedder.embed_texts(sentences)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             # Fall back to fixed-size on embedding failure
             return self._fixed_size_chunks(sentences, full_text, base_offset)
 
@@ -456,9 +456,7 @@ class SentenceGroupChunker:
             if not section_text.strip():
                 continue
 
-            sub_chunks = self._sentence_group_chunks(
-                section_text, base_offset=section_start
-            )
+            sub_chunks = self._sentence_group_chunks(section_text, base_offset=section_start)
             for sc in sub_chunks:
                 refs = _extract_links(sc["text"])
                 chunks.append(
@@ -492,9 +490,7 @@ class SentenceGroupChunker:
             )
         return result
 
-    def _sentence_group_chunks(
-        self, text: str, *, base_offset: int = 0
-    ) -> list[dict]:
+    def _sentence_group_chunks(self, text: str, *, base_offset: int = 0) -> list[dict]:
         """Group consecutive sentences into fixed-count chunks.
 
         :param text: Section or document text.

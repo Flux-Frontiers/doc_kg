@@ -1,6 +1,10 @@
 """
 snapshots.py — Temporal Snapshots of DocKG Metrics
 
+Author: Eric G. Suchanek, PhD
+License: Elastic-2.0
+Last Revision: 2026-04-07
+
 Thin compatibility layer over the shared ``kg_snapshot`` module.
 
 The shared module provides canonical ``Snapshot``, ``SnapshotManifest``, and
@@ -41,9 +45,12 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # Re-export shared base types (backwards-compat public API)
 # ---------------------------------------------------------------------------
+from kg_snapshot.snapshots import (
+    PruneResult,  # noqa: F401  re-exported
+    SnapshotManifest,  # noqa: F401  re-exported
+)
 from kg_snapshot.snapshots import Snapshot as _BaseSnapshot
 from kg_snapshot.snapshots import SnapshotManager as _BaseSnapshotManager
-from kg_snapshot.snapshots import SnapshotManifest  # noqa: F401  re-exported
 
 __all__ = [
     "SnapshotMetrics",
@@ -51,6 +58,7 @@ __all__ = [
     "Snapshot",
     "SnapshotManifest",
     "SnapshotManager",
+    "PruneResult",
     "metrics_to_dict",
     "metrics_from_dict",
 ]
