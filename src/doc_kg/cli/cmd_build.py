@@ -413,7 +413,14 @@ def build_graph(
     type=int,
     default=256,
     show_default=True,
-    help="Embedding batch size.",
+    help="LanceDB write batch size.",
+)
+@click.option(
+    "--encode-batch",
+    type=int,
+    default=1024,
+    show_default=True,
+    help="GPU encode batch size (higher = better MPS/CUDA utilisation; tune down if OOM).",
 )
 def build_index(
     repo: str,
@@ -424,6 +431,7 @@ def build_index(
     update: bool,
     no_similar: bool,
     batch: int,
+    encode_batch: int,
 ) -> None:
     """Build only the LanceDB semantic index from an existing SQLite graph."""
     repo_root = Path(repo).resolve()
@@ -448,6 +456,7 @@ def build_index(
         kg.store,
         wipe=wipe,
         batch_size=batch,
+        encode_batch_size=encode_batch,
         discover_similar=not no_similar,
         quiet=False,
     )

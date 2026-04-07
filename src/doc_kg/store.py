@@ -19,6 +19,7 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from collections.abc import Iterable, Sequence
@@ -168,72 +169,166 @@ class GraphStore:
         edges: Sequence[DocEdge],
         *,
         wipe: bool = False,
+        quiet: bool = False,
+        batch_size: int = 10_000,
     ) -> None:
         """Persist a complete graph to SQLite.
 
         :param nodes: Node list from :class:`~doc_kg.graph.DocGraph`.
         :param edges: Edge list from :class:`~doc_kg.graph.DocGraph`.
         :param wipe: If ``True``, clear existing data before writing.
+        :param quiet: Suppress progress output (default: ``False``).
+        :param batch_size: Rows per commit batch.
         """
         if wipe:
+            if not quiet:
+                from rich.console import Console  # pylint: disable=import-outside-toplevel
+
+                Console().print("  Clearing existing graph\u2026")
             self.clear()
-        self._upsert_nodes(nodes)
-        self._upsert_edges(edges)
+        self._upsert_nodes(nodes, quiet=quiet, batch_size=batch_size)
+        self._upsert_edges(edges, quiet=quiet, batch_size=batch_size)
 
-    def _upsert_nodes(self, nodes: Iterable[DocNode]) -> None:
-        rows = [
-            (
-                n.id,
-                n.kind,
-                n.name,
-                n.title,
-                n.file_path,
-                n.char_start,
-                n.char_end,
-                n.heading_level,
-                n.text,
-            )
-            for n in nodes
-        ]
-        self.con.executemany(
-            """
-            INSERT INTO nodes
-              (id, kind, name, title, file_path, char_start, char_end, heading_level, text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-              kind=excluded.kind,
-              name=excluded.name,
-              title=excluded.title,
-              file_path=excluded.file_path,
-              char_start=excluded.char_start,
-              char_end=excluded.char_end,
-              heading_level=excluded.heading_level,
-              text=excluded.text
-            """,
-            rows,
-        )
-        self.con.commit()
+    def _upsert_nodes(
+        self,
+        nodes: Iterable[DocNode],
+        *,
+        quiet: bool = False,
+        batch_size: int = 10_000,
+    ) -> None:
+        node_list = list(nodes)
+        if not node_list:
+            return
 
-    def _upsert_edges(self, edges: Iterable[DocEdge]) -> None:
-        rows = [
-            (
-                e.src,
-                e.rel,
-                e.dst,
-                (json.dumps(e.evidence, ensure_ascii=False) if e.evidence is not None else None),
+        if not quiet:
+            from rich.progress import (  # pylint: disable=import-outside-toplevel
+                BarColumn,
+                MofNCompleteColumn,
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                TimeElapsedColumn,
+                TimeRemainingColumn,
             )
-            for e in edges
-        ]
-        self.con.executemany(
-            """
-            INSERT INTO edges (src, rel, dst, evidence)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(src, rel, dst) DO UPDATE SET
-              evidence=excluded.evidence
-            """,
-            rows,
-        )
-        self.con.commit()
+
+            _ctx: contextlib.AbstractContextManager = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+            )
+        else:
+            _ctx = contextlib.nullcontext()
+
+        with _ctx as prog:
+            task = (
+                prog.add_task("  Writing nodes", total=len(node_list))
+                if prog is not None
+                else None
+            )
+            for i in range(0, len(node_list), batch_size):
+                batch = node_list[i : i + batch_size]
+                self.con.executemany(
+                    """
+                    INSERT INTO nodes
+                      (id, kind, name, title, file_path, char_start, char_end, heading_level, text)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                      kind=excluded.kind,
+                      name=excluded.name,
+                      title=excluded.title,
+                      file_path=excluded.file_path,
+                      char_start=excluded.char_start,
+                      char_end=excluded.char_end,
+                      heading_level=excluded.heading_level,
+                      text=excluded.text
+                    """,
+                    [
+                        (
+                            n.id,
+                            n.kind,
+                            n.name,
+                            n.title,
+                            n.file_path,
+                            n.char_start,
+                            n.char_end,
+                            n.heading_level,
+                            n.text,
+                        )
+                        for n in batch
+                    ],
+                )
+                self.con.commit()
+                if prog is not None and task is not None:
+                    prog.advance(task, len(batch))
+
+    def _upsert_edges(
+        self,
+        edges: Iterable[DocEdge],
+        *,
+        quiet: bool = False,
+        batch_size: int = 10_000,
+    ) -> None:
+        edge_list = list(edges)
+        if not edge_list:
+            return
+
+        if not quiet:
+            from rich.progress import (  # pylint: disable=import-outside-toplevel
+                BarColumn,
+                MofNCompleteColumn,
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                TimeElapsedColumn,
+                TimeRemainingColumn,
+            )
+
+            _ctx: contextlib.AbstractContextManager = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+            )
+        else:
+            _ctx = contextlib.nullcontext()
+
+        with _ctx as prog:
+            task = (
+                prog.add_task("  Writing edges", total=len(edge_list))
+                if prog is not None
+                else None
+            )
+            for i in range(0, len(edge_list), batch_size):
+                batch = edge_list[i : i + batch_size]
+                self.con.executemany(
+                    """
+                    INSERT INTO edges (src, rel, dst, evidence)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(src, rel, dst) DO UPDATE SET
+                      evidence=excluded.evidence
+                    """,
+                    [
+                        (
+                            e.src,
+                            e.rel,
+                            e.dst,
+                            (
+                                json.dumps(e.evidence, ensure_ascii=False)
+                                if e.evidence is not None
+                                else None
+                            ),
+                        )
+                        for e in batch
+                    ],
+                )
+                self.con.commit()
+                if prog is not None and task is not None:
+                    prog.advance(task, len(batch))
 
     # ------------------------------------------------------------------
     # Read — single node

@@ -28,7 +28,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from doc_kg.dockg import DEFAULT_MODEL
 
@@ -169,11 +169,21 @@ class SentenceTransformerEmbedder(Embedder):
         self.model_name = model_name
         self.dim: int = self.model.get_sentence_embedding_dimension() or 384
 
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Embed a list of strings into float32 vectors."""
+    def embed_texts(self, texts: list[str], encode_batch_size: int = 512) -> list[list[float]]:
+        """Embed a list of strings into float32 vectors.
+
+        :param texts: Input strings.
+        :param encode_batch_size: Internal batch size passed to ``model.encode()``
+                                  (higher = better GPU utilisation on MPS/CUDA).
+        """
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        vecs = self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+        vecs = self.model.encode(
+            texts,
+            batch_size=encode_batch_size,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
         return [np.asarray(v, dtype="float32").tolist() for v in vecs]
 
     def embed_query(self, query: str) -> list[float]:
@@ -272,6 +282,7 @@ class SemanticIndex:
         *,
         wipe: bool = False,
         batch_size: int = 256,
+        encode_batch_size: int = 1024,
         quiet: bool = False,
         discover_similar: bool = True,
         similar_k: int = 5,
@@ -284,7 +295,10 @@ class SemanticIndex:
 
         :param store: Authoritative :class:`~doc_kg.store.GraphStore`.
         :param wipe: If ``True``, delete all existing vectors first.
-        :param batch_size: Number of nodes to embed per batch.
+        :param batch_size: LanceDB write batch size.
+        :param encode_batch_size: Tokens fed to ``model.encode()`` per GPU call.
+                                   Larger values improve MPS/CUDA utilisation
+                                   (default 1024; tune down if OOM).
         :param quiet: Suppress progress output (default: ``False``).
         :param discover_similar: If ``True``, run SIMILAR_TO edge discovery.
         :param similar_k: k-nearest neighbors to examine per chunk.
@@ -295,6 +309,8 @@ class SemanticIndex:
         if quiet:
             suppress_ingestion_logging()
 
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
         nodes = self._read_nodes(store)
         if not quiet:
             from rich.console import Console  # pylint: disable=import-outside-toplevel
@@ -303,9 +319,10 @@ class SemanticIndex:
         tbl = self._open_table(wipe=wipe)
 
         indexed = 0
-        # Keep vectors in memory for SIMILAR_TO pass
         all_ids: list[str] = []
-        all_vecs: list[list[float]] = []
+        # Pre-allocate a contiguous float32 array — 8x smaller than list[list[float]]
+        # (1M × 768 × 4B = ~3 GB vs ~24 GB as Python objects)
+        all_vecs_np = np.zeros((len(nodes), self.embedder.dim), dtype=np.float32)
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -331,34 +348,41 @@ class SemanticIndex:
 
         with _progress_ctx as prog:
             task_id = prog.add_task("  Embedding", total=len(nodes)) if prog is not None else None
-            for i in range(0, len(nodes), batch_size):
-                chunk = nodes[i : i + batch_size]
-                texts = [_build_index_text(n) for n in chunk]
-                vecs = self.embedder.embed_texts(texts)
+            for i in range(0, len(nodes), encode_batch_size):
+                enc_nodes = nodes[i : i + encode_batch_size]
+                enc_texts = [_build_index_text(n) for n in enc_nodes]
+                enc_vecs = self.embedder.embed_texts(enc_texts, encode_batch_size=encode_batch_size)
+                enc_arr = np.asarray(enc_vecs, dtype=np.float32)
+                all_vecs_np[i : i + len(enc_nodes)] = enc_arr
 
-                ids = [n["id"] for n in chunk]
-                if ids:
-                    pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
-                    tbl.delete(pred)
+                # Write to LanceDB in batch_size slices
+                for j in range(0, len(enc_nodes), batch_size):
+                    chunk = enc_nodes[j : j + batch_size]
+                    texts_slice = enc_texts[j : j + batch_size]
+                    vecs_slice = enc_arr[j : j + batch_size]
 
-                rows = [
-                    {
-                        "id": n["id"],
-                        "kind": n["kind"],
-                        "name": n["name"],
-                        "title": n.get("title") or "",
-                        "file_path": n.get("file_path") or "",
-                        "text": text,
-                        "vector": vec,
-                    }
-                    for n, text, vec in zip(chunk, texts, vecs)
-                ]
-                tbl.add(rows)
-                indexed += len(rows)
-                all_ids.extend(ids)
-                all_vecs.extend(vecs)
-                if task_id is not None:
-                    prog.advance(task_id, len(rows))
+                    ids = [n["id"] for n in chunk]
+                    if ids:
+                        pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
+                        tbl.delete(pred)
+
+                    rows = [
+                        {
+                            "id": n["id"],
+                            "kind": n["kind"],
+                            "name": n["name"],
+                            "title": n.get("title") or "",
+                            "file_path": n.get("file_path") or "",
+                            "text": text,
+                            "vector": vec.tolist(),
+                        }
+                        for n, text, vec in zip(chunk, texts_slice, vecs_slice)
+                    ]
+                    tbl.add(rows)
+                    indexed += len(rows)
+                    all_ids.extend(ids)
+                    if prog is not None and task_id is not None:
+                        prog.advance(task_id, len(chunk))
 
         self._tbl = tbl
 
@@ -368,7 +392,7 @@ class SemanticIndex:
             similar_edges_added = self._discover_similar_edges(
                 store,
                 all_ids,
-                all_vecs,
+                all_vecs_np,
                 k=similar_k,
                 threshold=similarity_edge_threshold,
                 quiet=quiet,
@@ -392,11 +416,11 @@ class SemanticIndex:
         self,
         store: GraphStore,
         node_ids: list[str],
-        vecs: list[list[float]],
+        vecs: Any,
         *,
         k: int,
         threshold: float,
-        quiet: bool,  # pylint: disable=unused-argument
+        quiet: bool,
     ) -> int:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 
@@ -405,12 +429,14 @@ class SemanticIndex:
 
         :param store: GraphStore to write edges into.
         :param node_ids: Node IDs in the same order as *vecs*.
-        :param vecs: Embedding vectors for each node.
+        :param vecs: Float32 numpy array of shape ``(N, dim)``.
         :param k: k-nearest neighbors to examine.
         :param threshold: Minimum cosine similarity for an edge.
         :param quiet: Suppress progress output.
         :return: Number of edges added.
         """
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
         # Only chunk nodes get SIMILAR_TO edges
@@ -418,10 +444,9 @@ class SemanticIndex:
         if not chunk_indices:
             return 0
 
-        import numpy as np  # pylint: disable=import-outside-toplevel
-
         chunk_ids = [node_ids[i] for i in chunk_indices]
-        chunk_vecs = np.asarray([vecs[i] for i in chunk_indices], dtype="float32")
+        chunk_id_to_idx = {nid: i for i, nid in enumerate(chunk_ids)}  # O(1) lookups
+        chunk_vecs = vecs[chunk_indices]  # direct numpy slice — no copy
 
         # Cosine similarity matrix (chunked to avoid OOM on large corpora)
         edges: list[DocEdge] = []
@@ -473,7 +498,7 @@ class SemanticIndex:
                     seen.add(pair)
 
                     # Compute cosine similarity
-                    ci2 = chunk_ids.index(candidate) if candidate in chunk_ids else -1
+                    ci2 = chunk_id_to_idx.get(candidate, -1)
                     if ci2 == -1:
                         continue
                     a, b = chunk_vecs[ci], chunk_vecs[ci2]

@@ -446,7 +446,7 @@ class DocKG:
         :return: :class:`BuildStats` (``indexed_rows`` will be ``None``).
         """
         nodes, edges = self.graph.extract(force=wipe).result()
-        self.store.write(nodes, edges, wipe=wipe)
+        self.store.write(nodes, edges, wipe=wipe, quiet=False)
         s = self.store.stats()
         return BuildStats(
             corpus_root=str(self.corpus_root),
