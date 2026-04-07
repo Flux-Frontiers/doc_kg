@@ -272,7 +272,7 @@ class SemanticIndex:
         *,
         wipe: bool = False,
         batch_size: int = 256,
-        quiet: bool = True,
+        quiet: bool = False,
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
@@ -285,7 +285,7 @@ class SemanticIndex:
         :param store: Authoritative :class:`~doc_kg.store.GraphStore`.
         :param wipe: If ``True``, delete all existing vectors first.
         :param batch_size: Number of nodes to embed per batch.
-        :param quiet: Suppress progress output.
+        :param quiet: Suppress progress output (default: ``False``).
         :param discover_similar: If ``True``, run SIMILAR_TO edge discovery.
         :param similar_k: k-nearest neighbors to examine per chunk.
         :param similarity_edge_threshold: Minimum cosine similarity to emit a
@@ -296,6 +296,10 @@ class SemanticIndex:
             suppress_ingestion_logging()
 
         nodes = self._read_nodes(store)
+        if not quiet:
+            from rich.console import Console  # pylint: disable=import-outside-toplevel
+
+            Console().print(f"  nodes    : {len(nodes):,} to embed")
         tbl = self._open_table(wipe=wipe)
 
         indexed = 0
@@ -308,15 +312,19 @@ class SemanticIndex:
                 BarColumn,
                 MofNCompleteColumn,
                 Progress,
+                SpinnerColumn,
+                TextColumn,
                 TimeElapsedColumn,
+                TimeRemainingColumn,
             )
 
             _progress_ctx: contextlib.AbstractContextManager = Progress(
-                "[progress.description]{task.description}",
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 MofNCompleteColumn(),
                 TimeElapsedColumn(),
-                transient=True,
+                TimeRemainingColumn(),
             )
         else:
             _progress_ctx = contextlib.nullcontext()
@@ -423,39 +431,70 @@ class SemanticIndex:
         if tbl is None:
             return 0
 
-        for ci, (nid, qvec) in enumerate(zip(chunk_ids, chunk_vecs)):
-            raw = tbl.search(qvec.tolist()).limit(k + 1).to_list()
-            for row in raw:
-                candidate = row["id"]
-                if candidate == nid:
-                    continue
-                if not candidate.startswith("chunk:"):
-                    continue
-                pair = frozenset([nid, candidate])
-                if pair in seen:
-                    continue
-                seen.add(pair)
+        if not quiet:
+            from rich.progress import (  # pylint: disable=import-outside-toplevel
+                BarColumn,
+                MofNCompleteColumn,
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                TimeElapsedColumn,
+                TimeRemainingColumn,
+            )
 
-                # Compute cosine similarity
-                ci2 = chunk_ids.index(candidate) if candidate in chunk_ids else -1
-                if ci2 == -1:
-                    continue
-                a, b = chunk_vecs[ci], chunk_vecs[ci2]
-                na, nb = np.linalg.norm(a), np.linalg.norm(b)
-                if na > 0 and nb > 0:
-                    sim = float(np.dot(a, b) / (na * nb))
-                else:
-                    sim = 0.0
+            _sim_ctx: contextlib.AbstractContextManager = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+            )
+        else:
+            _sim_ctx = contextlib.nullcontext()
 
-                if sim >= threshold:
-                    edges.append(
-                        DocEdge(
-                            src=nid,
-                            rel="SIMILAR_TO",
-                            dst=candidate,
-                            evidence={"similarity": round(sim, 4)},
+        with _sim_ctx as sim_prog:
+            sim_task = (
+                sim_prog.add_task("  SIMILAR_TO scan", total=len(chunk_ids))
+                if sim_prog is not None
+                else None
+            )
+            for ci, (nid, qvec) in enumerate(zip(chunk_ids, chunk_vecs)):
+                raw = tbl.search(qvec.tolist()).limit(k + 1).to_list()
+                for row in raw:
+                    candidate = row["id"]
+                    if candidate == nid:
+                        continue
+                    if not candidate.startswith("chunk:"):
+                        continue
+                    pair = frozenset([nid, candidate])
+                    if pair in seen:
+                        continue
+                    seen.add(pair)
+
+                    # Compute cosine similarity
+                    ci2 = chunk_ids.index(candidate) if candidate in chunk_ids else -1
+                    if ci2 == -1:
+                        continue
+                    a, b = chunk_vecs[ci], chunk_vecs[ci2]
+                    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+                    if na > 0 and nb > 0:
+                        sim = float(np.dot(a, b) / (na * nb))
+                    else:
+                        sim = 0.0
+
+                    if sim >= threshold:
+                        edges.append(
+                            DocEdge(
+                                src=nid,
+                                rel="SIMILAR_TO",
+                                dst=candidate,
+                                evidence={"similarity": round(sim, 4)},
+                            )
                         )
-                    )
+
+                if sim_prog is not None and sim_task is not None:
+                    sim_prog.advance(sim_task, 1)
 
         if edges:
             store._upsert_edges(edges)

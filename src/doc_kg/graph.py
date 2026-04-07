@@ -88,10 +88,11 @@ class DocGraph:
     # Public API
     # ------------------------------------------------------------------
 
-    def extract(self, *, force: bool = False) -> DocGraph:
+    def extract(self, *, force: bool = False, quiet: bool = False) -> DocGraph:
         """Run corpus extraction (cached after first call).
 
         :param force: Re-extract even if already cached.
+        :param quiet: Suppress progress output.
         :return: self (for chaining)
         """
         if self._nodes is None or force:
@@ -110,6 +111,7 @@ class DocGraph:
                 cooccur_window=self.cooccur_window,
                 topic_threshold=self.topic_threshold,
                 topics_file=self.topics_file,
+                quiet=quiet,
             )
         return self
 

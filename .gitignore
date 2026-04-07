@@ -242,6 +242,11 @@ __marimo__/
 # Local MCP configuration (contains absolute paths)
 #.mcp.json
 
+# Benchmark working data (LongMemEval corpus + result logs)
+benchmarks/data/
+benchmarks/results_*.jsonl
+benchmarks/results_*.json
+
 # MacOS
 .DS_Store
 commit.txt

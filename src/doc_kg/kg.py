@@ -464,6 +464,10 @@ class DocKG:
         :return: :class:`BuildStats` with ``indexed_rows``, ``index_dim``, and
                  ``similar_edges_added`` set.
         """
+        from rich.console import Console  # pylint: disable=import-outside-toplevel
+
+        with Console().status("  Loading embedding model\u2026"):
+            _ = self.embedder  # warm up: loads SentenceTransformer weights
         idx_stats = self.index.build(self.store, wipe=wipe)
         s = self.store.stats()
         return BuildStats(

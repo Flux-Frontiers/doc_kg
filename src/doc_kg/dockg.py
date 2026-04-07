@@ -34,6 +34,7 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 from dataclasses import dataclass
@@ -258,6 +259,7 @@ def parse_corpus(
     cooccur_window: int = 1,
     topic_threshold: float = 0.2,
     topics_file: str | None = None,
+    quiet: bool = False,
 ) -> tuple[list[DocNode], list[DocEdge]]:
     """Extract a document knowledge graph from a corpus directory.
 
@@ -288,6 +290,7 @@ def parse_corpus(
     :param cooccur_window: Reserved for future windowed co-occurrence expansion.
     :param topic_threshold: Topic confidence threshold in [0, 1].
     :param topics_file: Optional topics catalog (JSON/YAML).
+    :param quiet: Suppress progress output (default: ``False``).
     :return: ``(nodes, edges)`` tuple.
     """
     from doc_kg.chunker import TextChunker  # pylint: disable=import-outside-toplevel
@@ -311,211 +314,242 @@ def parse_corpus(
         rel_file_path(p, corpus_root): doc_node_id(rel_file_path(p, corpus_root)) for p in files
     }
 
-    for abs_path in files:
-        file_path = rel_file_path(abs_path, corpus_root)
-        doc_id = doc_node_id(file_path)
-
-        try:
-            raw_text = abs_path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            try:
-                raw_text = abs_path.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-
-        # Build the document node
-        doc_title = _extract_doc_title(raw_text, abs_path)
-        nodes[doc_id] = DocNode(
-            id=doc_id,
-            kind="document",
-            name=abs_path.stem,
-            title=doc_title,
-            file_path=file_path,
-            char_start=0,
-            char_end=len(raw_text),
-            heading_level=None,
-            text=raw_text[:512],  # keep first 512 chars as document summary
+    if not quiet:
+        from rich.progress import (  # pylint: disable=import-outside-toplevel
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
         )
 
-        # Chunk the document (returns structured chunks with section info)
-        chunks = chunker.chunk(raw_text, file_path=file_path)
+        _progress_ctx: contextlib.AbstractContextManager = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+        )
+    else:
+        _progress_ctx = contextlib.nullcontext()
 
-        # Track the previous chunk id per section for NEXT edges
-        prev_chunk_id: str | None = None
-        prev_section_slug: str | None = None
-        global_chunk_idx = 0
-        section_nodes: dict[str, str] = {}  # slug → section_node_id
+    with _progress_ctx as prog:
+        task_id = (
+            prog.add_task("  Parsing files", total=len(files)) if prog is not None else None
+        )
+        for abs_path in files:
+            file_path = rel_file_path(abs_path, corpus_root)
+            doc_id = doc_node_id(file_path)
 
-        for chunk_info in chunks:
-            section_title = chunk_info.get("section_title")
-            section_level = chunk_info.get("section_level", 1)
-            text = chunk_info["text"]
-            char_start = chunk_info.get("char_start", 0)
-            char_end = chunk_info.get("char_end", len(text))
-            references = chunk_info.get("references", [])
+            try:
+                raw_text = abs_path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                try:
+                    raw_text = abs_path.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    if prog is not None and task_id is not None:
+                        prog.advance(task_id, 1)
+                    continue
 
-            # Create/reuse section node
-            if section_title:
-                slug = slugify(section_title)
-                sec_id = section_node_id(file_path, slug)
-                if sec_id not in section_nodes:
-                    section_nodes[slug] = sec_id
-                    nodes[sec_id] = DocNode(
-                        id=sec_id,
-                        kind="section",
-                        name=section_title,
-                        title=section_title,
-                        file_path=file_path,
-                        char_start=char_start,
-                        char_end=char_end,
-                        heading_level=section_level,
-                        text=None,
-                    )
-                    # document → section
-                    edges[(doc_id, "CONTAINS", sec_id)] = DocEdge(
-                        src=doc_id, rel="CONTAINS", dst=sec_id
-                    )
-                parent_id = sec_id
-            else:
-                parent_id = doc_id
-
-            # Create chunk node
-            chunk_id = chunk_node_id(file_path, global_chunk_idx)
-            global_chunk_idx += 1
-            nodes[chunk_id] = DocNode(
-                id=chunk_id,
-                kind="chunk",
-                name=f"chunk:{global_chunk_idx:04d}",
-                title=section_title,
+            # Build the document node
+            doc_title = _extract_doc_title(raw_text, abs_path)
+            nodes[doc_id] = DocNode(
+                id=doc_id,
+                kind="document",
+                name=abs_path.stem,
+                title=doc_title,
                 file_path=file_path,
-                char_start=char_start,
-                char_end=char_end,
+                char_start=0,
+                char_end=len(raw_text),
                 heading_level=None,
-                text=text,
+                text=raw_text[:512],  # keep first 512 chars as document summary
             )
 
-            # section/document → chunk CONTAINS edge
-            edges[(parent_id, "CONTAINS", chunk_id)] = DocEdge(
-                src=parent_id, rel="CONTAINS", dst=chunk_id
-            )
+            # Chunk the document (returns structured chunks with section info)
+            chunks = chunker.chunk(raw_text, file_path=file_path)
 
-            # NEXT edge (sequential within same section)
-            current_section_slug = slugify(section_title) if section_title else "__root__"
-            if prev_chunk_id is not None and prev_section_slug == current_section_slug:
-                edges[(prev_chunk_id, "NEXT", chunk_id)] = DocEdge(
-                    src=prev_chunk_id, rel="NEXT", dst=chunk_id
-                )
-            prev_chunk_id = chunk_id
-            prev_section_slug = current_section_slug
+            # Track the previous chunk id per section for NEXT edges
+            prev_chunk_id: str | None = None
+            prev_section_slug: str | None = None
+            global_chunk_idx = 0
+            section_nodes: dict[str, str] = {}  # slug → section_node_id
 
-            # REFERENCES edges (hyperlinks in the chunk text)
-            for href in references:
-                # Resolve relative links to known documents
-                resolved = _resolve_reference(href, file_path, path_to_doc_id)
-                if resolved:
-                    ref_doc_id = doc_node_id(resolved)
-                    edges[(chunk_id, "REFERENCES", ref_doc_id)] = DocEdge(
-                        src=chunk_id,
-                        rel="REFERENCES",
-                        dst=ref_doc_id,
-                        evidence={"href": href},
-                    )
+            for chunk_info in chunks:
+                section_title = chunk_info.get("section_title")
+                section_level = chunk_info.get("section_level", 1)
+                text = chunk_info["text"]
+                char_start = chunk_info.get("char_start", 0)
+                char_end = chunk_info.get("char_end", len(text))
+                references = chunk_info.get("references", [])
 
-            # Semantic nodes/edges (topic/entity/keyword + co-occurrence)
-            semantic_ids: list[str] = []
-
-            if topic_extractor is not None:
-                topic_matches = topic_extractor.classify(
-                    text,
-                    threshold=topic_threshold,
-                    top_k=3,
-                )
-                for match in topic_matches:
-                    topic_id = stable_topic_id(match.topic)
-                    semantic_ids.append(topic_id)
-                    if topic_id not in nodes:
-                        nodes[topic_id] = DocNode(
-                            id=topic_id,
-                            kind="topic",
-                            name=match.topic,
-                            title=match.topic,
-                            file_path=None,
-                            char_start=None,
-                            char_end=None,
-                            heading_level=None,
-                            text=", ".join(match.matched_terms),
-                        )
-                    edges[(chunk_id, "HAS_TOPIC", topic_id)] = DocEdge(
-                        src=chunk_id,
-                        rel="HAS_TOPIC",
-                        dst=topic_id,
-                        evidence={
-                            "confidence": match.score,
-                            "terms": match.matched_terms,
-                        },
-                    )
-
-            if enable_entities:
-                entities = extract_entities(text, max_entities=8)
-                for entity in entities:
-                    entity_id = stable_entity_id(entity)
-                    semantic_ids.append(entity_id)
-                    if entity_id not in nodes:
-                        nodes[entity_id] = DocNode(
-                            id=entity_id,
-                            kind="entity",
-                            name=entity,
-                            title=entity,
-                            file_path=None,
-                            char_start=None,
-                            char_end=None,
-                            heading_level=None,
+                # Create/reuse section node
+                if section_title:
+                    slug = slugify(section_title)
+                    sec_id = section_node_id(file_path, slug)
+                    if sec_id not in section_nodes:
+                        section_nodes[slug] = sec_id
+                        nodes[sec_id] = DocNode(
+                            id=sec_id,
+                            kind="section",
+                            name=section_title,
+                            title=section_title,
+                            file_path=file_path,
+                            char_start=char_start,
+                            char_end=char_end,
+                            heading_level=section_level,
                             text=None,
                         )
-                    edges[(chunk_id, "MENTIONS_ENTITY", entity_id)] = DocEdge(
-                        src=chunk_id,
-                        rel="MENTIONS_ENTITY",
-                        dst=entity_id,
-                        evidence={"source": "titlecase+acronym"},
-                    )
-
-            if topic_extractor is not None and enable_keywords:
-                keywords = topic_extractor.extract_keywords(text, max_keywords=4)
-                for keyword in keywords:
-                    kw_id = stable_keyword_id(keyword)
-                    if kw_id not in nodes:
-                        nodes[kw_id] = DocNode(
-                            id=kw_id,
-                            kind="keyword",
-                            name=keyword,
-                            title=keyword,
-                            file_path=None,
-                            char_start=None,
-                            char_end=None,
-                            heading_level=None,
-                            text=None,
+                        # document → section
+                        edges[(doc_id, "CONTAINS", sec_id)] = DocEdge(
+                            src=doc_id, rel="CONTAINS", dst=sec_id
                         )
-                    edges[(chunk_id, "HAS_KEYWORD", kw_id)] = DocEdge(
-                        src=chunk_id,
-                        rel="HAS_KEYWORD",
-                        dst=kw_id,
-                        evidence={"ranked": True},
-                    )
+                    parent_id = sec_id
+                else:
+                    parent_id = doc_id
 
-            if emit_cooccur and semantic_ids and cooccur_window >= 1:
-                for left, right in cooccur_pairs(semantic_ids):
-                    edges[(left, "CO_OCCURS_WITH", right)] = DocEdge(
-                        src=left,
-                        rel="CO_OCCURS_WITH",
-                        dst=right,
-                        evidence={"file": file_path, "window": cooccur_window},
+                # Create chunk node
+                chunk_id = chunk_node_id(file_path, global_chunk_idx)
+                global_chunk_idx += 1
+                nodes[chunk_id] = DocNode(
+                    id=chunk_id,
+                    kind="chunk",
+                    name=f"chunk:{global_chunk_idx:04d}",
+                    title=section_title,
+                    file_path=file_path,
+                    char_start=char_start,
+                    char_end=char_end,
+                    heading_level=None,
+                    text=text,
+                )
+
+                # section/document → chunk CONTAINS edge
+                edges[(parent_id, "CONTAINS", chunk_id)] = DocEdge(
+                    src=parent_id, rel="CONTAINS", dst=chunk_id
+                )
+
+                # NEXT edge (sequential within same section)
+                current_section_slug = slugify(section_title) if section_title else "__root__"
+                if prev_chunk_id is not None and prev_section_slug == current_section_slug:
+                    edges[(prev_chunk_id, "NEXT", chunk_id)] = DocEdge(
+                        src=prev_chunk_id, rel="NEXT", dst=chunk_id
                     )
-                    edges[(right, "CO_OCCURS_WITH", left)] = DocEdge(
-                        src=right,
-                        rel="CO_OCCURS_WITH",
-                        dst=left,
-                        evidence={"file": file_path, "window": cooccur_window},
+                prev_chunk_id = chunk_id
+                prev_section_slug = current_section_slug
+
+                # REFERENCES edges (hyperlinks in the chunk text)
+                for href in references:
+                    # Resolve relative links to known documents
+                    resolved = _resolve_reference(href, file_path, path_to_doc_id)
+                    if resolved:
+                        ref_doc_id = doc_node_id(resolved)
+                        edges[(chunk_id, "REFERENCES", ref_doc_id)] = DocEdge(
+                            src=chunk_id,
+                            rel="REFERENCES",
+                            dst=ref_doc_id,
+                            evidence={"href": href},
+                        )
+
+                # Semantic nodes/edges (topic/entity/keyword + co-occurrence)
+                semantic_ids: list[str] = []
+
+                if topic_extractor is not None:
+                    topic_matches = topic_extractor.classify(
+                        text,
+                        threshold=topic_threshold,
+                        top_k=3,
                     )
+                    for match in topic_matches:
+                        topic_id = stable_topic_id(match.topic)
+                        semantic_ids.append(topic_id)
+                        if topic_id not in nodes:
+                            nodes[topic_id] = DocNode(
+                                id=topic_id,
+                                kind="topic",
+                                name=match.topic,
+                                title=match.topic,
+                                file_path=None,
+                                char_start=None,
+                                char_end=None,
+                                heading_level=None,
+                                text=", ".join(match.matched_terms),
+                            )
+                        edges[(chunk_id, "HAS_TOPIC", topic_id)] = DocEdge(
+                            src=chunk_id,
+                            rel="HAS_TOPIC",
+                            dst=topic_id,
+                            evidence={
+                                "confidence": match.score,
+                                "terms": match.matched_terms,
+                            },
+                        )
+
+                if enable_entities:
+                    entities = extract_entities(text, max_entities=8)
+                    for entity in entities:
+                        entity_id = stable_entity_id(entity)
+                        semantic_ids.append(entity_id)
+                        if entity_id not in nodes:
+                            nodes[entity_id] = DocNode(
+                                id=entity_id,
+                                kind="entity",
+                                name=entity,
+                                title=entity,
+                                file_path=None,
+                                char_start=None,
+                                char_end=None,
+                                heading_level=None,
+                                text=None,
+                            )
+                        edges[(chunk_id, "MENTIONS_ENTITY", entity_id)] = DocEdge(
+                            src=chunk_id,
+                            rel="MENTIONS_ENTITY",
+                            dst=entity_id,
+                            evidence={"source": "titlecase+acronym"},
+                        )
+
+                if topic_extractor is not None and enable_keywords:
+                    keywords = topic_extractor.extract_keywords(text, max_keywords=4)
+                    for keyword in keywords:
+                        kw_id = stable_keyword_id(keyword)
+                        if kw_id not in nodes:
+                            nodes[kw_id] = DocNode(
+                                id=kw_id,
+                                kind="keyword",
+                                name=keyword,
+                                title=keyword,
+                                file_path=None,
+                                char_start=None,
+                                char_end=None,
+                                heading_level=None,
+                                text=None,
+                            )
+                        edges[(chunk_id, "HAS_KEYWORD", kw_id)] = DocEdge(
+                            src=chunk_id,
+                            rel="HAS_KEYWORD",
+                            dst=kw_id,
+                            evidence={"ranked": True},
+                        )
+
+                if emit_cooccur and semantic_ids and cooccur_window >= 1:
+                    for left, right in cooccur_pairs(semantic_ids):
+                        edges[(left, "CO_OCCURS_WITH", right)] = DocEdge(
+                            src=left,
+                            rel="CO_OCCURS_WITH",
+                            dst=right,
+                            evidence={"file": file_path, "window": cooccur_window},
+                        )
+                        edges[(right, "CO_OCCURS_WITH", left)] = DocEdge(
+                            src=right,
+                            rel="CO_OCCURS_WITH",
+                            dst=left,
+                            evidence={"file": file_path, "window": cooccur_window},
+                        )
+
+            if prog is not None and task_id is not None:
+                prog.advance(task_id, 1)
 
     return list(nodes.values()), list(edges.values())
 
