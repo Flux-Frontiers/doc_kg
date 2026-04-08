@@ -426,14 +426,15 @@ class DocKG:
     # Build
     # ------------------------------------------------------------------
 
-    def build(self, *, wipe: bool = False) -> BuildStats:
+    def build(self, *, wipe: bool = False, discover_similar: bool = True) -> BuildStats:
         """Full pipeline: corpus parsing → SQLite → LanceDB + SIMILAR_TO edges.
 
         :param wipe: Clear existing data before writing.
+        :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
         :return: :class:`BuildStats`.
         """
         graph_stats = self.build_graph(wipe=wipe)
-        index_stats = self.build_index(wipe=wipe)
+        index_stats = self.build_index(wipe=wipe, discover_similar=discover_similar)
         graph_stats.indexed_rows = index_stats.indexed_rows
         graph_stats.index_dim = index_stats.index_dim
         graph_stats.similar_edges_added = index_stats.similar_edges_added
@@ -457,10 +458,73 @@ class DocKG:
             edge_counts=s["edge_counts"],
         )
 
-    def build_index(self, *, wipe: bool = False) -> BuildStats:
+    def build_embeddings(
+        self,
+        out: "Path | str | None" = None,
+        *,
+        n_workers: int | None = None,
+        batch_size: int = 64,
+        quiet: bool = False,
+    ) -> Path:
+        """Embed all nodes and save to a JSON cache file (no LanceDB writes).
+
+        The graph must already exist — run :meth:`build_graph` first.
+
+        :param out: Output path for the embedding cache JSON.
+                    Defaults to ``<db_path parent>/embeddings.json``.
+        :param n_workers: Worker processes (default: CPU count / 2).
+        :param batch_size: Per-worker embedding batch size.
+        :param quiet: Suppress progress output.
+        :return: Path to the saved cache file.
+        """
+        if out is None:
+            out = self.db_path.parent / "embeddings.json"
+        return self.index.precompute_embeddings(
+            self.store,
+            Path(out),
+            n_workers=n_workers,
+            batch_size=batch_size,
+            quiet=quiet,
+        )
+
+    def build_index_from_cache(
+        self,
+        cache_path: "Path | str",
+        *,
+        wipe: bool = False,
+        discover_similar: bool = True,
+    ) -> BuildStats:
+        """Build the LanceDB index from a pre-computed embedding cache.
+
+        Skips the model inference pass — loads vectors from *cache_path* directly.
+        Use :meth:`build_embeddings` to produce the cache.
+
+        :param cache_path: Path to the embedding cache JSON.
+        :param wipe: Delete existing vectors before indexing.
+        :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
+        :return: :class:`BuildStats`.
+        """
+        idx_stats = self.index.build_from_cache(
+            self.store, Path(cache_path), wipe=wipe, discover_similar=discover_similar
+        )
+        s = self.store.stats()
+        return BuildStats(
+            corpus_root=str(self.corpus_root),
+            db_path=str(self.db_path),
+            total_nodes=s["total_nodes"],
+            total_edges=s["total_edges"],
+            node_counts=s["node_counts"],
+            edge_counts=s["edge_counts"],
+            indexed_rows=idx_stats["indexed_rows"],
+            index_dim=idx_stats["dim"],
+            similar_edges_added=idx_stats.get("similar_edges_added"),
+        )
+
+    def build_index(self, *, wipe: bool = False, discover_similar: bool = True) -> BuildStats:
         """SQLite → LanceDB only (graph must already exist).
 
         :param wipe: Delete existing vectors before indexing.
+        :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
         :return: :class:`BuildStats` with ``indexed_rows``, ``index_dim``, and
                  ``similar_edges_added`` set.
         """
@@ -468,7 +532,7 @@ class DocKG:
 
         with Console().status("  Loading embedding model\u2026"):
             _ = self.embedder  # warm up: loads SentenceTransformer weights
-        idx_stats = self.index.build(self.store, wipe=wipe)
+        idx_stats = self.index.build(self.store, wipe=wipe, discover_similar=discover_similar)
         s = self.store.stats()
         return BuildStats(
             corpus_root=str(self.corpus_root),

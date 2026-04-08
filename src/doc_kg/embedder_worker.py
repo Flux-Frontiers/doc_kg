@@ -28,6 +28,7 @@ import json
 import logging
 import multiprocessing
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -47,23 +48,28 @@ PIPELINE_MODEL: str = "nomic-ai/nomic-embed-text-v1"
 # ============================================================================
 
 
-def _embed_shard(args: tuple) -> list[list[float]]:
-    """Worker function: embed a shard of texts.
+def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
+    """Worker function: embed a shard of texts with per-batch progress reporting.
 
     Must be a top-level function (not a method) for pickle-safe multiprocessing
     with the ``spawn`` start method.
 
-    :param args: Tuple of ``(texts, model_name, batch_size, worker_id)``.
-    :return: List of float32 embedding vectors.
+    :param args: Tuple of ``(texts, model_name, batch_size, worker_id, progress_queue)``.
+        *progress_queue* receives ``int`` counts after each batch and ``None`` as a
+        sentinel when the shard is finished.  Pass ``None`` for the queue to skip
+        progress reporting (e.g. sequential mode).
+    :return: ``(worker_id, vectors)`` tuple so callers can reassemble in order.
     """
-    texts, model_name, batch_size, worker_id = args
+    texts, model_name, batch_size, worker_id, progress_queue = args
 
     # Suppress noisy logging in workers
     os.environ["TQDM_DISABLE"] = "1"
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
 
-    from sentence_transformers import SentenceTransformer  # pylint: disable=import-outside-toplevel
+    from sentence_transformers import (
+        SentenceTransformer,  # pylint: disable=import-outside-toplevel
+    )
 
     trust_remote = "nomic-ai/" in model_name
     model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
@@ -72,15 +78,23 @@ def _embed_shard(args: tuple) -> list[list[float]]:
     if "nomic-ai/" in model_name:
         texts = [f"search_document: {t}" for t in texts]
 
-    vecs = model.encode(
-        texts,
-        batch_size=batch_size,
-        convert_to_numpy=True,
-        show_progress_bar=(worker_id == 0),
-        normalize_embeddings=True,
-    )
+    all_vecs = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
+        vecs = model.encode(
+            batch,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        all_vecs.extend(vecs)
+        if progress_queue is not None:
+            progress_queue.put(len(batch))
 
-    return [np.asarray(v, dtype="float32").tolist() for v in vecs]
+    if progress_queue is not None:
+        progress_queue.put(None)  # sentinel: shard complete
+
+    return worker_id, [np.asarray(v, dtype="float32").tolist() for v in all_vecs]
 
 
 # ============================================================================
@@ -160,7 +174,9 @@ class CorpusEmbedder:
 
         # Temporal sampling if requested
         if sample_n and sample_n < len(texts):
-            indices = [round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)]
+            indices = [
+                round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)
+            ]
             indices = sorted(set(indices))
             texts = [texts[i] for i in indices]
             metadata = [metadata[i] for i in indices]
@@ -197,33 +213,90 @@ class CorpusEmbedder:
 
     def _embed_sequential(self, texts: list[str]) -> list[list[float]]:
         """Embed in the main process (small inputs or single worker)."""
-        return _embed_shard((texts, self.model_name, self.batch_size, 0))
+        _, vectors = _embed_shard((texts, self.model_name, self.batch_size, 0, None))
+        return vectors
 
     def _embed_parallel(self, texts: list[str]) -> list[list[float]]:
-        """Embed using multiprocessing pool."""
+        """Embed using multiprocessing pool with rich progress."""
+        from rich.progress import (  # pylint: disable=import-outside-toplevel
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
+
         # Split texts into shards
         n = self.n_workers
         shard_size = (len(texts) + n - 1) // n
-        shards = []
+        shards_base = []
         for i in range(n):
             start = i * shard_size
             end = min(start + shard_size, len(texts))
             if start < len(texts):
-                shards.append((texts[start:end], self.model_name, self.batch_size, i))
+                shards_base.append((texts[start:end], self.model_name, self.batch_size, i))
 
         # Use spawn to avoid fork-unsafe tokenizer/CUDA issues
         ctx = multiprocessing.get_context("spawn")
-        all_vectors: list[list[float]] = []
+        n_shards = len(shards_base)
+        results: dict[int, list[list[float]]] = {}
+        stop_event = threading.Event()
 
         try:
-            with ctx.Pool(processes=len(shards)) as pool:
-                results = pool.map(_embed_shard, shards)
-                for shard_vecs in results:
-                    all_vectors.extend(shard_vecs)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning("Multiprocessing failed (%s), falling back to sequential", exc)
-            all_vectors = self._embed_sequential(texts)
+            # Manager.Queue() is a proxy — picklable across spawn boundary
+            with multiprocessing.Manager() as manager:
+                progress_queue = manager.Queue()
+                shards = [(*s, progress_queue) for s in shards_base]
 
+                with ctx.Pool(processes=n_shards) as pool:
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        BarColumn(),
+                        MofNCompleteColumn(),
+                        TimeElapsedColumn(),
+                        TimeRemainingColumn(),
+                    ) as progress:
+                        task = progress.add_task(
+                            f"  Embedding ({n_shards} workers)", total=len(texts)
+                        )
+
+                        def _drain() -> None:
+                            """Consume per-batch counts from the queue, advance the bar."""
+                            done = 0
+                            while done < n_shards and not stop_event.is_set():
+                                try:
+                                    item = progress_queue.get(timeout=0.05)
+                                except Exception:  # queue.Empty or OS error  # pylint: disable=broad-exception-caught
+                                    continue
+                                if item is None:
+                                    done += 1
+                                else:
+                                    progress.advance(task, item)
+
+                        drain_thread = threading.Thread(target=_drain, daemon=True)
+                        drain_thread.start()
+
+                        for worker_id, shard_vecs in pool.imap_unordered(_embed_shard, shards):
+                            results[worker_id] = shard_vecs
+
+                        drain_thread.join(timeout=5.0)
+
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            stop_event.set()
+            logger.warning(
+                "Multiprocessing failed (%s), falling back to sequential", exc
+            )
+            return self._embed_sequential(texts)
+        finally:
+            stop_event.set()
+
+        # Reassemble in original shard order
+        all_vectors: list[list[float]] = []
+        for i in range(n_shards):
+            all_vectors.extend(results[i])
         return all_vectors
 
     @staticmethod
@@ -245,10 +318,17 @@ class CorpusEmbedder:
             "embeddings": cache.vectors,
         }
 
+        logger.info("Saving %d embeddings to %s …", cache.n_vectors, path)
+        print(f"  cache    : saving {cache.n_vectors:,} vectors to {path.name} …", flush=True)
+        t0 = time.monotonic()
+
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=None)
 
-        logger.info("Saved %d embeddings to %s", cache.n_vectors, path)
+        elapsed = time.monotonic() - t0
+        size_mb = path.stat().st_size / 1_048_576
+        logger.info("Saved %d embeddings to %s (%.0f MB) in %.1fs", cache.n_vectors, path, size_mb, elapsed)
+        print(f"  cache    : saved {size_mb:,.0f} MB in {elapsed:.1f}s", flush=True)
 
     @staticmethod
     def load_cache(path: Path) -> EmbeddingCache:
@@ -257,8 +337,16 @@ class CorpusEmbedder:
         :param path: Path to JSON cache.
         :return: :class:`EmbeddingCache`.
         """
+        size_mb = path.stat().st_size / 1_048_576
+        logger.info("Loading embedding cache: %s (%.0f MB) …", path.name, size_mb)
+        t0 = time.monotonic()
+
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+
+        elapsed = time.monotonic() - t0
+        n = len(data.get("embeddings", []))
+        logger.info("Cache loaded: %d vectors in %.1fs", n, elapsed)
 
         return EmbeddingCache(
             model=data.get("model", "unknown"),

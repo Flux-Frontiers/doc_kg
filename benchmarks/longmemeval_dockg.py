@@ -76,6 +76,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 CORPUS_DIR = REPO_ROOT / "benchmarks" / "data" / "longmemeval_corpus"
 DOCKG_DB = REPO_ROOT / "benchmarks" / "data" / ".dockg" / "graph.sqlite"
 DOCKG_LANCEDB = REPO_ROOT / "benchmarks" / "data" / ".dockg" / "lancedb"
+DOCKG_EMB_CACHE = REPO_ROOT / "benchmarks" / "data" / ".dockg" / "embeddings.json"
 
 
 # =============================================================================
@@ -181,15 +182,28 @@ def build_kg(
     lancedb_dir: Path,
     wipe: bool = True,
     model: str | None = None,
+    workers: int | None = None,
+    emb_cache: Path | None = None,
+    similar: bool = True,
 ) -> None:
-    """Build a persistent DocKG from the corpus dir."""
+    """Build a persistent DocKG from the corpus dir.
+
+    When *workers* > 1 (or *emb_cache* is given), uses the two-phase build:
+    ``build_graph`` → ``build_embeddings`` (multi-worker) → ``build_index_from_cache``.
+    Otherwise falls back to the standard single-process ``build``.
+    """
     from doc_kg.kg import DEFAULT_MODEL, DocKG
 
-    print(f"  Building DocKG ({'wipe' if wipe else 'incremental'})...")
+    use_two_phase = (workers is not None and workers > 1) or emb_cache is not None
+    print(f"  Building DocKG ({'wipe' if wipe else 'incremental'}, "
+          f"{'two-phase' if use_two_phase else 'standard'})...")
     print(f"    corpus:  {corpus_dir}")
     print(f"    sqlite:  {db_path}")
     print(f"    lancedb: {lancedb_dir}")
     print(f"    model:   {model or DEFAULT_MODEL}")
+    if use_two_phase:
+        print(f"    workers: {workers or 'auto'}")
+        print(f"    emb cache: {emb_cache or DOCKG_EMB_CACHE}")
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     lancedb_dir.mkdir(parents=True, exist_ok=True)
@@ -202,7 +216,23 @@ def build_kg(
         model=model or DEFAULT_MODEL,
     )
     try:
-        stats = kg.build(wipe=wipe)
+        if use_two_phase:
+            cache_path = emb_cache or DOCKG_EMB_CACHE
+            # Skip graph rebuild if SQLite already exists and wipe not requested
+            if wipe or not db_path.exists():
+                graph_stats = kg.build_graph(wipe=wipe)
+                print(
+                    f"  Graph:   {graph_stats.total_nodes} nodes, "
+                    f"{graph_stats.total_edges} edges"
+                )
+            else:
+                print(f"  Graph:   reusing existing SQLite at {db_path}")
+            kg.build_embeddings(out=cache_path, n_workers=workers)
+            # Always wipe LanceDB in two-phase mode — embeddings are recomputed
+            # fresh so incremental deletes are wasteful and slow.
+            stats = kg.build_index_from_cache(cache_path, wipe=True, discover_similar=similar)
+        else:
+            stats = kg.build(wipe=wipe, discover_similar=similar)
     finally:
         kg.close()
     dt = time.time() - t0
@@ -252,7 +282,16 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     print(f"  Source: {data_file}")
 
     write_corpus(data_file, CORPUS_DIR, force=args.wipe)
-    build_kg(CORPUS_DIR, DOCKG_DB, DOCKG_LANCEDB, wipe=args.wipe, model=args.model)
+    build_kg(
+        CORPUS_DIR,
+        DOCKG_DB,
+        DOCKG_LANCEDB,
+        wipe=args.wipe,
+        model=args.model,
+        workers=getattr(args, "workers", None),
+        emb_cache=Path(args.emb_cache) if getattr(args, "emb_cache", None) else None,
+        similar=not getattr(args, "no_similar", False),
+    )
     print("  Ready. Run with:")
     print(f"    python {Path(__file__).name} run {data_file}")
 
@@ -584,6 +623,22 @@ def main() -> None:
         "--model", default=None, help="Override sentence-transformer model"
     )
     p_prep.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker processes for embedding (enables two-phase build). Default: single-process.",
+    )
+    p_prep.add_argument(
+        "--emb-cache",
+        default=None,
+        help=f"Path to embedding cache JSON (two-phase build). Default: {DOCKG_EMB_CACHE}",
+    )
+    p_prep.add_argument(
+        "--no-similar",
+        action="store_true",
+        help="Skip SIMILAR_TO edge discovery (recommended for large corpora >100K chunks)",
+    )
+    p_prep.add_argument(
         "--download",
         action="store_true",
         help="Download the dataset from HuggingFace if the data file does not exist",
@@ -599,6 +654,22 @@ def main() -> None:
     p_all.add_argument("--wipe", action="store_true", help="Rebuild the KG")
     p_all.add_argument(
         "--model", default=None, help="Override sentence-transformer model"
+    )
+    p_all.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker processes for embedding (enables two-phase build). Default: single-process.",
+    )
+    p_all.add_argument(
+        "--emb-cache",
+        default=None,
+        help=f"Path to embedding cache JSON (two-phase build). Default: {DOCKG_EMB_CACHE}",
+    )
+    p_all.add_argument(
+        "--no-similar",
+        action="store_true",
+        help="Skip SIMILAR_TO edge discovery (recommended for large corpora >100K chunks)",
     )
     p_all.add_argument(
         "--download",
