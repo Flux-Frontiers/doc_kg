@@ -62,9 +62,11 @@ CREATE INDEX IF NOT EXISTS idx_nodes_file_path ON nodes(file_path);
 CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(src);
 CREATE INDEX IF NOT EXISTS idx_edges_dst ON edges(dst);
 CREATE INDEX IF NOT EXISTS idx_edges_rel ON edges(rel);
+CREATE INDEX IF NOT EXISTS idx_edges_src_rel ON edges(src, rel);
+CREATE INDEX IF NOT EXISTS idx_edges_dst_rel ON edges(dst, rel);
 """
 
-# Default edge types used for graph expansion
+# Default edge types used for graph expansion (document layer only)
 DEFAULT_RELS: tuple[str, ...] = (
     "CONTAINS",
     "NEXT",
@@ -73,7 +75,17 @@ DEFAULT_RELS: tuple[str, ...] = (
     "HAS_TOPIC",
     "MENTIONS_ENTITY",
     "HAS_KEYWORD",
-    "CO_OCCURS_WITH",
+)
+
+# Memory layer edge types (semantic assertions + events)
+MEMORY_RELS: tuple[str, ...] = (
+    "SUPPORTS",  # chunk → assertion
+    "ABOUT",  # assertion → entity (subject)
+    "REFERS_TO",  # assertion → entity (object)
+    "INVOLVES",  # event → entity
+    "DESCRIBES",  # chunk → event
+    "SUPERSEDES",  # assertion → assertion
+    "DERIVED_FROM",  # assertion → event
 )
 
 
@@ -224,9 +236,7 @@ class GraphStore:
 
         with _ctx as prog:
             task = (
-                prog.add_task("  Writing nodes", total=len(node_list))
-                if prog is not None
-                else None
+                prog.add_task("  Writing nodes", total=len(node_list)) if prog is not None else None
             )
             for i in range(0, len(node_list), batch_size):
                 batch = node_list[i : i + batch_size]
@@ -299,9 +309,7 @@ class GraphStore:
 
         with _ctx as prog:
             task = (
-                prog.add_task("  Writing edges", total=len(edge_list))
-                if prog is not None
-                else None
+                prog.add_task("  Writing edges", total=len(edge_list)) if prog is not None else None
             )
             for i in range(0, len(edge_list), batch_size):
                 batch = edge_list[i : i + batch_size]
@@ -348,6 +356,27 @@ class GraphStore:
             (node_id,),
         ).fetchone()
         return _row_to_node(row) if row else None
+
+    def nodes_batch(self, node_ids: set[str]) -> dict[str, dict]:
+        """Fetch multiple nodes in a single query.
+
+        :param node_ids: Node IDs to fetch.
+        :return: ``{node_id: node_dict}`` for all found nodes.
+        """
+        if not node_ids:
+            return {}
+        self.con.execute("DROP TABLE IF EXISTS _tmp_nids;")
+        self.con.execute("CREATE TEMP TABLE _tmp_nids (id TEXT PRIMARY KEY);")
+        self.con.executemany("INSERT INTO _tmp_nids (id) VALUES (?)", [(i,) for i in node_ids])
+        rows = self.con.execute(
+            """
+            SELECT n.id, n.kind, n.name, n.title, n.file_path,
+                   n.char_start, n.char_end, n.heading_level, n.text
+            FROM nodes n
+            JOIN _tmp_nids t ON t.id = n.id
+            """
+        ).fetchall()
+        return {r[0]: _row_to_node(r) for r in rows}
 
     # ------------------------------------------------------------------
     # Read — filtered node lists
@@ -446,46 +475,77 @@ class GraphStore:
         *,
         hop: int = 1,
         rels: tuple[str, ...] = DEFAULT_RELS,
+        max_frontier: int = 5_000,
     ) -> dict[str, ProvMeta]:
         """Expand the graph from *seed_ids* up to *hop* hops.
 
         Returns a mapping from every reachable node ID to its
         :class:`ProvMeta` (minimum hop distance and originating seed).
 
+        Uses a single batched SQL query per hop (via a temp table + UNION)
+        rather than one query per frontier node, which is orders of magnitude
+        faster over large graphs.  The frontier is capped at *max_frontier*
+        nodes before each hop to prevent explosive expansion through
+        high-degree hub nodes (e.g. CO_OCCURS_WITH, CONTAINS).
+
         :param seed_ids: Starting node IDs (hop 0).
         :param hop: Maximum number of hops to traverse.
         :param rels: Edge relation types to follow.
+        :param max_frontier: Maximum frontier size per hop.  Excess nodes are
+            dropped before the next hop (seeds are always kept at hop 0).
         :return: ``{node_id: ProvMeta}`` for all reachable nodes.
         """
         rels = tuple(rels)
+        rel_ph = ",".join("?" for _ in rels)
+
         meta: dict[str, ProvMeta] = {sid: ProvMeta(best_hop=0, via_seed=sid) for sid in seed_ids}
         frontier: set[str] = set(seed_ids)
 
         for h in range(1, hop + 1):
+            if not frontier:
+                break
+
+            # Cap frontier to prevent explosive fan-out through hub nodes.
+            if len(frontier) > max_frontier:
+                frontier = set(list(frontier)[:max_frontier])
+
+            # Load frontier + provenance into a temp table for batch lookup.
+            self.con.execute("DROP TABLE IF EXISTS _tmp_frontier;")
+            self.con.execute(
+                "CREATE TEMP TABLE _tmp_frontier (id TEXT PRIMARY KEY, via_seed TEXT);"
+            )
+            self.con.executemany(
+                "INSERT INTO _tmp_frontier (id, via_seed) VALUES (?, ?)",
+                [(nid, meta[nid].via_seed) for nid in frontier],
+            )
+
+            # Two index-friendly JOIN scans (no OR) unified with UNION ALL.
+            # Uses composite indexes idx_edges_src_rel and idx_edges_dst_rel.
+            rows = self.con.execute(
+                f"""
+                SELECT f.via_seed, e.src, e.dst
+                FROM _tmp_frontier f
+                JOIN edges e ON e.src = f.id
+                WHERE e.rel IN ({rel_ph})
+                UNION ALL
+                SELECT f.via_seed, e.src, e.dst
+                FROM _tmp_frontier f
+                JOIN edges e ON e.dst = f.id
+                WHERE e.rel IN ({rel_ph})
+                """,
+                (*rels, *rels),
+            ).fetchall()
+
             nxt: set[str] = set()
-            for nid in frontier:
-                rows = self.con.execute(
-                    f"""
-                    SELECT src, dst FROM edges
-                    WHERE (src = ? OR dst = ?)
-                      AND rel IN ({",".join("?" for _ in rels)})
-                    """,
-                    (nid, nid, *rels),
-                ).fetchall()
-                for src, dst in rows:
-                    for cand in (src, dst):
-                        if cand not in meta:
-                            meta[cand] = ProvMeta(
-                                best_hop=h,
-                                via_seed=meta[nid].via_seed,
-                            )
-                            nxt.add(cand)
-                        elif h < meta[cand].best_hop:
-                            meta[cand] = ProvMeta(
-                                best_hop=h,
-                                via_seed=meta[nid].via_seed,
-                            )
-                            nxt.add(cand)
+            for via_seed, src, dst in rows:
+                for cand in (src, dst):
+                    if cand not in meta:
+                        meta[cand] = ProvMeta(best_hop=h, via_seed=via_seed)
+                        nxt.add(cand)
+                    elif h < meta[cand].best_hop:
+                        meta[cand] = ProvMeta(best_hop=h, via_seed=via_seed)
+                        nxt.add(cand)
+
             frontier = nxt
 
         return meta

@@ -35,6 +35,8 @@ class DocGraph:
     :param corpus_root: Path to the corpus root directory.
     :param extensions: File extensions to include (default: .md, .txt, .rst).
     :param exclude: Directory names to exclude from extraction.
+    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
+    :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
     :param chunk_size: Approximate maximum characters per chunk.
     :param chunk_overlap: Character overlap between consecutive chunks.
     :param similarity_threshold: Cosine similarity threshold for semantic split detection.
@@ -42,7 +44,8 @@ class DocGraph:
     :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
     :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
     :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
-    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes (default: False;
+                         noisy and dense; use MemoryKG for semantic memory instead).
     :param cooccur_window: Co-occurrence window metadata.
     :param topic_threshold: Topic confidence threshold.
     :param topics_file: Optional topics file path (JSON/YAML).
@@ -54,6 +57,8 @@ class DocGraph:
         *,
         extensions: set[str] | None = None,
         exclude: set[str] | None = None,
+        chunk_strategy: str = "semantic",
+        sentences_per_chunk: int = 4,
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
@@ -61,7 +66,7 @@ class DocGraph:
         enable_topics: bool = True,
         enable_entities: bool = True,
         enable_keywords: bool = True,
-        emit_cooccur: bool = True,
+        emit_cooccur: bool = False,
         cooccur_window: int = 1,
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
@@ -69,6 +74,8 @@ class DocGraph:
         self.corpus_root: Path = Path(corpus_root).resolve()
         self.extensions = extensions
         self.exclude: set[str] = exclude or set()
+        self.chunk_strategy = chunk_strategy
+        self.sentences_per_chunk = sentences_per_chunk
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.similarity_threshold = similarity_threshold
@@ -100,6 +107,8 @@ class DocGraph:
                 self.corpus_root,
                 extensions=self.extensions,
                 exclude=self.exclude,
+                chunk_strategy=self.chunk_strategy,
+                sentences_per_chunk=self.sentences_per_chunk,
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
                 similarity_threshold=self.similarity_threshold,

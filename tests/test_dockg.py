@@ -103,7 +103,7 @@ def test_parse_corpus_semantic_edges(tmp_path):
         "DocKG integrates LanceDB and SQLite for performance.\n"
     )
 
-    nodes, edges = parse_corpus(tmp_path)
+    nodes, edges = parse_corpus(tmp_path, emit_cooccur=True)
 
     kinds = {n.kind for n in nodes}
     rels = {e.rel for e in edges}

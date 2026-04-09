@@ -1,0 +1,145 @@
+{
+  "format": "1.0",
+  "last_update": "2026-04-09T00:19:43.907906+00:00",
+  "snapshots": [
+    {
+      "key": "07e2c5e71c02b0e3b84ecfd01d19105c49295acc",
+      "branch": "main",
+      "timestamp": "2026-03-15T00:20:04.106213+00:00",
+      "version": "v0.4.0",
+      "file": "07e2c5e71c02b0e3b84ecfd01d19105c49295acc.json",
+      "metrics": {
+        "total_nodes": 2592,
+        "total_edges": 2583,
+        "meaningful_nodes": 217,
+        "docstring_coverage": 0.76,
+        "node_counts": {
+          "class": 23,
+          "function": 65,
+          "method": 103,
+          "module": 26,
+          "symbol": 2375
+        },
+        "edge_counts": {
+          "ATTR_ACCESS": 777,
+          "CALLS": 881,
+          "CONTAINS": 191,
+          "IMPORTS": 179,
+          "INHERITS": 1,
+          "RESOLVES_TO": 554
+        },
+        "critical_issues": 3,
+        "complexity_median": 4,
+        "module_node_counts": {
+          "src/doc_kg/__init__.py": 3,
+          "src/doc_kg/__main__.py": 1,
+          "src/doc_kg/app.py": 148,
+          "src/doc_kg/chunker.py": 152,
+          "src/doc_kg/cli/__init__.py": 1,
+          "src/doc_kg/cli/cmd_analyze.py": 8,
+          "src/doc_kg/cli/cmd_build.py": 99,
+          "src/doc_kg/cli/cmd_hooks.py": 22,
+          "src/doc_kg/cli/cmd_mcp.py": 13,
+          "src/doc_kg/cli/cmd_query.py": 56,
+          "src/doc_kg/cli/cmd_snapshot.py": 134,
+          "src/doc_kg/cli/cmd_viz.py": 21,
+          "src/doc_kg/cli/group.py": 2,
+          "src/doc_kg/cli/main.py": 1,
+          "src/doc_kg/cli/options.py": 10,
+          "src/doc_kg/config.py": 16,
+          "src/doc_kg/dockg.py": 144,
+          "src/doc_kg/dockg_thorough_analysis.py": 170,
+          "src/doc_kg/graph.py": 67,
+          "src/doc_kg/index.py": 228,
+          "src/doc_kg/kg.py": 307,
+          "src/doc_kg/mcp_server.py": 73,
+          "src/doc_kg/relations.py": 46,
+          "src/doc_kg/snapshots.py": 216,
+          "src/doc_kg/store.py": 133,
+          "src/doc_kg/topics.py": 80
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": null
+      }
+    },
+    {
+      "key": "21ec937beaada44832b2854e58ce2b15363bc7a5",
+      "branch": "feat/benchmarks",
+      "timestamp": "2026-04-09T00:19:43.906906+00:00",
+      "version": "0.7.0",
+      "file": "21ec937beaada44832b2854e58ce2b15363bc7a5.json",
+      "metrics": {
+        "total_nodes": 4295,
+        "total_edges": 4099,
+        "meaningful_nodes": 324,
+        "docstring_coverage": 0.784,
+        "node_counts": {
+          "class": 39,
+          "function": 88,
+          "method": 161,
+          "module": 36,
+          "symbol": 3971
+        },
+        "edge_counts": {
+          "ATTR_ACCESS": 1278,
+          "CALLS": 1488,
+          "CONTAINS": 288,
+          "IMPORTS": 274,
+          "INHERITS": 3,
+          "RESOLVES_TO": 768
+        },
+        "critical_issues": 2,
+        "complexity_median": 4,
+        "module_node_counts": {
+          "src/__init__.py": 3,
+          "src/doc_kg/__init__.py": 2,
+          "src/doc_kg/__main__.py": 1,
+          "src/doc_kg/app.py": 148,
+          "src/doc_kg/chunker.py": 209,
+          "src/doc_kg/cli/__init__.py": 1,
+          "src/doc_kg/cli/cmd_analyze.py": 8,
+          "src/doc_kg/cli/cmd_build.py": 126,
+          "src/doc_kg/cli/cmd_hooks.py": 22,
+          "src/doc_kg/cli/cmd_mcp.py": 13,
+          "src/doc_kg/cli/cmd_model.py": 14,
+          "src/doc_kg/cli/cmd_pipeline.py": 100,
+          "src/doc_kg/cli/cmd_query.py": 62,
+          "src/doc_kg/cli/cmd_semantic_analyze.py": 8,
+          "src/doc_kg/cli/cmd_snapshot.py": 168,
+          "src/doc_kg/cli/cmd_viz.py": 21,
+          "src/doc_kg/cli/group.py": 2,
+          "src/doc_kg/cli/main.py": 1,
+          "src/doc_kg/cli/options.py": 10,
+          "src/doc_kg/config.py": 16,
+          "src/doc_kg/dockg.py": 160,
+          "src/doc_kg/dockg_semantic_analysis.py": 278,
+          "src/doc_kg/dockg_thorough_analysis.py": 170,
+          "src/doc_kg/embedder_worker.py": 183,
+          "src/doc_kg/entry_chunk.py": 21,
+          "src/doc_kg/graph.py": 72,
+          "src/doc_kg/index.py": 367,
+          "src/doc_kg/kg.py": 353,
+          "src/doc_kg/manifold.py": 143,
+          "src/doc_kg/mcp_server.py": 73,
+          "src/doc_kg/pipeline.py": 187,
+          "src/doc_kg/relations.py": 51,
+          "src/doc_kg/sampler.py": 208,
+          "src/doc_kg/snapshots.py": 150,
+          "src/doc_kg/store.py": 185,
+          "src/doc_kg/topics.py": 126
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 1703,
+          "edges": 1516,
+          "coverage_delta": 0.02400000000000002,
+          "critical_issues_delta": -1
+        }
+      }
+    }
+  ]
+}

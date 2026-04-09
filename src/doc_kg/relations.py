@@ -70,24 +70,63 @@ def stable_keyword_id(keyword: str) -> str:
     return f"keyword:{_slug(keyword)}"
 
 
-def extract_entities(text: str, *, max_entities: int = 8) -> list[str]:
-    """Extract likely named entities from capitalized spans.
+_VALUE_PATTERNS: list[re.Pattern] = [
+    # Percentages: "10%", "5.5 %"
+    re.compile(r"\b\d+(?:\.\d+)?\s*%"),
+    # Currency amounts: "$5", "£20", "€100", "$1,200"
+    re.compile(r"[$£€¥]\d[\d,]*(?:\.\d+)?"),
+    # Color phrases: "lighter shade of gray", "deep blue", "matte black", etc.
+    re.compile(
+        r"\b(?:lighter|darker|light|dark|deep|pale|bright|matte|glossy|"
+        r"shiny|vivid|bold|soft|warm|cool)\s+"
+        r"(?:shade\s+of\s+)?(?:red|orange|yellow|green|blue|purple|pink|"
+        r"brown|gray|grey|black|white|beige|cream|ivory|gold|silver|teal|"
+        r"coral|lavender|navy|maroon|olive|cyan|magenta|indigo|violet|tan|khaki)\b",
+        re.IGNORECASE,
+    ),
+    # Plain color words that appear as standalone descriptors
+    re.compile(
+        r"\b(?:red|orange|yellow|green|blue|purple|pink|brown|gray|grey|"
+        r"black|white|beige|cream|ivory|gold|silver|teal|coral|lavender|"
+        r"navy|maroon|olive|cyan|magenta|indigo|violet|tan|khaki)\b",
+        re.IGNORECASE,
+    ),
+    # Lowercase occupational role phrases: "marketing specialist", "software engineer", etc.
+    re.compile(
+        r"\b(?:marketing|sales|software|data|product|project|financial|"
+        r"senior|junior|lead|chief|head|staff|assistant|associate|principal)"
+        r"\s+(?:specialist|engineer|manager|analyst|director|consultant|"
+        r"coordinator|developer|designer|officer|scientist|advisor|executive|"
+        r"architect|strategist)\b",
+        re.IGNORECASE,
+    ),
+]
 
-    This intentionally avoids heavy NLP dependencies while capturing practical
-    project entities such as class names, library names, org names, and tools.
+
+def extract_entities(text: str, *, max_entities: int = 8) -> list[str]:
+    """Extract likely named entities from capitalized spans and value patterns.
+
+    Captures titlecase proper nouns plus numeric values (percentages, currency),
+    color phrases, and lowercase occupational role phrases that are semantically
+    important but missed by capitalization-only heuristics.
 
     :param text: Chunk text.
     :param max_entities: Max entities returned.
     :return: Ordered de-duplicated entity names.
     """
     # Multi-word titlecase entities, acronyms, and CamelCase identifiers.
-    pattern = re.compile(
+    cap_pattern = re.compile(
         r"\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}"
         r"|[A-Z]{2,}[A-Z0-9]*"
         r"|[A-Z][a-z]+[A-Z][A-Za-z0-9]*"
         r"|[A-Z]{2,}[a-z][A-Za-z0-9]*)\b"
     )
-    found = [m.group(0).strip() for m in pattern.finditer(text)]
+    found: list[str] = [m.group(0).strip() for m in cap_pattern.finditer(text)]
+
+    # Value and phrase patterns (order matters: more specific first)
+    for pat in _VALUE_PATTERNS:
+        for m in pat.finditer(text):
+            found.append(m.group(0).strip())
 
     entities: list[str] = []
     seen: set[str] = set()

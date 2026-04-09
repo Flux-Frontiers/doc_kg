@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `store.py`: `GraphStore.nodes_batch()` — batch-fetch multiple nodes in a single SQL query via temp table JOIN; eliminates N individual lookups during graph query expansion
+- `store.py`: `MEMORY_RELS` tuple for memory-layer edge types (`SUPPORTS`, `ABOUT`, `REFERS_TO`, `INVOLVES`, `DESCRIBES`, `SUPERSEDES`, `DERIVED_FROM`)
+- `store.py`: Composite indexes `idx_edges_src_rel` and `idx_edges_dst_rel` for faster edge traversal
+- `kg.py`: `_short_chunk_boost()` — ranking boost for short factual chunks (< 200 chars) to surface single-sentence asides that are diluted in longer chunks
+- `relations.py`: `_VALUE_PATTERNS` — regex patterns for percentages, currency amounts, color phrases, and occupational role phrases; `extract_entities()` now captures these in addition to titlecase proper nouns
+- `dockg.py`, `graph.py`, `kg.py`: `chunk_strategy` (`"semantic"` | `"sentence_group"` | `"fixed"`) and `sentences_per_chunk` parameters propagated through `DocKG` → `DocGraph` → `parse_corpus()`; uses new `chunker_for()` factory
+- `benchmarks/build_dockg.py`: `--chunk-strategy` and `--sentences-per-chunk` CLI arguments for `build_kg()`
+- `benchmarks/longmemeval_dockg.py`: `_normalize_question()` — deterministic regex pre-processing that strips interrogative framing (`"What degree did I graduate with?"` → `"degree graduate with"`) to bring embeddings closer to answer text; applied before each query
+
+### Changed
+- `store.py`: `GraphStore.expand()` now uses batched SQL per hop (temp table + UNION) instead of per-node queries; frontier capped at `max_frontier=5000` to prevent explosive expansion through hub nodes; `CO_OCCURS_WITH` removed from `DEFAULT_RELS` (moved to `MEMORY_RELS` conceptually; excluded from document-layer defaults due to ~8M edges causing query slowdowns)
+- `kg.py`: `DocKG.query()` and `DocKG.pack()` switched to `nodes_batch()` for node materialisation; edge fetch in `query()` is now conditional (`len(all_ids) <= max_nodes * 10`) to skip expensive JOINs on large corpora; ranking key now includes `short_boost`
+- `kg.py`: `DocKG.query()` and `DocKG.pack()` ranking key switched to score-first ordering (`base_dist` → `best_hop` → boosts → kind → id), backported from MemoryKG where this change yielded +8.8 pp R@5 on LongMemEval benchmarks
+- `dockg.py`, `graph.py`, `kg.py`: `emit_cooccur` default changed from `True` to `False` — CO_OCCURS_WITH is noisy and dense; semantic memory should use MemoryKG instead
+- `benchmarks/longmemeval_dockg.py`: `query_sessions()` return type changed from `list[SessionHit]` to `tuple[list[SessionHit], QueryResult]` to expose raw result diagnostics; default `--hop` reduced from 2 to 1; default `--rels` now excludes `CO_OCCURS_WITH` to prevent explosive expansion; per-query diagnostics printed (seeds, expanded, returned nodes, query time)
+- `.codekg/` → `.pycodekg/`: Renamed CodeKG snapshot and artifact directory from `.codekg/` to `.pycodekg/` to distinguish from DocKG (`.dockg/`); `.gitignore` updated to reflect new path; existing snapshot migrated
+
+### Added
 - `cmd_snapshot.py`: `dockg snapshot prune` command — removes vestigial snapshots (metric-duplicates, broken manifest entries, orphaned JSON files) while always preserving the oldest and newest; supports `--dry-run`
 - `snapshots.py`: Re-export `PruneResult` from `kg_snapshot.snapshots` in the public API
 - `.mcp.json`: MCP server configuration (copilot-memory, skills-copilot, task-copilot, pycodekg, dockg) now tracked in git; `.gitignore` un-ignored it and added `.agentkg/` to ignored paths

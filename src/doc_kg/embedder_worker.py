@@ -67,8 +67,8 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
 
-    from sentence_transformers import (
-        SentenceTransformer,  # pylint: disable=import-outside-toplevel
+    from sentence_transformers import (  # pylint: disable=import-outside-toplevel
+        SentenceTransformer,
     )
 
     trust_remote = "nomic-ai/" in model_name
@@ -174,9 +174,7 @@ class CorpusEmbedder:
 
         # Temporal sampling if requested
         if sample_n and sample_n < len(texts):
-            indices = [
-                round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)
-            ]
+            indices = [round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)]
             indices = sorted(set(indices))
             texts = [texts[i] for i in indices]
             metadata = [metadata[i] for i in indices]
@@ -286,9 +284,7 @@ class CorpusEmbedder:
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
             stop_event.set()
-            logger.warning(
-                "Multiprocessing failed (%s), falling back to sequential", exc
-            )
+            logger.warning("Multiprocessing failed (%s), falling back to sequential", exc)
             return self._embed_sequential(texts)
         finally:
             stop_event.set()
@@ -327,7 +323,9 @@ class CorpusEmbedder:
 
         elapsed = time.monotonic() - t0
         size_mb = path.stat().st_size / 1_048_576
-        logger.info("Saved %d embeddings to %s (%.0f MB) in %.1fs", cache.n_vectors, path, size_mb, elapsed)
+        logger.info(
+            "Saved %d embeddings to %s (%.0f MB) in %.1fs", cache.n_vectors, path, size_mb, elapsed
+        )
         print(f"  cache    : saved {size_mb:,.0f} MB in {elapsed:.1f}s", flush=True)
 
     @staticmethod

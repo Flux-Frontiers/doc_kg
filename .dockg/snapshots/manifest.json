@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-04-07T21:32:58.457693+00:00",
+  "last_update": "2026-04-09T18:16:34.722182+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -676,6 +676,135 @@
           "nodes": 189,
           "edges": 1432,
           "coverage_delta": -0.00997335804471211,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "a79de24a3916d8fa163cf02eeb76c81ec1cc08d9",
+      "branch": "feat/benchmarks",
+      "timestamp": "2026-04-08T23:12:17.359135+00:00",
+      "version": "0.7.0",
+      "file": "a79de24a3916d8fa163cf02eeb76c81ec1cc08d9.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2186,
+        "total_edges": 13514,
+        "node_counts": {
+          "chunk": 447,
+          "document": 19,
+          "entity": 555,
+          "keyword": 510,
+          "section": 354,
+          "topic": 301
+        },
+        "edge_counts": {
+          "CONTAINS": 801,
+          "CO_OCCURS_WITH": 8934,
+          "HAS_KEYWORD": 1605,
+          "HAS_TOPIC": 446,
+          "MENTIONS_ENTITY": 1491,
+          "NEXT": 69,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 159
+        },
+        "meaningful_nodes": 2167,
+        "coverage_score": 0.8762117822520507,
+        "issues_count": 0,
+        "complexity_median": 16.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 219,
+          "edges": 1825,
+          "coverage_delta": -0.008667942833859965,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "83cafd53bc8cfa533cc3f9c60217fec2a2ebcc86",
+      "branch": "feat/benchmarks",
+      "timestamp": "2026-04-09T17:09:02.810016+00:00",
+      "version": "0.7.0",
+      "file": "83cafd53bc8cfa533cc3f9c60217fec2a2ebcc86.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2187,
+        "total_edges": 13538,
+        "node_counts": {
+          "chunk": 447,
+          "document": 19,
+          "entity": 556,
+          "keyword": 510,
+          "section": 354,
+          "topic": 301
+        },
+        "edge_counts": {
+          "CONTAINS": 801,
+          "CO_OCCURS_WITH": 8956,
+          "HAS_KEYWORD": 1605,
+          "HAS_TOPIC": 446,
+          "MENTIONS_ENTITY": 1493,
+          "NEXT": 69,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 159
+        },
+        "meaningful_nodes": 2168,
+        "coverage_score": 0.8762117822520507,
+        "issues_count": 0,
+        "complexity_median": 16.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 220,
+          "edges": 1849,
+          "coverage_delta": -0.008667942833859965,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "dbf12c327d3b92588a7785ce01a04195a2865381",
+      "branch": "feat/benchmarks",
+      "timestamp": "2026-04-09T18:16:34.721464+00:00",
+      "version": "0.7.0",
+      "file": "dbf12c327d3b92588a7785ce01a04195a2865381.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2191,
+        "total_edges": 13573,
+        "node_counts": {
+          "chunk": 448,
+          "document": 19,
+          "entity": 558,
+          "keyword": 510,
+          "section": 354,
+          "topic": 302
+        },
+        "edge_counts": {
+          "CONTAINS": 802,
+          "CO_OCCURS_WITH": 8980,
+          "HAS_KEYWORD": 1609,
+          "HAS_TOPIC": 447,
+          "MENTIONS_ENTITY": 1497,
+          "NEXT": 70,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 159
+        },
+        "meaningful_nodes": 2172,
+        "coverage_score": 0.8764880952380952,
+        "issues_count": 0,
+        "complexity_median": 16.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 224,
+          "edges": 1884,
+          "coverage_delta": -0.008391629847815385,
           "issues_delta": 0
         }
       }

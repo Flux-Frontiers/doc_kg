@@ -174,6 +174,8 @@ def build_kg(
     workers: int | None = None,
     emb_cache: Path | None = None,
     similar: bool = True,
+    chunk_strategy: str = "semantic",
+    sentences_per_chunk: int = 4,
 ) -> None:
     """Build a persistent DocKG from *corpus_dir*.
 
@@ -193,18 +195,33 @@ def build_kg(
     :param model: Sentence-transformer model name override.
     :param workers: Worker processes for embedding (enables two-phase build).
     :param emb_cache: Path for the embedding cache JSON (two-phase build).
+    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
+    :param sentences_per_chunk: Sentences per chunk for ``sentence_group`` strategy.
     """
-    from doc_kg.kg import DEFAULT_MODEL, DocKG  # pylint: disable=import-outside-toplevel
+    from doc_kg.kg import (  # pylint: disable=import-outside-toplevel
+        DEFAULT_MODEL,
+        DocKG,
+    )
 
     use_two_phase = (workers is not None and workers > 1) or emb_cache is not None
     cache_path = emb_cache or DEFAULT_EMB_CACHE
 
-    print(f"  Mode:    {'two-phase' if use_two_phase else 'standard'} "
-          f"({'wipe' if wipe else 'incremental'})")
+    print(
+        f"  Mode:    {'two-phase' if use_two_phase else 'standard'} "
+        f"({'wipe' if wipe else 'incremental'})"
+    )
     print(f"  Corpus:  {corpus_dir}")
     print(f"  SQLite:  {db_path}")
     print(f"  LanceDB: {lancedb_dir}")
     print(f"  Model:   {model or DEFAULT_MODEL}")
+    print(
+        f"  Chunks:  {chunk_strategy}"
+        + (
+            f" (sentences_per_chunk={sentences_per_chunk})"
+            if chunk_strategy == "sentence_group"
+            else ""
+        )
+    )
     if use_two_phase:
         print(f"  Workers: {workers or 'auto'}")
         print(f"  Cache:   {cache_path}")
@@ -218,6 +235,8 @@ def build_kg(
         db_path=db_path,
         lancedb_dir=lancedb_dir,
         model=model or DEFAULT_MODEL,
+        chunk_strategy=chunk_strategy,
+        sentences_per_chunk=sentences_per_chunk,
     )
     try:
         if use_two_phase:
@@ -225,8 +244,7 @@ def build_kg(
             if wipe or not db_path.exists():
                 graph_stats = kg.build_graph(wipe=wipe)
                 print(
-                    f"  Graph:   {graph_stats.total_nodes} nodes, "
-                    f"{graph_stats.total_edges} edges"
+                    f"  Graph:   {graph_stats.total_nodes} nodes, {graph_stats.total_edges} edges"
                 )
             else:
                 print(f"  Graph:   reusing existing SQLite at {db_path}")
@@ -325,6 +343,18 @@ def main() -> None:
         help="Skip SIMILAR_TO edge discovery (recommended for large corpora >100K chunks)",
     )
     parser.add_argument(
+        "--chunk-strategy",
+        default="semantic",
+        choices=["semantic", "sentence_group", "fixed"],
+        help="Chunking strategy (default: semantic)",
+    )
+    parser.add_argument(
+        "--sentences-per-chunk",
+        type=int,
+        default=2,
+        help="Sentences per chunk for sentence_group strategy (default: 2)",
+    )
+    parser.add_argument(
         "--skip-corpus",
         action="store_true",
         help="Skip corpus writing (assumes Markdown files already exist)",
@@ -358,6 +388,8 @@ def main() -> None:
         workers=args.workers,
         emb_cache=Path(args.emb_cache) if args.emb_cache else None,
         similar=not args.no_similar,
+        chunk_strategy=args.chunk_strategy,
+        sentences_per_chunk=args.sentences_per_chunk,
     )
 
 

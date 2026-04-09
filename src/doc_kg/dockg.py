@@ -248,6 +248,8 @@ def parse_corpus(
     *,
     extensions: set[str] | None = None,
     exclude: set[str] | None = None,
+    chunk_strategy: str = "semantic",
+    sentences_per_chunk: int = 4,
     chunk_size: int = 512,
     chunk_overlap: int = 64,
     similarity_threshold: float = 0.75,
@@ -255,7 +257,7 @@ def parse_corpus(
     enable_topics: bool = True,
     enable_entities: bool = True,
     enable_keywords: bool = True,
-    emit_cooccur: bool = True,
+    emit_cooccur: bool = False,
     cooccur_window: int = 1,
     topic_threshold: float = 0.2,
     topics_file: str | None = None,
@@ -278,6 +280,8 @@ def parse_corpus(
     :param corpus_root: Root directory of the corpus.
     :param extensions: File extensions to include (default: .md, .txt, .rst).
     :param exclude: Extra directory names to skip.
+    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
+    :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
     :param chunk_size: Approximate maximum characters per chunk.
     :param chunk_overlap: Character overlap between consecutive chunks.
     :param similarity_threshold: Cosine-similarity threshold for semantic split detection.
@@ -286,19 +290,22 @@ def parse_corpus(
     :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
     :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
     :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
-    :param emit_cooccur: Emit CO_OCCURS_WITH edges among extracted semantic nodes.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among extracted semantic nodes (default: False,
+                         noisy and dense; use MemoryKG for semantic memory instead).
     :param cooccur_window: Reserved for future windowed co-occurrence expansion.
     :param topic_threshold: Topic confidence threshold in [0, 1].
     :param topics_file: Optional topics catalog (JSON/YAML).
     :param quiet: Suppress progress output (default: ``False``).
     :return: ``(nodes, edges)`` tuple.
     """
-    from doc_kg.chunker import TextChunker  # pylint: disable=import-outside-toplevel
+    from doc_kg.chunker import chunker_for  # pylint: disable=import-outside-toplevel
 
     nodes: dict[str, DocNode] = {}
     edges: dict[tuple[str, str, str], DocEdge] = {}
 
-    chunker = TextChunker(
+    chunker = chunker_for(
+        chunk_strategy,  # type: ignore[arg-type]
+        sentences_per_chunk=sentences_per_chunk,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         similarity_threshold=similarity_threshold,
@@ -337,9 +344,7 @@ def parse_corpus(
         _progress_ctx = contextlib.nullcontext()
 
     with _progress_ctx as prog:
-        task_id = (
-            prog.add_task("  Parsing files", total=len(files)) if prog is not None else None
-        )
+        task_id = prog.add_task("  Parsing files", total=len(files)) if prog is not None else None
         for abs_path in files:
             file_path = rel_file_path(abs_path, corpus_root)
             doc_id = doc_node_id(file_path)

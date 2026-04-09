@@ -143,8 +143,8 @@ class SentenceTransformerEmbedder(Embedder):
         from sentence_transformers import (  # pylint: disable=import-outside-toplevel
             SentenceTransformer,
         )
-        from transformers import (
-            logging as hf_logging,  # pylint: disable=import-outside-toplevel
+        from transformers import (  # pylint: disable=import-outside-toplevel
+            logging as hf_logging,
         )
 
         hf_logging.set_verbosity_error()
@@ -155,9 +155,7 @@ class SentenceTransformerEmbedder(Embedder):
         os.environ["TQDM_DISABLE"] = "1"
         try:
             if local_path.exists():
-                self.model = SentenceTransformer(
-                    str(local_path), trust_remote_code=trust_remote
-                )
+                self.model = SentenceTransformer(str(local_path), trust_remote_code=trust_remote)
             else:
                 try:
                     self.model = SentenceTransformer(
@@ -166,9 +164,7 @@ class SentenceTransformerEmbedder(Embedder):
                         trust_remote_code=trust_remote,
                     )
                 except OSError:
-                    self.model = SentenceTransformer(
-                        model_name, trust_remote_code=trust_remote
-                    )
+                    self.model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
         finally:
             if _prev_tqdm is None:
                 os.environ.pop("TQDM_DISABLE", None)
@@ -177,9 +173,7 @@ class SentenceTransformerEmbedder(Embedder):
         self.model_name = model_name
         self.dim: int = self.model.get_sentence_embedding_dimension() or 384
 
-    def embed_texts(
-        self, texts: list[str], encode_batch_size: int = 512
-    ) -> list[list[float]]:
+    def embed_texts(self, texts: list[str], encode_batch_size: int = 512) -> list[list[float]]:
         """Embed a list of strings into float32 vectors.
 
         :param texts: Input strings.
@@ -362,17 +356,11 @@ class SemanticIndex:
             _progress_ctx = contextlib.nullcontext()
 
         with _progress_ctx as prog:
-            task_id = (
-                prog.add_task("  Embedding", total=len(nodes))
-                if prog is not None
-                else None
-            )
+            task_id = prog.add_task("  Embedding", total=len(nodes)) if prog is not None else None
             for i in range(0, len(nodes), encode_batch_size):
                 enc_nodes = nodes[i : i + encode_batch_size]
                 enc_texts = [_build_index_text(n) for n in enc_nodes]
-                enc_vecs = self.embedder.embed_texts(
-                    enc_texts, encode_batch_size=encode_batch_size
-                )
+                enc_vecs = self.embedder.embed_texts(enc_texts)
                 enc_arr = np.asarray(enc_vecs, dtype=np.float32)
                 if all_vecs_np is not None:
                     all_vecs_np[i : i + len(enc_nodes)] = enc_arr
@@ -436,7 +424,7 @@ class SemanticIndex:
 
     def precompute_embeddings(
         self,
-        store: "GraphStore",
+        store: GraphStore,
         out: Path,
         *,
         n_workers: int | None = None,
@@ -455,8 +443,8 @@ class SemanticIndex:
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file (*out*).
         """
-        from doc_kg.embedder_worker import (
-            CorpusEmbedder,  # pylint: disable=import-outside-toplevel
+        from doc_kg.embedder_worker import (  # pylint: disable=import-outside-toplevel
+            CorpusEmbedder,
         )
 
         if quiet:
@@ -495,15 +483,13 @@ class SemanticIndex:
         if not quiet:
             from rich.console import Console  # pylint: disable=import-outside-toplevel
 
-            Console().print(
-                f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})"
-            )
+            Console().print(f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})")
 
         return out
 
     def build_from_cache(
         self,
-        store: "GraphStore",
+        store: GraphStore,
         cache_path: Path,
         *,
         wipe: bool = False,
@@ -531,8 +517,8 @@ class SemanticIndex:
         """
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        from doc_kg.embedder_worker import (
-            CorpusEmbedder,  # pylint: disable=import-outside-toplevel
+        from doc_kg.embedder_worker import (  # pylint: disable=import-outside-toplevel
+            CorpusEmbedder,
         )
 
         if quiet:
@@ -549,9 +535,7 @@ class SemanticIndex:
         if not quiet:
             from rich.console import Console  # pylint: disable=import-outside-toplevel
 
-            Console().print(
-                f"  nodes    : {cache.n_vectors:,} from cache ({cache_path.name})"
-            )
+            Console().print(f"  nodes    : {cache.n_vectors:,} from cache ({cache_path.name})")
 
         tbl = self._open_table(wipe=wipe)
 
@@ -621,7 +605,12 @@ class SemanticIndex:
         self._tbl = tbl
 
         import sys  # pylint: disable=import-outside-toplevel
-        print(f"DEBUG: indexed={indexed}, all_ids={len(all_ids)}, discover={discover_similar}", flush=True, file=sys.stderr)
+
+        print(
+            f"DEBUG: indexed={indexed}, all_ids={len(all_ids)}, discover={discover_similar}",
+            flush=True,
+            file=sys.stderr,
+        )
 
         similar_edges_added = 0
         if discover_similar and all_ids:
@@ -688,9 +677,7 @@ class SemanticIndex:
 
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
-        chunk_indices = [
-            i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")
-        ]
+        chunk_indices = [i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")]
         if not chunk_indices:
             return 0
 

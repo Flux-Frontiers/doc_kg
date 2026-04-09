@@ -261,6 +261,29 @@ _REL_RANK_WEIGHTS: dict[str, float] = {
 }
 
 
+def _short_chunk_boost(node: dict, *, threshold: int = 200) -> float:
+    """Return a boost for short chunk nodes to surface factual asides.
+
+    Single-sentence factual asides (< *threshold* chars) get a positive boost
+    so they rank ahead of same-hop nodes whose embeddings are diluted by longer,
+    topically mixed context.  Non-chunk nodes are unaffected.
+
+    :param node: Node dict with optional ``text`` and ``kind`` keys.
+    :param threshold: Character length below which the boost is applied.
+    :return: Boost value in [0.0, 1.5].
+    """
+    if node.get("kind") != "chunk":
+        return 0.0
+    text = node.get("text") or ""
+    if not text:
+        return 0.0
+    n = len(text)
+    if n >= threshold:
+        return 0.0
+    # Linear scale: 200 chars → 0.0 boost, 0 chars → 1.5 boost
+    return round(1.5 * (1.0 - n / threshold), 4)
+
+
 def _semantic_rank_boost(node_id: str, edges: list[dict]) -> float:
     """Compute weighted semantic connectivity score for a node.
 
@@ -312,13 +335,16 @@ class DocKG:
     :param lancedb_dir: LanceDB directory.
     :param model: Sentence-transformer model name.
     :param table: LanceDB table name.
+    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
+    :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
     :param chunk_size: Approximate max characters per chunk.
     :param chunk_overlap: Character overlap between chunks.
     :param similarity_threshold: Semantic split threshold for chunker.
     :param enable_topics: Emit topic nodes and HAS_TOPIC edges.
     :param enable_entities: Emit entity nodes and MENTIONS_ENTITY edges.
     :param enable_keywords: Emit keyword nodes and HAS_KEYWORD edges.
-    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes.
+    :param emit_cooccur: Emit CO_OCCURS_WITH edges among semantic nodes (default: False;
+                         noisy and dense; use MemoryKG for semantic memory instead).
     :param cooccur_window: Co-occurrence window metadata.
     :param topic_threshold: Topic confidence threshold.
     :param topics_file: Optional topic catalog file (JSON/YAML).
@@ -332,13 +358,15 @@ class DocKG:
         *,
         model: str = DEFAULT_MODEL,
         table: str = "dockg_nodes",
+        chunk_strategy: str = "semantic",
+        sentences_per_chunk: int = 4,
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
         enable_topics: bool = True,
         enable_entities: bool = True,
         enable_keywords: bool = True,
-        emit_cooccur: bool = True,
+        emit_cooccur: bool = False,
         cooccur_window: int = 1,
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
@@ -356,6 +384,8 @@ class DocKG:
         )
         self.model_name = model
         self.table_name = table
+        self.chunk_strategy = chunk_strategy
+        self.sentences_per_chunk = sentences_per_chunk
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.similarity_threshold = similarity_threshold
@@ -384,6 +414,8 @@ class DocKG:
             self._graph = DocGraph(
                 self.corpus_root,
                 exclude=self.exclude or None,
+                chunk_strategy=self.chunk_strategy,
+                sentences_per_chunk=self.sentences_per_chunk,
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
                 similarity_threshold=self.similarity_threshold,
@@ -460,7 +492,7 @@ class DocKG:
 
     def build_embeddings(
         self,
-        out: "Path | str | None" = None,
+        out: Path | str | None = None,
         *,
         n_workers: int | None = None,
         batch_size: int = 64,
@@ -489,7 +521,7 @@ class DocKG:
 
     def build_index_from_cache(
         self,
-        cache_path: "Path | str",
+        cache_path: Path | str,
         *,
         wipe: bool = False,
         discover_similar: bool = True,
@@ -574,21 +606,25 @@ class DocKG:
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
-        all_edges = self.store.edges_within(all_ids)
+
+        # Batch-fetch all expanded nodes in one query instead of N individual lookups.
+        node_map = self.store.nodes_batch(all_ids)
+        # Only fetch edges for the ranking-boost pass when the expanded set is small
+        # enough to be practical.  For large corpora this JOIN dominates query time
+        # while the hop+distance signal already handles ranking adequately.
+        all_edges = self.store.edges_within(all_ids) if len(all_ids) <= max_nodes * 10 else []
 
         ranked_nodes: list[dict] = []
-        for nid in sorted(all_ids):
-            n = self.store.node(nid)
-            if not n:
-                continue
+        for nid, n in node_map.items():
             prov: ProvMeta = meta[nid]
             base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
+            short_boost = _short_chunk_boost(n)
             n["_rank_key"] = (
-                prov.best_hop,
-                -semantic_boost,
                 base_dist,
+                prov.best_hop,
+                -(semantic_boost + short_boost),
                 kind_pri,
                 n["id"],
             )
@@ -651,22 +687,22 @@ class DocKG:
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
+
+        # Batch-fetch all expanded nodes in one query instead of N individual lookups.
+        node_map = self.store.nodes_batch(all_ids)
         all_edges = self.store.edges_within(all_ids)
 
         # Materialise + rank nodes
         raw_nodes: list[dict] = []
-        for nid in sorted(all_ids):
-            n = self.store.node(nid)
-            if not n:
-                continue
+        for nid, n in node_map.items():
             prov: ProvMeta = meta[nid]
             base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
             n["_rank_key"] = (
+                base_dist,
                 prov.best_hop,
                 -semantic_boost,
-                base_dist,
                 kind_pri,
                 n["id"],
             )

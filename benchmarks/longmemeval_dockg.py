@@ -56,6 +56,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 import time
 from collections import defaultdict
@@ -88,12 +89,8 @@ def dcg(relevances: list[float], k: int) -> float:
     return sum(rel / math.log2(i + 2) for i, rel in enumerate(relevances[:k]))
 
 
-def ndcg(
-    rankings: list[int], correct_ids: set[str], corpus_ids: list[str], k: int
-) -> float:
-    relevances = [
-        1.0 if corpus_ids[idx] in correct_ids else 0.0 for idx in rankings[:k]
-    ]
+def ndcg(rankings: list[int], correct_ids: set[str], corpus_ids: list[str], k: int) -> float:
+    relevances = [1.0 if corpus_ids[idx] in correct_ids else 0.0 for idx in rankings[:k]]
     ideal = sorted(relevances, reverse=True)
     idcg = dcg(ideal, k)
     if idcg == 0:
@@ -136,9 +133,7 @@ def _format_session_markdown(sess_id: str, date: str, turns: list[dict]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def write_corpus(
-    data_file: Path, corpus_dir: Path, force: bool = False
-) -> dict[str, str]:
+def write_corpus(data_file: Path, corpus_dir: Path, force: bool = False) -> dict[str, str]:
     """Walk the longmemeval JSON and write every unique haystack session to disk.
 
     Returns a map of ``session_id → file_path`` (as a string, repo-relative).
@@ -169,10 +164,7 @@ def write_corpus(
             existing.add(sess_id)
 
     total = written + skipped
-    print(
-        f"  Corpus: {total} unique sessions "
-        f"({written} written, {skipped} reused) → {corpus_dir}"
-    )
+    print(f"  Corpus: {total} unique sessions ({written} written, {skipped} reused) → {corpus_dir}")
     return session_files
 
 
@@ -195,8 +187,10 @@ def build_kg(
     from doc_kg.kg import DEFAULT_MODEL, DocKG
 
     use_two_phase = (workers is not None and workers > 1) or emb_cache is not None
-    print(f"  Building DocKG ({'wipe' if wipe else 'incremental'}, "
-          f"{'two-phase' if use_two_phase else 'standard'})...")
+    print(
+        f"  Building DocKG ({'wipe' if wipe else 'incremental'}, "
+        f"{'two-phase' if use_two_phase else 'standard'})..."
+    )
     print(f"    corpus:  {corpus_dir}")
     print(f"    sqlite:  {db_path}")
     print(f"    lancedb: {lancedb_dir}")
@@ -222,8 +216,7 @@ def build_kg(
             if wipe or not db_path.exists():
                 graph_stats = kg.build_graph(wipe=wipe)
                 print(
-                    f"  Graph:   {graph_stats.total_nodes} nodes, "
-                    f"{graph_stats.total_edges} edges"
+                    f"  Graph:   {graph_stats.total_nodes} nodes, {graph_stats.total_edges} edges"
                 )
             else:
                 print(f"  Graph:   reusing existing SQLite at {db_path}")
@@ -323,6 +316,45 @@ def _session_id_from_file_path(file_path: str | None) -> str | None:
     return stem or None
 
 
+# Interrogative words stripped from query prefix (deterministic, no inference).
+_WH_PREFIX = re.compile(
+    r"^(?:what(?:'s| is| was| were| did| do| does| are)?|"
+    r"where(?:'s| is| was| did| do)?|"
+    r"when(?:'s| is| was| did| do)?|"
+    r"who(?:'s| is| was| did)?|"
+    r"how(?:\s+(?:many|much|long|often|far|old))?|"
+    r"which|why)\s+",
+    re.IGNORECASE,
+)
+# Personal pronoun/verb fragments left after WH-stripping ("did I", "was my", etc.).
+# \b after i/my prevents "did it" from matching as "did i" + "t...".
+_PERSONAL_STUB = re.compile(
+    r"^(?:did\s+(?:i|my)\b|was\s+(?:my|i|the)\b|is\s+(?:my|the)\b|"
+    r"do\s+(?:i|my)\b|are\s+(?:my|the)\b|have\s+(?:i|my)\b|"
+    r"i\s+(?:get|have|take|buy|go|make|do|attend|use|pick|find|spend|"
+    r"pack|earn|win|lose|create|join|start|finish|complete)\b|"
+    r"(?:i|my|the)\s+)\s*",
+    re.IGNORECASE,
+)
+
+
+def _normalize_question(q: str) -> str:
+    """Strip interrogative framing so the embedding lands closer to answer text.
+
+    Converts e.g. ``"What degree did I graduate with?"``
+    →  ``"degree graduate with"``
+
+    No inference — pure deterministic regex preprocessing.
+
+    :param q: Raw question string.
+    :return: Normalised noun-phrase string.
+    """
+    s = q.strip().rstrip("?").strip()
+    s = _WH_PREFIX.sub("", s)
+    s = _PERSONAL_STUB.sub("", s)
+    return s.strip() or q  # fall back to original if we stripped everything
+
+
 def query_sessions(
     kg: Any,
     question: str,
@@ -332,7 +364,7 @@ def query_sessions(
     rels: tuple[str, ...],
     max_nodes: int,
     haystack: set[str] | None = None,
-) -> list[SessionHit]:
+) -> tuple[list[SessionHit], Any]:
     """Run ``DocKG.query`` and collapse its ranked nodes to session-level hits.
 
     This is the pure DocKG retrieval path: semantic seeding over LanceDB plus
@@ -351,7 +383,7 @@ def query_sessions(
     :param rels: Edge types to traverse during expansion.
     :param max_nodes: Cap on ranked nodes returned by ``DocKG.query``.
     :param haystack: If supplied, only sessions in this set are returned.
-    :return: Session-level hits sorted by ascending rank (best first).
+    :return: Tuple of (session-level hits sorted by ascending rank, raw QueryResult).
     """
     result = kg.query(question, k=k, hop=hop, rels=rels, max_nodes=max_nodes)
 
@@ -370,7 +402,7 @@ def query_sessions(
                 via_node_id=node.get("id"),
             )
 
-    return sorted(best_per_session.values(), key=lambda x: x.rank)
+    return sorted(best_per_session.values(), key=lambda x: x.rank), result
 
 
 # =============================================================================
@@ -445,15 +477,22 @@ def cmd_run(args: argparse.Namespace) -> None:
             haystack = set(entry["haystack_session_ids"])
             answer_sids = set(entry["answer_session_ids"])
 
-            hits = query_sessions(
+            normalized = _normalize_question(question)
+            print(
+                f"  [{i + 1:4}/{len(data)}] {qid[:30]:30}  querying: {normalized[:60]!r}",
+                flush=True,
+            )
+            t_q0 = time.time()
+            hits, qr = query_sessions(
                 kg,
-                question,
+                normalized,
                 k=args.k,
                 hop=args.hop,
                 rels=rels,
                 max_nodes=args.max_nodes,
                 haystack=haystack,
             )
+            t_q = time.time() - t_q0
 
             # Any haystack sessions not surfaced by the graph query go to the tail
             returned = {h.session_id for h in hits}
@@ -493,8 +532,11 @@ def cmd_run(args: argparse.Namespace) -> None:
             if status == "MISS":
                 misses.append(qid)
             print(
-                f"  [{i + 1:4}/{len(data)}] {qid[:30]:30} "
-                f"R@5={r5:.0f} R@10={r10:.0f}  {status}"
+                f"         {'':30}  seeds={qr.seeds} exp={qr.expanded_nodes} "
+                f"ret={qr.returned_nodes} sess={len(hits)} "
+                f"t={t_q:.2f}s  "
+                f"R@5={r5:.0f} R@10={r10:.0f}  {status}",
+                flush=True,
             )
 
             results_log.append(
@@ -521,9 +563,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     print()
     print("=" * 60)
-    print(
-        f"  RESULTS — DocKG (k={args.k} hop={args.hop} " f"max_nodes={args.max_nodes})"
-    )
+    print(f"  RESULTS — DocKG (k={args.k} hop={args.hop} max_nodes={args.max_nodes})")
     print("=" * 60)
     print(f"  Time: {elapsed:.1f}s ({elapsed / max(len(data), 1):.2f}s per question)")
     print()
@@ -571,9 +611,7 @@ def cmd_all(args: argparse.Namespace) -> None:
 
 def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("data_file", help="Path to longmemeval_s_cleaned.json")
-    p.add_argument(
-        "--limit", type=int, default=0, help="Limit to N questions (0 = all)"
-    )
+    p.add_argument("--limit", type=int, default=0, help="Limit to N questions (0 = all)")
     p.add_argument("--skip", type=int, default=0, help="Skip first N questions")
     p.add_argument(
         "--k",
@@ -584,8 +622,8 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--hop",
         type=int,
-        default=2,
-        help="Graph expansion hops from each seed. Default: 2.",
+        default=1,
+        help="Graph expansion hops from each seed. Default: 1.",
     )
     p.add_argument(
         "--max-nodes",
@@ -596,13 +634,20 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
             "Must be large enough that the haystack's sessions are covered. Default: 1000."
         ),
     )
+    # CO_OCCURS_WITH has ~8M edges in the LongMemEval corpus (59%% of all edges).
+    # Including it at hop>=2 causes explosive graph expansion and makes queries
+    # extremely slow without meaningfully improving session recall.  The tighter
+    # default below keeps the high-signal semantic edges only.
+    _DEFAULT_BENCH_RELS = (
+        "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD"
+    )
     p.add_argument(
         "--rels",
-        default=None,
+        default=_DEFAULT_BENCH_RELS,
         help=(
             "Comma-separated edge types to traverse during graph expansion. "
-            "Default: DocKG DEFAULT_RELS (CONTAINS,NEXT,REFERENCES,SIMILAR_TO,"
-            "HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH)."
+            f"Default: {_DEFAULT_BENCH_RELS}  (CO_OCCURS_WITH excluded — "
+            "it has ~8M edges in the LongMemEval corpus and causes explosive expansion)."
         ),
     )
     p.add_argument("--out", default=None, help="Output JSONL file path")
@@ -619,9 +664,7 @@ def main() -> None:
         action="store_true",
         help="Rewrite corpus files and rebuild from scratch",
     )
-    p_prep.add_argument(
-        "--model", default=None, help="Override sentence-transformer model"
-    )
+    p_prep.add_argument("--model", default=None, help="Override sentence-transformer model")
     p_prep.add_argument(
         "--workers",
         type=int,
@@ -652,9 +695,7 @@ def main() -> None:
     p_all = sub.add_parser("all", help="prepare + run in one invocation")
     _add_run_args(p_all)
     p_all.add_argument("--wipe", action="store_true", help="Rebuild the KG")
-    p_all.add_argument(
-        "--model", default=None, help="Override sentence-transformer model"
-    )
+    p_all.add_argument("--model", default=None, help="Override sentence-transformer model")
     p_all.add_argument(
         "--workers",
         type=int,
