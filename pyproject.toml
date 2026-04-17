@@ -6,13 +6,8 @@
 # but for natural-language documents instead of Python source code.
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-04-07
+# Last Revision: 2026-04-17 13:08:13
 #
-
-[[tool.poetry.source]]
-name = "testpypi"
-url = "https://test.pypi.org/simple/"
-priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
@@ -20,7 +15,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "doc-kg"
-version = "0.8.0"
+version = "0.8.1"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
 license = "Elastic-2.0"
@@ -48,19 +43,17 @@ pyyaml = ">=6.0.0"
 mcp = ">=1.0.0"
 markdown-it-py = ">=3.0.0"
 einops = "^0.8.2"
-kg-snapshot = { version = ">=0.3.0", source = "testpypi" }
+kg-snapshot = { git = "https://github.com/Flux-Frontiers/kg_snapshot.git" }
 
+# our own adaptors
+pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git", optional = true }
+ftree-kg  = { git = "https://github.com/Flux-Frontiers/ftree_kg.git",  optional = true }
+agent-kg  = { git = "https://github.com/Flux-Frontiers/agent_kg.git",  optional = true }
+memory-kg = { git = "https://github.com/Flux-Frontiers/memory_kg.git", optional = true }
 
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
-
-[tool.poetry.group.kgdeps]
-optional = true
-
-[tool.poetry.group.kgdeps.dependencies]
-pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git" }
-ftree-kg = { git = "https://github.com/Flux-Frontiers/FTree_kg.git" }
-agent-kg = { git = "https://github.com/Flux-Frontiers/agent_kg.git" }
+kg  = ["pycode-kg", "ftree-kg", "agent-kg", "memory-kg"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
@@ -95,7 +88,7 @@ select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 strict = false
 ignore_missing_imports = true
 mypy_path = "src"

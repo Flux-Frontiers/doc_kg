@@ -217,9 +217,7 @@ __marimo__/
 *.fdb_latexmk
 *.synctex.gz
 
-# CodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
-# MUST include .codekg/snapshots!
-# This is the correct pattern
+# PyCodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
 .pycodekg/lancedb/
 .pycodekg/lancedb-*
 .pycodekg/graph.sqlite
