@@ -203,14 +203,14 @@ def build(
     _console.print(Rule(f"DocKG build — {repo_root.name}", style="bold blue"))
     _console.print(f"  corpus   : {repo_root}")
     _console.print(f"  model    : {model}")
-    _console.print(f"  sqlite   : {db_path}")
-    _console.print(f"  lancedb  : {lancedb_dir}")
+    _console.print(f"  graph store  : {db_path}")
+    _console.print(f"  vector index : {lancedb_dir}")
     _console.print(f"  ext      : {', '.join(sorted(extensions))}")
     _console.print(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
     _console.print(f"  features : {features}")
 
     # Step 1: Parse corpus → SQLite
-    _console.print("\n[bold][1/2][/bold] Parsing corpus \u2192 SQLite \u2026")
+    _console.print("\n[bold][1/2][/bold] Parsing corpus \u2192 graph store \u2026")
     graph_stats = kg.build_graph(wipe=wipe)
     for kind, count in sorted(graph_stats.node_counts.items()):
         _console.print(f"  {kind:<12} {count:>6}")
@@ -218,7 +218,7 @@ def build(
     _console.print(f"  {'nodes':<12} {graph_stats.total_nodes:>6}  edges {graph_stats.total_edges}")
 
     # Step 2: SQLite → LanceDB + SIMILAR_TO
-    _console.print("\n[bold][2/2][/bold] Embedding nodes \u2192 LanceDB \u2026")
+    _console.print("\n[bold][2/2][/bold] Embedding nodes \u2192 vector index \u2026")
     idx_stats = kg.index.build(
         kg.store,
         wipe=wipe,
@@ -372,8 +372,8 @@ def build_graph(
 
     _console.print(Rule(f"DocKG build-graph — {repo_root.name}", style="bold blue"))
     _console.print(f"  corpus  : {repo_root}")
-    _console.print(f"  sqlite  : {db_path}")
-    _console.print(f"  ext     : {', '.join(sorted(extensions))}")
+    _console.print(f"  graph store : {db_path}")
+    _console.print(f"  ext         : {', '.join(sorted(extensions))}")
     _console.print(f"  exclude : {', '.join(sorted(exclude)) if exclude else '(none)'}")
 
     stats = kg.build_graph(wipe=wipe)
@@ -447,11 +447,11 @@ def build_index(
     )
 
     _console.print(Rule(f"DocKG build-index — {db_path.name}", style="bold blue"))
-    _console.print(f"  sqlite  : {db_path}")
-    _console.print(f"  lancedb : {lancedb_dir}")
-    _console.print(f"  table   : {table}")
+    _console.print(f"  graph store  : {db_path}")
+    _console.print(f"  vector index : {lancedb_dir}")
+    _console.print(f"  table        : {table}")
 
-    _console.print("\nEmbedding nodes \u2192 LanceDB \u2026")
+    _console.print("\nEmbedding nodes \u2192 vector index \u2026")
     idx_stats = kg.index.build(
         kg.store,
         wipe=wipe,
