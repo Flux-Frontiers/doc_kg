@@ -15,7 +15,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "doc-kg"
-version = "0.8.1"
+version = "0.8.2"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
 license = "Elastic-2.0"
@@ -35,7 +35,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 python = ">=3.12,<3.14"
 lancedb = ">=0.29.0"
 numpy = ">=1.24.0"
-sentence-transformers = ">=2.7.0"
+sentence-transformers = "^5.4.1"
 pandas = ">=2.0.0"
 rich = ">=13.0.0"
 click = ">=8.1.0"

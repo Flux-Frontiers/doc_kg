@@ -4519,4 +4519,4 @@ viz = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "57e7b9a1d8d550816e3b20036c6843b6c2ba74e4af02dc062b0647c4a512d981"
+content-hash = "7d4e7b9cf915513cea4d14fed0886485c4bd1c0b658aef35672149ebb054d749"

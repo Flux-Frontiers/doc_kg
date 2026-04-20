@@ -1,12 +1,12 @@
-# CodeKG Rebuild
+# PyCodeKG Rebuild
 
-Wipe and rebuild the CodeKG SQLite knowledge graph and LanceDB semantic index for a repository. Execute the following steps in sequence.
+Wipe and rebuild the PyCodeKG SQLite knowledge graph and LanceDB semantic index for a repository. Execute the following steps in sequence.
 
 ## Command Argument Handling
 
 **Usage:**
-- `/codekg-rebuild` — Rebuild for the current working directory
-- `/codekg-rebuild /path/to/repo` — Rebuild for the specified repository
+- `/pycodekg-rebuild` — Rebuild for the current working directory
+- `/pycodekg-rebuild /path/to/repo` — Rebuild for the specified repository
 
 ---
 
@@ -24,11 +24,11 @@ Wipe and rebuild the CodeKG SQLite knowledge graph and LanceDB semantic index fo
 
 All artifact paths default to `$REPO_ROOT/.codekg/` — do not pass `--db`, `--sqlite`, or `--lancedb` flags.
 
-Detect how to invoke CodeKG — try in order:
-1. `poetry run codekg-build-sqlite` (preferred if inside a Poetry project)
-2. `python -m code_kg build-sqlite` (fallback for pip/venv installs)
+Detect how to invoke PyCodeKG — try in order:
+1. `poetry run pycodekg-build-sqlite` (preferred if inside a Poetry project)
+2. `python -m pycode_kg build-sqlite` (fallback for pip/venv installs)
 
-Use whichever works and apply it consistently for all commands below. Call this `RUN_PREFIX` (either `poetry run` or nothing, with `python -m code_kg` subcommands).
+Use whichever works and apply it consistently for all commands below. Call this `RUN_PREFIX` (either `poetry run` or nothing, with `python -m pycode_kg` subcommands).
 
 ---
 
@@ -38,10 +38,10 @@ Run the static analysis build with `--wipe` to replace any existing graph:
 
 ```bash
 # Poetry
-poetry run codekg-build-sqlite --repo "$REPO_ROOT" --wipe
+poetry run pycodekg-build-sqlite --repo "$REPO_ROOT" --wipe
 
 # pip / venv
-python -m code_kg build-sqlite --repo "$REPO_ROOT" --wipe
+python -m pycode_kg build-sqlite --repo "$REPO_ROOT" --wipe
 ```
 
 Verify the database was created and is non-empty:
@@ -59,10 +59,10 @@ Run the embedding build with `--wipe`:
 
 ```bash
 # Poetry
-poetry run codekg-build-lancedb --repo "$REPO_ROOT" --wipe
+poetry run pycodekg-build-lancedb --repo "$REPO_ROOT" --wipe
 
 # pip / venv
-python -m code_kg build-lancedb --repo "$REPO_ROOT" --wipe
+python -m pycode_kg build-lancedb --repo "$REPO_ROOT" --wipe
 ```
 
 Confirm the LanceDB directory was populated:
@@ -81,15 +81,15 @@ Run a quick stats check to confirm both layers are consistent:
 ```bash
 # Poetry
 poetry run python -c "
-from code_kg import CodeKG; import json
-kg = CodeKG(repo_root='$REPO_ROOT')
+from pycode_kg import PyCodeKG; import json
+kg = PyCodeKG(repo_root='$REPO_ROOT')
 print(json.dumps(kg.stats(), indent=2))
 "
 
 # pip / venv
 python -c "
-from code_kg import CodeKG; import json
-kg = CodeKG(repo_root='$REPO_ROOT')
+from pycode_kg import PyCodeKG; import json
+kg = PyCodeKG(repo_root='$REPO_ROOT')
 print(json.dumps(kg.stats(), indent=2))
 "
 ```
