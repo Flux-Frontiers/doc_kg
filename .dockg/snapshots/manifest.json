@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-04-20T17:34:34.798086+00:00",
+  "last_update": "2026-04-20T17:44:44.861153+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -1235,6 +1235,92 @@
           "nodes": 224,
           "edges": 1884,
           "coverage_delta": -0.008391629847815385,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "bd5d8a23f3f0744acb35e6d120c53166fae7d231",
+      "branch": "main",
+      "timestamp": "2026-04-20T17:42:13.353014+00:00",
+      "version": "0.8.0",
+      "file": "bd5d8a23f3f0744acb35e6d120c53166fae7d231.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2222,
+        "total_edges": 13803,
+        "node_counts": {
+          "chunk": 456,
+          "document": 21,
+          "entity": 565,
+          "keyword": 516,
+          "section": 361,
+          "topic": 303
+        },
+        "edge_counts": {
+          "CONTAINS": 817,
+          "CO_OCCURS_WITH": 9086,
+          "HAS_KEYWORD": 1638,
+          "HAS_TOPIC": 455,
+          "MENTIONS_ENTITY": 1544,
+          "NEXT": 70,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 184
+        },
+        "meaningful_nodes": 2201,
+        "coverage_score": 0.8786549707602339,
+        "issues_count": 0,
+        "complexity_median": 17.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 255,
+          "edges": 2114,
+          "coverage_delta": -0.006224754325676707,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "04fe1b201b5e24d5e152f3b56d31362b283d93f9",
+      "branch": "main",
+      "timestamp": "2026-04-20T17:44:44.860377+00:00",
+      "version": "0.8.0",
+      "file": "04fe1b201b5e24d5e152f3b56d31362b283d93f9.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2462,
+        "total_edges": 15643,
+        "node_counts": {
+          "chunk": 525,
+          "document": 22,
+          "entity": 620,
+          "keyword": 558,
+          "section": 411,
+          "topic": 326
+        },
+        "edge_counts": {
+          "CONTAINS": 936,
+          "CO_OCCURS_WITH": 10046,
+          "HAS_KEYWORD": 1910,
+          "HAS_TOPIC": 528,
+          "MENTIONS_ENTITY": 1884,
+          "NEXT": 88,
+          "REFERENCES": 9,
+          "SIMILAR_TO": 242
+        },
+        "meaningful_nodes": 2440,
+        "coverage_score": 0.8946031746031746,
+        "issues_count": 0,
+        "complexity_median": 17.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 495,
+          "edges": 3954,
+          "coverage_delta": 0.009723449517264005,
           "issues_delta": 0
         }
       }
