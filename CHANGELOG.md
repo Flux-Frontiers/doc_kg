@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.9.1] - 2026-04-22
+
+### Added
+- `kg.py`: `DocKG.query()` and `DocKG.pack()` now inject a `relevance` dict into every returned node — `{"score": float, "dist": float, "hop": int, "semantic_boost": float}` — where `score` is cosine similarity in [0, 1] (higher = more relevant). Previously nodes had no score field, causing all DocKG hits to register as `0.0` in federated KGRAG queries and sink below code hits regardless of semantic quality.
+
+### Changed
+- `kg.py`: `QueryResult` docstring updated to document the new `relevance` field on each node dict.
+- `.claude/settings.json`: Additional `codekg-build-sqlite`, `pycodekg-build-sqlite`, `pycodekg-build-lancedb`, and `pycodekg-analyze` commands added to the allow list.
+
 ## [0.9.0] - 2026-04-20
 
 ### Added

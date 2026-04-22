@@ -94,7 +94,10 @@ class QueryResult:
     :param returned_nodes: Nodes returned after filtering.
     :param hop: Hop count used.
     :param rels: Edge relations used for expansion.
-    :param nodes: List of node dicts (sorted by rank).
+    :param nodes: List of node dicts (sorted by rank).  Each node includes a
+        ``relevance`` dict with keys ``score`` (float in [0, 1], higher =
+        more relevant), ``dist`` (raw cosine distance), ``hop`` (graph hops
+        from nearest seed), and ``semantic_boost``.
     :param edges: List of edge dicts within the returned node set.
     """
 
@@ -621,6 +624,13 @@ class DocKG:
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
             short_boost = _short_chunk_boost(n)
+            seed_sim = max(0.0, round(1.0 - min(base_dist, 1.0), 4))
+            n["relevance"] = {
+                "score": seed_sim,
+                "dist": round(base_dist, 4),
+                "hop": prov.best_hop,
+                "semantic_boost": round(semantic_boost, 4),
+            }
             n["_rank_key"] = (
                 base_dist,
                 prov.best_hop,
@@ -699,6 +709,13 @@ class DocKG:
             base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
+            seed_sim = max(0.0, round(1.0 - min(base_dist, 1.0), 4))
+            n["relevance"] = {
+                "score": seed_sim,
+                "dist": round(base_dist, 4),
+                "hop": prov.best_hop,
+                "semantic_boost": round(semantic_boost, 4),
+            }
             n["_rank_key"] = (
                 base_dist,
                 prov.best_hop,
