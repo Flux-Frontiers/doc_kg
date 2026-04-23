@@ -6,8 +6,8 @@ SemanticIndex — LanceDB vector index for DocKG.
 
 Mirrors CodeKG's index.py with the following additions:
 
-1. Default model is a general-text embedding model (all-mpnet-base-v2)
-   instead of a code-specific model.
+1. Default model is BAAI/bge-small-en-v1.5 — wins across literary and
+   technical retrieval benchmarks; same model as PyCodeKG.
 
 2. After building the vector index, ``build()`` optionally runs a
    SIMILAR_TO edge discovery pass: each chunk is queried against its
@@ -129,10 +129,10 @@ class Embedder:
 class SentenceTransformerEmbedder(Embedder):
     """Local embedding via ``sentence-transformers``.
 
-    Defaults to ``all-mpnet-base-v2`` — a strong general-text sentence model
-    (768 dimensions).  Swap for ``BAAI/bge-small-en-v1.5`` or any
-    other HuggingFace model by changing ``DEFAULT_MODEL`` or setting the
-    ``DOCKG_MODEL`` environment variable.
+    Defaults to ``BAAI/bge-small-en-v1.5`` — benchmarked winner across
+    literary and technical retrieval (384 dimensions, fast).  Override by
+    changing ``DEFAULT_MODEL`` or setting the ``DOCKG_MODEL`` environment
+    variable.
 
     :param model_name: HuggingFace model name or local path.
     """
@@ -720,13 +720,7 @@ class SemanticIndex:
 
             for batch_start in range(0, n_chunks, row_batch):
                 batch_end = min(batch_start + row_batch, n_chunks)
-                # (batch, n_chunks) — cosine similarities for this row slice
-                import sys  # pylint: disable=import-outside-toplevel
-
-                print(f"tick {batch_start}/{n_chunks}", flush=True, file=sys.stderr)
-
                 sims = chunk_vecs[batch_start:batch_end] @ chunk_vecs.T
-                print(f"tock {batch_start}", flush=True, file=sys.stderr)
 
                 # All pairs above threshold
                 row_idxs, col_idxs = np.where(sims >= threshold)
@@ -780,7 +774,7 @@ class SemanticIndex:
         """
         tbl = self._get_table()
         qvec = self.embedder.embed_query(query)
-        raw = tbl.search(qvec).limit(k).to_list()
+        raw = tbl.search(qvec).metric("cosine").limit(k).to_list()
 
         hits: list[SeedHit] = []
         for rank, row in enumerate(raw):

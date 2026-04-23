@@ -53,10 +53,11 @@ from doc_kg.topics import TopicExtractor
 # Configuration
 # ============================================================================
 
-#: Default sentence-transformer model for general text (not code).
-#: Mirrors personal_agent's sentence-transformer default.
+#: Default sentence-transformer model for document retrieval.
+#: BAAI/bge-small-en-v1.5 wins across all query types (literary and technical)
+#: and produces L2 distances that map cleanly to [0, 1] similarity scores.
 #: Override via the ``DOCKG_MODEL`` environment variable.
-DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "all-mpnet-base-v2")
+DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "BAAI/bge-small-en-v1.5")
 
 # ============================================================================
 # Graph primitives (LOCKED v0 CONTRACT)

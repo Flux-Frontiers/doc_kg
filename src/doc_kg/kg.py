@@ -624,7 +624,7 @@ class DocKG:
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
             short_boost = _short_chunk_boost(n)
-            seed_sim = max(0.0, round(1.0 - min(base_dist, 1.0), 4))
+            seed_sim = max(0.0, round(1.0 - base_dist, 4))
             n["relevance"] = {
                 "score": seed_sim,
                 "dist": round(base_dist, 4),
@@ -709,7 +709,7 @@ class DocKG:
             base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
-            seed_sim = max(0.0, round(1.0 - min(base_dist, 1.0), 4))
+            seed_sim = max(0.0, round(1.0 - base_dist, 4))
             n["relevance"] = {
                 "score": seed_sim,
                 "dist": round(base_dist, 4),
