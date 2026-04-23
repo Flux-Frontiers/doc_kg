@@ -982,32 +982,6 @@ test-full = ["adlfs", "aiohttp (!=4.0.0a0,!=4.0.0a1)", "backports-zstd ; python_
 tqdm = ["tqdm"]
 
 [[package]]
-name = "ftree-kg"
-version = "0.5.0"
-description = "KGModule for file tree knowledge graphs"
-optional = true
-python-versions = ">=3.12,<3.14"
-groups = ["main"]
-markers = "extra == \"kg\""
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.1.0,<9"
-kg-snapshot = {git = "https://github.com/Flux-Frontiers/kg_snapshot.git"}
-kg-utils = {git = "https://github.com/Flux-Frontiers/kg_utils.git"}
-
-[package.extras]
-agentkg = ["agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git"]
-dockg = ["doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/ftree_kg.git"
-reference = "HEAD"
-resolved_reference = "be81870182cbe338bf8bdf8f2d17f9eacb8fac94"
-
-[[package]]
 name = "h11"
 version = "0.16.0"
 description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
@@ -1295,23 +1269,6 @@ type = "git"
 url = "https://github.com/Flux-Frontiers/kg_snapshot.git"
 reference = "HEAD"
 resolved_reference = "2fbdf488b55b382ae625300b1cbbfc4cf32296c2"
-
-[[package]]
-name = "kg-utils"
-version = "0.1.0"
-description = "Shared types and snapshot infrastructure for the KGModule SDK"
-optional = true
-python-versions = ">=3.12,<3.14"
-groups = ["main"]
-markers = "extra == \"kg\""
-files = []
-develop = false
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/kg_utils.git"
-reference = "HEAD"
-resolved_reference = "6ef289e99321b6b0b546deeac20623c1687724a7"
 
 [[package]]
 name = "lance-namespace"
@@ -1679,39 +1636,6 @@ files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
 ]
-
-[[package]]
-name = "memory-kg"
-version = "0.2.0"
-description = "A tool to build a semantically searchable knowledge graph from memories"
-optional = true
-python-versions = ">=3.12,<3.14"
-groups = ["main"]
-markers = "extra == \"kg\""
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.1.0"
-einops = "^0.8.2"
-kg-snapshot = {git = "https://github.com/Flux-Frontiers/kg_snapshot.git"}
-lancedb = ">=0.29.0"
-markdown-it-py = ">=3.0.0"
-mcp = ">=1.0.0"
-numpy = ">=1.24.0"
-pandas = ">=2.0.0"
-pyyaml = ">=6.0.0"
-rich = ">=13.0.0"
-sentence-transformers = ">=2.7.0"
-
-[package.extras]
-viz = []
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/memory_kg.git"
-reference = "HEAD"
-resolved_reference = "c15050409a888bfc7be7af3e4da2a092627ed1a2"
 
 [[package]]
 name = "mpmath"
@@ -4513,10 +4437,10 @@ files = [
 dev = ["pytest", "setuptools"]
 
 [extras]
-kg = ["agent-kg", "ftree-kg", "memory-kg", "pycode-kg"]
+kg = ["agent-kg", "pycode-kg"]
 viz = []
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "7d4e7b9cf915513cea4d14fed0886485c4bd1c0b658aef35672149ebb054d749"
+content-hash = "1f085642aa4f19a07dddb7162eb6b72be790df9faeaa79d9a63122c373e01601"

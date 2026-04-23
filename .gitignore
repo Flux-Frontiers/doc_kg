@@ -230,8 +230,7 @@ __marimo__/
 .dockg/*.sqlite-shm
 .dockg/*.sqlite-wal
 .dockg/models
-.dockg/cache/
-.dockg/pipeline/
+
 # Also ignore .dockg/ nested under subdirectories (e.g. docs/.dockg/)
 **/.dockg/
 

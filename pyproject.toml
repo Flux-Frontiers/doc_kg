@@ -6,7 +6,12 @@
 # but for natural-language documents instead of Python source code.
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-04-17 13:08:13
+# Last Revision: 2026-04-22 20:47:56
+#
+
+# poetry install --all-extras
+# poetry install --with dev
+# poetry install --extras kg
 #
 
 [build-system]
@@ -17,14 +22,14 @@ build-backend = "poetry.core.masonry.api"
 name = "doc-kg"
 version = "0.9.2"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
-authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
+authors = ["Eric G. Suchanek, PhD <suchanek@flux-frontiers.com>"]
 license = "Elastic-2.0"
 readme = "README.md"
 homepage = "https://github.com/Flux-Frontiers/doc_kg"
 repository = "https://github.com/Flux-Frontiers/doc_kg"
 keywords = ["knowledge-graph", "document-analysis", "markdown", "lancedb", "sqlite", "semantic-search"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -47,13 +52,11 @@ kg-snapshot = { git = "https://github.com/Flux-Frontiers/kg_snapshot.git" }
 
 # our own adaptors
 pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git", optional = true }
-ftree-kg  = { git = "https://github.com/Flux-Frontiers/ftree_kg.git",  optional = true }
 agent-kg  = { git = "https://github.com/Flux-Frontiers/agent_kg.git",  optional = true }
-memory-kg = { git = "https://github.com/Flux-Frontiers/memory_kg.git", optional = true }
 
 [tool.poetry.extras]
 viz = ["streamlit", "pyvis", "plotly"]
-kg  = ["pycode-kg", "ftree-kg", "agent-kg", "memory-kg"]
+kg  = ["pycode-kg", "agent-kg"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

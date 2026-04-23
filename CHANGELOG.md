@@ -8,14 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `analysis/memory_kg_semantic_20260422.md`: MemoryKG semantic corpus analysis report (language profile, top entities, dominant themes, document signatures).
 
 ### Changed
 - `dockg.py`, `index.py`: Default embedding model switched from `all-mpnet-base-v2` to `BAAI/bge-small-en-v1.5` — benchmarked winner across literary and technical retrieval; 384-dim, faster inference, same model used by PyCodeKG. Override via `DOCKG_MODEL` env var.
 - `index.py`: `SemanticIndex.search()` now chains `.metric("cosine")` on the LanceDB query builder — ensures cosine distances are returned so the `1 - dist` similarity formula in `kg.py` maps correctly to [0, 1]. (`create_table()` does not accept a `metric` argument in LanceDB 0.30.x; the previous attempt to pass it there raised `TypeError`.)
 - `index.py`: Removed debug `print` (tick/tock) statements from the SIMILAR_TO batch similarity loop.
 - `kg.py`: Removed `min(base_dist, 1.0)` clamp from `seed_sim` in `DocKG.query()` and `DocKG.pack()` — cosine distances from `BAAI/bge-small-en-v1.5` are already in [0, 1]; the clamp was masking true score fidelity for distant hits.
+- `pyproject.toml`: Development status classifier promoted from `3 - Alpha` to `4 - Beta`; author email updated to `suchanek@flux-frontiers.com`; `ftree-kg` and `memory-kg` removed from optional `kg` extras (now only `pycode-kg` and `agent-kg`); added install command hints as comments.
+- `poetry.lock`: Removed `ftree-kg`, `kg-utils`, and `memory-kg` from the resolved dependency graph.
 
 ### Removed
+- `.gitignore`: Removed `.dockg/cache/` and `.dockg/pipeline/` exclusions (no longer needed).
 
 ### Fixed
 
