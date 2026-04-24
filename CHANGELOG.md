@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.11.0] - 2026-04-24
+
+### Added
 - `analysis/memory_kg_semantic_20260422.md`: MemoryKG semantic corpus analysis report (language profile, top entities, dominant themes, document signatures).
 - `store.py`: `GraphStore.stamp_meta(builder_name, builder_version)` — writes the `_kgrag_meta` table into a built SQLite DB with `builder_name`, `builder_version`, and `built_at` (ISO-8601 UTC). Implements the KGRAG builder-version stamp contract so `kgrag info` can surface builder provenance. Uses `INSERT OR REPLACE` so repeated calls update `built_at` without creating duplicates.
 - `kg.py`: `DocKG.build_graph()` now calls `store.stamp_meta()` immediately after writing nodes and edges, stamping `builder_name="doc_kg"` and `builder_version` from `importlib.metadata` into the database on every build.

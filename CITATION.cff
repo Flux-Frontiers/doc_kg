@@ -1,0 +1,28 @@
+cff-version: "1.2.0"
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "DocKG: Semantic Knowledge Graph for Document Corpora"
+abstract: >
+  DocKG builds a semantically searchable knowledge graph from markdown and text
+  documents. It indexes document chunks, sections, topics, and entities as nodes
+  with structural edges, enabling hybrid semantic + graph queries, cross-document
+  relationship discovery, and MCP-based AI integration for document understanding.
+authors:
+  - family-names: Suchanek
+    given-names: "Eric G., PhD"
+    orcid: "https://orcid.org/0009-0009-0891-1507"
+    email: suchanek@flux-frontiers.com
+    affiliation: "Flux-Frontiers"
+version: "0.11.0"
+date-released: "2026-04-24"
+license-url: "https://www.elastic.co/licensing/elastic-license"
+repository-code: "https://github.com/Flux-Frontiers/doc_kg"
+url: "https://github.com/Flux-Frontiers/doc_kg"
+keywords:
+  - knowledge-graph
+  - document-retrieval
+  - semantic-search
+  - markdown
+  - lancedb
+  - mcp
+  - rag
