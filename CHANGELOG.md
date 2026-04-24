@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `analysis/memory_kg_semantic_20260422.md`: MemoryKG semantic corpus analysis report (language profile, top entities, dominant themes, document signatures).
+- `store.py`: `GraphStore.stamp_meta(builder_name, builder_version)` — writes the `_kgrag_meta` table into a built SQLite DB with `builder_name`, `builder_version`, and `built_at` (ISO-8601 UTC). Implements the KGRAG builder-version stamp contract so `kgrag info` can surface builder provenance. Uses `INSERT OR REPLACE` so repeated calls update `built_at` without creating duplicates.
+- `kg.py`: `DocKG.build_graph()` now calls `store.stamp_meta()` immediately after writing nodes and edges, stamping `builder_name="doc_kg"` and `builder_version` from `importlib.metadata` into the database on every build.
+- `kg.py`: `DocKG.stats()` upgraded from a thin `store.stats()` delegate to a flat dict conforming to the KGRAG adapter stats contract — returns `node_count`, `edge_count`, `document_count`, `chunk_count`, `section_count`, `topic_count`, `entity_count`, `keyword_count`. Wraps all queries in `try/except` so it never raises; returns zeros plus an `"error"` key on failure.
+- `cli/cmd_status.py`: New `dockg status` command — reads `_kgrag_meta` and `GraphStore.stats()` and renders builder metadata (name, version, built-at, DB size in MB) plus side-by-side Rich tables of node kinds and edge relations. Exits non-zero if the database file is absent.
+- `cli/main.py`: Registered `cmd_status` in the CLI group.
+- `tests/test_store.py`: Tests for `stamp_meta` — verifies all three required keys land correctly and that a second call updates rather than duplicating.
+- `tests/test_kg_stats.py`: Tests for `DocKG.stats()` — required keys, correct per-kind counts, no-raise on empty DB, and end-to-end verification that `build_graph()` stamps `_kgrag_meta`.
+- `tests/test_cli.py`: Tests for `dockg status` — `status` appears in `--help`, output contains builder info and node kinds, exits non-zero on missing DB.
 
 ### Changed
 - `dockg.py`, `index.py`: Default embedding model switched from `all-mpnet-base-v2` to `BAAI/bge-small-en-v1.5` — benchmarked winner across literary and technical retrieval; 384-dim, faster inference, same model used by PyCodeKG. Override via `DOCKG_MODEL` env var.

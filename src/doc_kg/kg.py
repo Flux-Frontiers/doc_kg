@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
+from typing import Any
 
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.graph import DocGraph
@@ -483,6 +485,7 @@ class DocKG:
         """
         nodes, edges = self.graph.extract(force=wipe).result()
         self.store.write(nodes, edges, wipe=wipe, quiet=False)
+        self.store.stamp_meta("doc_kg", _pkg_version("doc_kg"))
         s = self.store.stats()
         return BuildStats(
             corpus_root=str(self.corpus_root),
@@ -771,9 +774,42 @@ class DocKG:
     # Convenience
     # ------------------------------------------------------------------
 
-    def stats(self) -> dict:
-        """Return store statistics (node/edge counts by kind/relation)."""
-        return self.store.stats()
+    def stats(self) -> dict[str, Any]:
+        """Return live statistics for this DocKG instance.
+
+        Returns a flat dict conforming to the KGRAG adapter stats contract.
+        All counts default to 0 on error so this method never raises.
+
+        :return: Flat dict with ``node_count``, ``edge_count``, and
+            per-kind counts: ``document_count``, ``chunk_count``,
+            ``section_count``, ``topic_count``, ``entity_count``,
+            ``keyword_count``.
+        """
+        try:
+            s = self.store.stats()
+            nc = s.get("node_counts", {})
+            return {
+                "node_count": s.get("total_nodes", 0),
+                "edge_count": s.get("total_edges", 0),
+                "document_count": nc.get("document", 0),
+                "chunk_count": nc.get("chunk", 0),
+                "section_count": nc.get("section", 0),
+                "topic_count": nc.get("topic", 0),
+                "entity_count": nc.get("entity", 0),
+                "keyword_count": nc.get("keyword", 0),
+            }
+        except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+            return {
+                "node_count": 0,
+                "edge_count": 0,
+                "document_count": 0,
+                "chunk_count": 0,
+                "section_count": 0,
+                "topic_count": 0,
+                "entity_count": 0,
+                "keyword_count": 0,
+                "error": str(exc),
+            }
 
     def node(self, node_id: str) -> dict | None:
         """Fetch a single node by ID from the store."""

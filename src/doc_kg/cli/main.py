@@ -13,6 +13,7 @@ Usage::
     dockg analyze        [OPTIONS] [CORPUS_ROOT]
     dockg download-model [OPTIONS]
     dockg snapshot       [COMMAND]
+    dockg status         [OPTIONS]
     dockg viz            [OPTIONS]
 
 Author: Eric G. Suchanek, PhD
@@ -32,6 +33,7 @@ from doc_kg.cli import (  # noqa: F401
     cmd_query,
     cmd_semantic_analyze,
     cmd_snapshot,
+    cmd_status,
     cmd_viz,
 )
 from doc_kg.cli.group import cli  # noqa: F401  # pylint: disable=unused-import

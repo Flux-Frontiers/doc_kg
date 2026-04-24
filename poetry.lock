@@ -2467,7 +2467,7 @@ files = [
 
 [[package]]
 name = "pycode-kg"
-version = "0.14.0"
+version = "0.14.1"
 description = "A tool to build a searchable knowledge graph from Python repositories"
 optional = true
 python-versions = ">=3.12,<3.14"
@@ -2485,7 +2485,7 @@ numpy = ">=1.24.0"
 pandas = ">=2.0.0"
 rich = "^14.3.3"
 safetensors = "^0.5.0"
-sentence-transformers = "^5.2.0"
+sentence-transformers = "^5.4.1"
 torch = ">=2.5.1"
 transformers = "^4.57.6"
 
@@ -2497,7 +2497,7 @@ viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jup
 type = "git"
 url = "https://github.com/Flux-Frontiers/pycode_kg.git"
 reference = "HEAD"
-resolved_reference = "e04c8229b99e42d3ed3a5c4068f02f2753c5f22d"
+resolved_reference = "d5dcbe5a5b8706d0ff51921e0d4f2cb4deaa3f36"
 
 [[package]]
 name = "pycparser"

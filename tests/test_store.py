@@ -125,3 +125,40 @@ def test_store_context_manager(tmp_path):
     with GraphStore(db) as store:
         store.write(_make_nodes(), _make_edges(), wipe=True)
         assert store.stats()["total_nodes"] == 3
+
+
+def test_stamp_meta_writes_required_keys(tmp_path):
+    db = tmp_path / "test.sqlite"
+    store = GraphStore(db)
+    store.write(_make_nodes(), _make_edges(), wipe=True)
+    store.stamp_meta("doc_kg", "1.2.3")
+
+    import sqlite3
+
+    con = sqlite3.connect(str(db))
+    rows = {k: v for k, v in con.execute("SELECT key, value FROM _kgrag_meta").fetchall()}
+    con.close()
+    store.close()
+
+    assert rows["builder_name"] == "doc_kg"
+    assert rows["builder_version"] == "1.2.3"
+    assert "built_at" in rows
+    assert rows["built_at"].startswith("20")  # ISO-8601 timestamp
+
+
+def test_stamp_meta_idempotent(tmp_path):
+    db = tmp_path / "test.sqlite"
+    store = GraphStore(db)
+    store.write(_make_nodes(), _make_edges(), wipe=True)
+    store.stamp_meta("doc_kg", "1.0.0")
+    store.stamp_meta("doc_kg", "1.0.1")  # second call must not raise or duplicate
+
+    import sqlite3
+
+    con = sqlite3.connect(str(db))
+    rows = con.execute("SELECT value FROM _kgrag_meta WHERE key='builder_version'").fetchall()
+    con.close()
+    store.close()
+
+    assert len(rows) == 1
+    assert rows[0][0] == "1.0.1"

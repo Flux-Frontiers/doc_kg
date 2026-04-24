@@ -23,6 +23,7 @@ import contextlib
 import json
 import sqlite3
 from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 from doc_kg.dockg import DocEdge, DocNode
@@ -173,6 +174,25 @@ class GraphStore:
         """Delete all nodes and edges."""
         self.con.execute("DELETE FROM edges;")
         self.con.execute("DELETE FROM nodes;")
+        self.con.commit()
+
+    def stamp_meta(self, builder_name: str, builder_version: str) -> None:
+        """Write KGRAG builder-version metadata into the ``_kgrag_meta`` table.
+
+        :param builder_name: Builder package name (e.g. ``"doc_kg"``).
+        :param builder_version: Builder package ``__version__``.
+        """
+        self.con.execute(
+            "CREATE TABLE IF NOT EXISTS _kgrag_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        self.con.executemany(
+            "INSERT OR REPLACE INTO _kgrag_meta (key, value) VALUES (?, ?)",
+            [
+                ("builder_name", builder_name),
+                ("builder_version", builder_version),
+                ("built_at", datetime.now(UTC).isoformat()),
+            ],
+        )
         self.con.commit()
 
     def write(
