@@ -49,7 +49,7 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 "$REPO_ROOT/.venv/bin/dockg" snapshot save "${VERSION:-unknown}" \
     --repo . \
-    --commit "$TREE_HASH" \
+    --tree-hash "$TREE_HASH" \
     --branch "$BRANCH" \
   || { echo "[dockg] snapshot skipped (run 'dockg build' to initialize)" >&2; exit 0; }
 

@@ -159,41 +159,103 @@ get_node("chunk:intro:overview")     # fetch a single node by ID
 
 **Requirements:** Python ≥ 3.12, < 3.14
 
-### pip (from GitHub)
+### pip
 
 ```bash
-# Core install (SQLite + LanceDB + MCP server)
-pip install 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
+# From PyPI (recommended)
+pip install doc-kg
 
-# With Streamlit web visualizer (adds Streamlit, pyvis, plotly)
-pip install 'doc-kg[viz] @ git+https://github.com/Flux-Frontiers/doc_kg.git'
+# With Streamlit web visualizer
+pip install 'doc-kg[viz]'
+
+# Latest from GitHub
+pip install 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
 ```
 
-### Existing Poetry project
+### Poetry (existing project)
 
 ```bash
-# Core
-poetry add 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
+# From PyPI
+poetry add doc-kg
 
 # With Streamlit visualizer
-poetry add 'doc-kg[viz] @ git+https://github.com/Flux-Frontiers/doc_kg.git'
+poetry add 'doc-kg[viz]'
+
+# From GitHub source
+poetry add 'doc-kg @ git+https://github.com/Flux-Frontiers/doc_kg.git'
 ```
 
 Or declare in `pyproject.toml`:
 
 ```toml
 [tool.poetry.dependencies]
-doc-kg = {git = "https://github.com/Flux-Frontiers/doc_kg.git", extras = ["viz"]}
+doc-kg = "^0.11.0"
+# or with visualizer:
+doc-kg = {version = "^0.11.0", extras = ["viz"]}
 ```
 
-> **Note for DocKG developers:** Use `poetry install -E viz` to install the Streamlit visualizer locally. The `extras` mechanism above is for *consumers* of the package; `-E` is for local development.
+> **Note for DocKG developers:** Clone the repo and use `poetry install -E viz` for a full local development environment including the Streamlit visualizer.
 
-All CLI entry points are available immediately after installation:
+### Verify the installation
 
 ```bash
-dockg build docs/
-dockg query "search term"
-dockg mcp --repo docs/
+dockg --help
+dockg status --repo .
+```
+
+`dockg status` shows the knowledge graph builder metadata, node/edge counts, and DB size. It exits non-zero if no graph has been built yet — useful for CI health checks.
+
+### First build
+
+```bash
+# Build a knowledge graph from a directory of .md and .txt files
+dockg build --repo /path/to/docs/
+
+# Verify the result
+dockg status --repo /path/to/docs/
+
+# Run a query
+dockg query --repo /path/to/docs/ "your search topic"
+```
+
+### Git hooks (optional)
+
+Install a pre-commit hook that automatically captures a graph metrics snapshot before each commit:
+
+```bash
+# Via the CLI (recommended — uses the full quality-check pipeline)
+dockg install-hooks
+
+# Via the standalone script
+bash scripts/install-hooks.sh
+
+# Skip the hook for a specific commit
+DOCKG_SKIP_SNAPSHOT=1 git commit -m "message"
+```
+
+### Download embedding model for offline use
+
+The default model (`BAAI/bge-small-en-v1.5`) is fetched from HuggingFace on first use. To pre-download it for air-gapped or offline environments:
+
+```bash
+dockg download-model
+# or a specific model:
+dockg download-model --model BAAI/bge-small-en-v1.5
+```
+
+### AI agent integration (MCP)
+
+After installing, wire DocKG into your AI agent by adding it as an MCP server. See [docs/MCP.md](docs/MCP.md) for the full setup guide, or run the installer script to configure all providers automatically:
+
+```bash
+# Configure Claude Code, GitHub Copilot, and Cline in one step
+bash scripts/install-skill.sh
+
+# Claude Code only
+bash scripts/install-skill.sh --providers claude
+
+# Dry-run to see what would be changed
+bash scripts/install-skill.sh --dry-run
 ```
 
 ---
@@ -232,7 +294,7 @@ dockg build CORPUS_ROOT [--db PATH] [--lancedb PATH] [--model NAME]
 | `CORPUS_ROOT` | required | Root directory of documents to index |
 | `--db` | `.dockg/graph.sqlite` | SQLite database path |
 | `--lancedb` | `.dockg/lancedb` | LanceDB index directory |
-| `--model` | `all-MiniLM-L6-v2` | Sentence-transformer embedding model |
+| `--model` | `BAAI/bge-small-en-v1.5` | Sentence-transformer embedding model |
 | `--update` | off | Incremental update — keep existing data instead of wiping |
 | `--no-similar` | off | Skip computing `SIMILAR_TO` edges |
 | `--exclude-dir` | — | Exclude a directory at every depth (repeatable); merged with `[tool.dockg].exclude` |

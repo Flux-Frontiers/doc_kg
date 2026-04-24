@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# install-skill.sh — Bootstrap the CodeKG AI integration layer
+# install-skill.sh — Bootstrap the DocKG AI integration layer
 #
-# Installs SKILL.md reference files and the /codekg slash command for AI agents,
+# Installs SKILL.md reference files and the /dockg slash command for AI agents,
 # then configures MCP server integration for the specified providers.
 #
 # Supported providers:
 #   claude   — Claude Code  (.claude/claude_code_config.json)
 #   kilo     — Kilo Code    (.mcp.json, shared with Claude Code)
 #   copilot  — GitHub Copilot (.vscode/mcp.json)
-#   cline    — Cline        (.claude/commands/codekg.md slash command)
+#   cline    — Cline        (.claude/commands/dockg.md slash command)
 #
 # Usage (from a target repo, no clone needed):
-#   curl -fsSL https://raw.githubusercontent.com/Flux-Frontiers/code_kg/main/scripts/install-skill.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Flux-Frontiers/doc_kg/main/scripts/install-skill.sh | bash
 #
 # With provider selection:
 #   curl -fsSL .../install-skill.sh | bash -s -- --providers all
@@ -21,26 +21,27 @@
 #
 # Flags:
 #   --providers <list>   Comma-separated provider names, or "all" (default: all)
-#   --wipe               Force rebuild of SQLite graph and LanceDB index
+#   --wipe               Force rebuild of graph and vector index
 #   --dry-run            Print what would be done without making any changes
 #
 # What it does:
 #   1. Creates skill directories for Claude Code, Kilo Code, and other agents
 #      and installs SKILL.md + references/installation.md into each
-#   2. Installs Claude Code slash commands (codekg, setup-codekg-mcp, changelog-commit,
-#      continue, protocol, release) to ~/.claude/commands/
-#   3. Installs the /codekg slash command into the target repo for Cline
-#   4. Installs code-kg if codekg is not found:
+#   2. Installs Claude Code slash commands (dockg, dockg-rebuild, setup-mcp, changelog-commit,
+#      release) to ~/.claude/commands/
+#   3. Installs the /dockg slash command into the target repo for Cline
+#   4. Installs doc-kg if dockg is not found:
 #        a. pip install from latest GitHub release wheel (preferred, no git needed)
 #        b. pip install from git+https (fallback, needs git)
 #        c. poetry add (fallback for Poetry-managed repos)
-#   5. Builds the SQLite knowledge graph (skips if already present, unless --wipe)
-#   6. Builds the LanceDB vector index  (skips if already present, unless --wipe)
+#   5. Builds the graph store (skips if already present, unless --wipe)
+#   6. Builds the vector index  (skips if already present, unless --wipe)
 #   7. Writes provider MCP configs as requested
 #   8. Prints a final summary
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-03-02 09:45:06
+# Last Revision: 2026-04-24
+# License: Elastic 2.0
 # =============================================================================
 
 set -eo pipefail
@@ -107,24 +108,23 @@ for _p in "${_PLIST[@]}"; do
     _enable_provider "$(echo "$_p" | tr -d ' ')"
 done
 
-REPO="Flux-Frontiers/code_kg"
+REPO="Flux-Frontiers/doc_kg"
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 
 # Install to Claude Code, Kilo Code, and other agent skill directories
 SKILL_DIRS=(
-    "${HOME}/.claude/skills/codekg"
-    "${HOME}/.kilocode/skills/codekg"
-    "${HOME}/.agents/skills/codekg"
+    "${HOME}/.claude/skills/dockg"
+    "${HOME}/.kilocode/skills/dockg"
+    "${HOME}/.agents/skills/dockg"
 )
 
 # Global Claude Code command files to install to ~/.claude/commands/
 CLAUDE_COMMAND_FILES=(
-    "codekg.md"
-    "setup-codekg-mcp.md"
+    "dockg.md"
+    "dockg-rebuild.md"
+    "setup-mcp.md"
     "changelog-commit.md"
-    "continue.md"
-    "protocol.md"
     "release.md"
 )
 
@@ -140,15 +140,15 @@ else
     SCRIPT_DIR=""
     REPO_ROOT=""
 fi
-LOCAL_SKILL="${REPO_ROOT:+${REPO_ROOT}/.claude/skills/codekg/SKILL.md}"
+LOCAL_SKILL="${REPO_ROOT:+${REPO_ROOT}/.claude/skills/dockg/SKILL.md}"
 
 # The target repo is where the user ran the script from (CWD).
 TARGET_REPO="${PWD}"
-SQLITE_DB="${TARGET_REPO}/.codekg/graph.sqlite"
-LANCEDB_DIR="${TARGET_REPO}/.codekg/lancedb"
+GRAPH_DB="${TARGET_REPO}/.dockg/graph.sqlite"
+LANCEDB_DIR="${TARGET_REPO}/.dockg/lancedb"
 
 echo "╔══════════════════════════════════════════════════╗"
-echo "║       CodeKG Integration Installer               ║"
+echo "║     DocKG Integration Installer (doc_kg)         ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 [ -n "$DRY_RUN" ] && echo "  *** DRY RUN — no changes will be made ***"
@@ -176,22 +176,22 @@ for SKILL_DIR in "${SKILL_DIRS[@]}"; do
             echo "  Copying skill files from local clone..."
             FIRST_RUN=0
         fi
-        _exec cp "${REPO_ROOT}/.claude/skills/codekg/SKILL.md" "${SKILL_DIR}/SKILL.md"
-        _exec cp "${REPO_ROOT}/.claude/skills/codekg/references/installation.md" "${REFS_DIR}/installation.md"
+        _exec cp "${REPO_ROOT}/.claude/skills/dockg/SKILL.md" "${SKILL_DIR}/SKILL.md"
+        _exec cp "${REPO_ROOT}/.claude/skills/dockg/references/installation.md" "${REFS_DIR}/installation.md"
     else
         if [ "${FIRST_RUN:-1}" = "1" ]; then
             echo "→ No local clone detected. Downloading from GitHub..."
             FIRST_RUN=0
         fi
         if [ -n "$DRY_RUN" ]; then
-            echo "  [dry-run] would download ${RAW_BASE}/.claude/skills/codekg/SKILL.md → ${SKILL_DIR}/SKILL.md"
-            echo "  [dry-run] would download ${RAW_BASE}/.claude/skills/codekg/references/installation.md → ${REFS_DIR}/installation.md"
+            echo "  [dry-run] would download ${RAW_BASE}/.claude/skills/dockg/SKILL.md → ${SKILL_DIR}/SKILL.md"
+            echo "  [dry-run] would download ${RAW_BASE}/.claude/skills/dockg/references/installation.md → ${REFS_DIR}/installation.md"
         elif command -v curl &>/dev/null; then
-            curl -fsSL "${RAW_BASE}/.claude/skills/codekg/SKILL.md" -o "${SKILL_DIR}/SKILL.md"
-            curl -fsSL "${RAW_BASE}/.claude/skills/codekg/references/installation.md" -o "${REFS_DIR}/installation.md"
+            curl -fsSL "${RAW_BASE}/.claude/skills/dockg/SKILL.md" -o "${SKILL_DIR}/SKILL.md"
+            curl -fsSL "${RAW_BASE}/.claude/skills/dockg/references/installation.md" -o "${REFS_DIR}/installation.md"
         elif command -v wget &>/dev/null; then
-            wget -q "${RAW_BASE}/.claude/skills/codekg/SKILL.md" -O "${SKILL_DIR}/SKILL.md"
-            wget -q "${RAW_BASE}/.claude/skills/codekg/references/installation.md" -O "${REFS_DIR}/installation.md"
+            wget -q "${RAW_BASE}/.claude/skills/dockg/SKILL.md" -O "${SKILL_DIR}/SKILL.md"
+            wget -q "${RAW_BASE}/.claude/skills/dockg/references/installation.md" -O "${REFS_DIR}/installation.md"
         else
             echo "ERROR: Neither curl nor wget found. Install one and retry."
             exit 1
@@ -247,8 +247,8 @@ echo ""
 
 if [ "$DO_CLINE" = "1" ]; then
     CLINE_CMD_DIR="${TARGET_REPO}/.claude/commands"
-    CLINE_CMD_FILE="${CLINE_CMD_DIR}/codekg.md"
-    _LOCAL_CMD="${REPO_ROOT:+${REPO_ROOT}/.claude/commands/codekg.md}"
+    CLINE_CMD_FILE="${CLINE_CMD_DIR}/dockg.md"
+    _LOCAL_CMD="${REPO_ROOT:+${REPO_ROOT}/.claude/commands/dockg.md}"
 
     _exec mkdir -p "$CLINE_CMD_DIR"
 
@@ -260,12 +260,12 @@ if [ "$DO_CLINE" = "1" ]; then
     else
         # Download from GitHub
         if [ -n "$DRY_RUN" ]; then
-            echo "  [dry-run] would download ${RAW_BASE}/.claude/commands/codekg.md → ${CLINE_CMD_FILE}"
+            echo "  [dry-run] would download ${RAW_BASE}/.claude/commands/dockg.md → ${CLINE_CMD_FILE}"
         elif command -v curl &>/dev/null; then
-            curl -fsSL "${RAW_BASE}/.claude/commands/codekg.md" -o "$CLINE_CMD_FILE"
+            curl -fsSL "${RAW_BASE}/.claude/commands/dockg.md" -o "$CLINE_CMD_FILE"
             echo "  ✓ Downloaded → ${CLINE_CMD_FILE}"
         elif command -v wget &>/dev/null; then
-            wget -q "${RAW_BASE}/.claude/commands/codekg.md" -O "$CLINE_CMD_FILE"
+            wget -q "${RAW_BASE}/.claude/commands/dockg.md" -O "$CLINE_CMD_FILE"
             echo "  ✓ Downloaded → ${CLINE_CMD_FILE}"
         else
             echo "  ⚠ Neither curl nor wget found — skipping Cline command install"
@@ -275,9 +275,9 @@ else
     echo "  – Skipped (cline not selected)"
 fi
 
-# ── Step 4: Install code-kg if not already present ────────────────────────────
+# ── Step 4: Install doc-kg if not already present ────────────────────────────
 echo ""
-echo "── Step 4: Checking code-kg installation ────────────"
+echo "── Step 4: Checking doc-kg installation ─────────────"
 echo ""
 
 # Resolve the latest GitHub release wheel URL (requires curl or wget + python3).
@@ -304,58 +304,58 @@ except Exception:
 PYEOF
 }
 
-CODEKG_BIN=""
+DOCKG_BIN=""
 
 # Probe for an existing installation in order of priority:
-#   1. Local .venv in the target repo (Poetry project that added code-kg)
-#   2. Local .venv in the code_kg source repo (running the script from the repo itself)
+#   1. Local .venv in the target repo (Poetry project that added doc-kg)
+#   2. Local .venv in the doc_kg source repo (running the script from the repo itself)
 #   3. Importable in the active Python environment
 #   4. On $PATH
-if [ -x "${TARGET_REPO}/.venv/bin/codekg" ]; then
-    CODEKG_BIN="${TARGET_REPO}/.venv/bin/codekg"
-    echo "  ✓ Found codekg in local venv: ${CODEKG_BIN}"
-elif [ -n "${REPO_ROOT}" ] && [ -x "${REPO_ROOT}/.venv/bin/codekg" ]; then
-    CODEKG_BIN="${REPO_ROOT}/.venv/bin/codekg"
-    echo "  ✓ Found codekg in source venv: ${CODEKG_BIN}"
-elif python3 -c "import code_kg" &>/dev/null 2>&1; then
+if [ -x "${TARGET_REPO}/.venv/bin/dockg" ]; then
+    DOCKG_BIN="${TARGET_REPO}/.venv/bin/dockg"
+    echo "  ✓ Found dockg in local venv: ${DOCKG_BIN}"
+elif [ -n "${REPO_ROOT}" ] && [ -x "${REPO_ROOT}/.venv/bin/dockg" ]; then
+    DOCKG_BIN="${REPO_ROOT}/.venv/bin/dockg"
+    echo "  ✓ Found dockg in source venv: ${DOCKG_BIN}"
+elif python3 -c "import doc_kg" &>/dev/null 2>&1; then
     # Importable — resolve the binary from the same interpreter's Scripts/bin
-    CODEKG_BIN="$(python3 -c "import sysconfig; print(sysconfig.get_path('scripts'))")/codekg"
-    [ -x "$CODEKG_BIN" ] || CODEKG_BIN="codekg"   # fallback to PATH entry
-    echo "  ✓ Found code_kg in Python environment — codekg: ${CODEKG_BIN}"
-elif command -v codekg &>/dev/null; then
-    CODEKG_BIN="$(command -v codekg)"
-    echo "  ✓ Found codekg on PATH: ${CODEKG_BIN}"
+    DOCKG_BIN="$(python3 -c "import sysconfig; print(sysconfig.get_path('scripts'))")/dockg"
+    [ -x "$DOCKG_BIN" ] || DOCKG_BIN="dockg"   # fallback to PATH entry
+    echo "  ✓ Found doc_kg in Python environment — dockg: ${DOCKG_BIN}"
+elif command -v dockg &>/dev/null; then
+    DOCKG_BIN="$(command -v dockg)"
+    echo "  ✓ Found dockg on PATH: ${DOCKG_BIN}"
 fi
 
-if [ -z "$CODEKG_BIN" ]; then
+if [ -z "$DOCKG_BIN" ]; then
     if [ -n "$DRY_RUN" ]; then
-        echo "  [dry-run] would install code-kg from GitHub (wheel or git source)"
-        CODEKG_BIN="codekg"
+        echo "  [dry-run] would install doc-kg from GitHub (wheel or git source)"
+        DOCKG_BIN="dockg"
     else
         # ── Preferred: latest GitHub release wheel (no git needed) ────────────
         WHEEL_URL="$(_latest_wheel_url || true)"
         if [ -n "$WHEEL_URL" ]; then
-            echo "  → Installing code-kg from GitHub release wheel..."
-            pip install --quiet "code-kg @ ${WHEEL_URL}"
+            echo "  → Installing doc-kg from GitHub release wheel..."
+            pip install --quiet "doc-kg @ ${WHEEL_URL}"
         else
             # ── Fallback: pip from git source ─────────────────────────────────
-            echo "  → Installing code-kg from GitHub source..."
-            pip install --quiet "code-kg @ git+https://github.com/${REPO}.git"
+            echo "  → Installing doc-kg from GitHub source..."
+            pip install --quiet "doc-kg @ git+https://github.com/${REPO}.git"
         fi
         # Re-probe after install
-        CODEKG_BIN="$(command -v codekg 2>/dev/null || true)"
-        if [ -n "$CODEKG_BIN" ]; then
-            echo "  ✓ Installed code-kg — codekg at: ${CODEKG_BIN}"
+        DOCKG_BIN="$(command -v dockg 2>/dev/null || true)"
+        if [ -n "$DOCKG_BIN" ]; then
+            echo "  ✓ Installed doc-kg — dockg at: ${DOCKG_BIN}"
         else
             echo "  ✗ Installation failed. Install manually:"
-            echo "      pip install 'code-kg @ git+https://github.com/${REPO}.git'"
+            echo "      pip install 'doc-kg @ git+https://github.com/${REPO}.git'"
             exit 1
         fi
     fi
 fi
 
 # ── Step 4b: Write Cline MCP settings (cline_mcp_settings.json) ─────────────
-# Must run after CODEKG_BIN is resolved above.
+# Must run after DOCKG_BIN is resolved above.
 echo ""
 echo "── Step 4b: Configuring Cline MCP settings ──────────"
 echo ""
@@ -374,16 +374,16 @@ if [ "$DO_CLINE" = "1" ]; then
         echo "    Expected: ~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
     elif [ -n "$DRY_RUN" ]; then
         REPO_NAME="$(basename "${TARGET_REPO}")"
-        echo "  [dry-run] would upsert codekg-${REPO_NAME} in ${CLINE_SETTINGS}"
+        echo "  [dry-run] would upsert dockg-${REPO_NAME} in ${CLINE_SETTINGS}"
     else
         REPO_NAME="$(basename "${TARGET_REPO}")"
-        python3 - "$CLINE_SETTINGS" "$TARGET_REPO" "$REPO_NAME" "$CODEKG_BIN" <<'PYEOF'
+        python3 - "$CLINE_SETTINGS" "$TARGET_REPO" "$REPO_NAME" "$DOCKG_BIN" <<'PYEOF'
 import json, sys
 cline_settings = sys.argv[1]
 target_repo    = sys.argv[2]
 repo_name      = sys.argv[3]
-codekg_bin     = sys.argv[4]
-server_key     = f"codekg-{repo_name}"
+dockg_bin      = sys.argv[4]
+server_key     = f"dockg-{repo_name}"
 
 with open(cline_settings, "r") as f:
     data = json.load(f)
@@ -391,9 +391,8 @@ if "mcpServers" not in data:
     data["mcpServers"] = {}
 
 data["mcpServers"][server_key] = {
-    "command": codekg_bin,
-    "args": ["mcp", "--repo", target_repo,
-             "--db", f"{target_repo}/.codekg/graph.sqlite"]
+    "command": dockg_bin,
+    "args": ["mcp", "--repo", target_repo]
 }
 
 with open(cline_settings, "w") as f:
@@ -406,46 +405,46 @@ else
     echo "  – Skipped (cline not selected)"
 fi
 
-# ── Step 4: Build the SQLite knowledge graph ──────────────────────────────────
+# ── Step 5: Build the graph store ─────────────────────────────────────────────
 echo ""
-echo "── Step 5: Building SQLite knowledge graph ──────────"
+echo "── Step 5: Building graph store ─────────────────────"
 echo ""
 
-if [ -f "$SQLITE_DB" ] && [ -z "$WIPE_FLAG" ]; then
-    echo "  ✓ SQLite graph already exists: ${SQLITE_DB} — skipping build"
+if [ -f "$GRAPH_DB" ] && [ -z "$WIPE_FLAG" ]; then
+    echo "  ✓ Graph store already exists: ${GRAPH_DB} — skipping build"
     echo "    (Run with --wipe to force rebuild)"
 else
     if [ -n "$DRY_RUN" ]; then
-        echo "  [dry-run] would run: codekg build-sqlite --repo ${TARGET_REPO}${WIPE_FLAG:+ --wipe}"
+        echo "  [dry-run] would run: dockg build-graph --repo ${TARGET_REPO}${WIPE_FLAG:+ --wipe}"
     else
-        _exec mkdir -p "$(dirname "$SQLITE_DB")"
-        echo "  → Building SQLite graph at: ${SQLITE_DB}"
+        _exec mkdir -p "$(dirname "$GRAPH_DB")"
+        echo "  → Building graph store at: ${GRAPH_DB}"
         _WIPE_ARG=${WIPE_FLAG:+--wipe}
-        (cd "${TARGET_REPO}" && "${CODEKG_BIN}" build-sqlite --repo "${TARGET_REPO}" ${_WIPE_ARG})
-        if [ -f "$SQLITE_DB" ]; then
-            echo "  ✓ Built: ${SQLITE_DB}"
+        (cd "${TARGET_REPO}" && "${DOCKG_BIN}" build-graph --repo "${TARGET_REPO}" ${_WIPE_ARG})
+        if [ -f "$GRAPH_DB" ]; then
+            echo "  ✓ Built: ${GRAPH_DB}"
         else
-            echo "  ✗ Build failed — ${SQLITE_DB} not created"
+            echo "  ✗ Build failed — ${GRAPH_DB} not created"
             exit 1
         fi
     fi
 fi
 
-# ── Step 5: Build the LanceDB vector index ────────────────────────────────────
+# ── Step 6: Build the vector index ───────────────────────────────────────────
 echo ""
-echo "── Step 6: Building LanceDB vector index ────────────"
+echo "── Step 6: Building vector index ───────────────────"
 echo ""
 
 if [ -d "$LANCEDB_DIR" ] && [ "$(ls -A "$LANCEDB_DIR" 2>/dev/null)" ] && [ -z "$WIPE_FLAG" ]; then
-    echo "  ✓ LanceDB index already exists: ${LANCEDB_DIR} — skipping build"
+    echo "  ✓ Vector index already exists: ${LANCEDB_DIR} — skipping build"
     echo "    (Run with --wipe to force rebuild)"
 else
     if [ -n "$DRY_RUN" ]; then
-        echo "  [dry-run] would run: codekg build-lancedb --repo ${TARGET_REPO}${WIPE_FLAG:+ --wipe}"
+        echo "  [dry-run] would run: dockg build-index --repo ${TARGET_REPO}${WIPE_FLAG:+ --wipe}"
     else
-        echo "  → Building LanceDB index at: ${LANCEDB_DIR}"
+        echo "  → Building vector index at: ${LANCEDB_DIR}"
         _WIPE_ARG=${WIPE_FLAG:+--wipe}
-        (cd "${TARGET_REPO}" && "${CODEKG_BIN}" build-lancedb --repo "${TARGET_REPO}" ${_WIPE_ARG})
+        (cd "${TARGET_REPO}" && "${DOCKG_BIN}" build-index --repo "${TARGET_REPO}" ${_WIPE_ARG})
         if [ -d "$LANCEDB_DIR" ] && [ "$(ls -A "$LANCEDB_DIR" 2>/dev/null)" ]; then
             echo "  ✓ Built: ${LANCEDB_DIR}"
         else
@@ -465,13 +464,13 @@ MCP_JSON="${TARGET_REPO}/.mcp.json"
 if [ "$DO_KILO" = "0" ] && [ "$DO_CLAUDE" = "0" ]; then
     echo "  – Skipped (neither claude nor kilo selected)"
 elif [ -n "$DRY_RUN" ]; then
-    echo "  [dry-run] would upsert codekg entry in ${MCP_JSON}"
+    echo "  [dry-run] would upsert dockg entry in ${MCP_JSON}"
 elif [ ! -f "$MCP_JSON" ]; then
     cat > "$MCP_JSON" <<EOF
 {
   "mcpServers": {
-    "codekg": {
-      "command": "${CODEKG_BIN}",
+    "dockg": {
+      "command": "${DOCKG_BIN}",
       "args": [
         "mcp",
         "--repo", "${TARGET_REPO}"
@@ -482,24 +481,24 @@ elif [ ! -f "$MCP_JSON" ]; then
 EOF
     echo "  ✓ Created ${MCP_JSON}"
 else
-    python3 - "$MCP_JSON" "$TARGET_REPO" "$CODEKG_BIN" <<'PYEOF'
+    python3 - "$MCP_JSON" "$TARGET_REPO" "$DOCKG_BIN" <<'PYEOF'
 import json, sys
-mcp_json    = sys.argv[1]
+mcp_json   = sys.argv[1]
 target_repo = sys.argv[2]
-codekg_bin  = sys.argv[3]
+dockg_bin  = sys.argv[3]
 with open(mcp_json, "r") as f:
     data = json.load(f)
 if "mcpServers" not in data:
     data["mcpServers"] = {}
-data["mcpServers"]["codekg"] = {
-    "command": codekg_bin,
+data["mcpServers"]["dockg"] = {
+    "command": dockg_bin,
     "args": ["mcp", "--repo", target_repo]
 }
 with open(mcp_json, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
 PYEOF
-    echo "  ✓ Updated codekg entry in ${MCP_JSON}"
+    echo "  ✓ Updated dockg entry in ${MCP_JSON}"
 fi
 
 # ── Step 8: Write .vscode/mcp.json (GitHub Copilot) ──────────────────────────
@@ -516,7 +515,7 @@ elif [ -n "$DRY_RUN" ]; then
     if [ ! -f "$VSCODE_MCP" ]; then
         echo "  [dry-run] would create ${VSCODE_MCP}"
     else
-        echo "  [dry-run] would upsert codekg entry in existing ${VSCODE_MCP}"
+        echo "  [dry-run] would upsert dockg entry in existing ${VSCODE_MCP}"
     fi
 else
     _exec mkdir -p "$VSCODE_DIR"
@@ -525,13 +524,12 @@ else
         cat > "$VSCODE_MCP" <<EOF
 {
   "servers": {
-    "codekg": {
+    "dockg": {
       "type": "stdio",
-      "command": "${CODEKG_BIN}",
+      "command": "${DOCKG_BIN}",
       "args": [
         "mcp",
-        "--repo", "${TARGET_REPO}",
-        "--db",   "${TARGET_REPO}/.codekg/graph.sqlite"
+        "--repo", "${TARGET_REPO}"
       ]
     }
   }
@@ -539,26 +537,25 @@ else
 EOF
         echo "  ✓ Created ${VSCODE_MCP}"
     else
-        python3 - "$VSCODE_MCP" "$TARGET_REPO" "$CODEKG_BIN" <<'PYEOF'
+        python3 - "$VSCODE_MCP" "$TARGET_REPO" "$DOCKG_BIN" <<'PYEOF'
 import json, sys
 vscode_mcp  = sys.argv[1]
 target_repo = sys.argv[2]
-codekg_bin  = sys.argv[3]
+dockg_bin   = sys.argv[3]
 with open(vscode_mcp, "r") as f:
     data = json.load(f)
 if "servers" not in data:
     data["servers"] = {}
-data["servers"]["codekg"] = {
+data["servers"]["dockg"] = {
     "type": "stdio",
-    "command": codekg_bin,
-    "args": ["mcp", "--repo", target_repo,
-             "--db", f"{target_repo}/.codekg/graph.sqlite"]
+    "command": dockg_bin,
+    "args": ["mcp", "--repo", target_repo]
 }
 with open(vscode_mcp, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
 PYEOF
-        echo "  ✓ Updated codekg entry in ${VSCODE_MCP}"
+        echo "  ✓ Updated dockg entry in ${VSCODE_MCP}"
     fi
 fi  # DO_COPILOT
 
@@ -566,35 +563,34 @@ fi  # DO_COPILOT
 echo ""
 if [ -n "$DRY_RUN" ]; then
 echo "╔══════════════════════════════════════════════════╗"
-echo "║   CodeKG dry-run complete — no changes made.     ║"
+echo "║   DocKG dry-run complete — no changes made.      ║"
 echo "╚══════════════════════════════════════════════════╝"
 else
 echo "╔══════════════════════════════════════════════════╗"
-echo "║   CodeKG installed and configured successfully!  ║"
+echo "║   DocKG installed and configured successfully!   ║"
 echo "╚══════════════════════════════════════════════════╝"
 fi
 echo ""
-echo "  Repo:    ${TARGET_REPO}"
-echo "  SQLite:  ${SQLITE_DB}"
-echo "  LanceDB: ${LANCEDB_DIR}"
+echo "  Repo:     ${TARGET_REPO}"
+echo "  Graph DB: ${GRAPH_DB}"
+echo "  LanceDB:  ${LANCEDB_DIR}"
 echo ""
 echo "  Claude commands installed:"
-echo "    ✓ ~/.claude/commands/codekg.md"
-echo "    ✓ ~/.claude/commands/setup-codekg-mcp.md"
+echo "    ✓ ~/.claude/commands/dockg.md"
+echo "    ✓ ~/.claude/commands/dockg-rebuild.md"
+echo "    ✓ ~/.claude/commands/setup-mcp.md"
 echo "    ✓ ~/.claude/commands/changelog-commit.md"
-echo "    ✓ ~/.claude/commands/continue.md"
-echo "    ✓ ~/.claude/commands/protocol.md"
 echo "    ✓ ~/.claude/commands/release.md"
 echo ""
 echo "  Providers configured:"
 ( [ "$DO_CLAUDE" = "1" ] || [ "$DO_KILO" = "1" ] ) && echo "    ✓ Claude Code + Kilo Code  (.mcp.json)"
 [ "$DO_COPILOT" = "1" ] && echo "    ✓ GitHub Copilot (.vscode/mcp.json)"
-[ "$DO_CLINE"   = "1" ] && echo "    ✓ Cline          (.claude/commands/codekg.md + cline_mcp_settings.json)"
+[ "$DO_CLINE"   = "1" ] && echo "    ✓ Cline          (.claude/commands/dockg.md + cline_mcp_settings.json)"
 echo ""
 echo "  ⚠ One manual step required:"
 echo "    Reload VS Code to activate the MCP servers:"
 echo "    Cmd+Shift+P → 'Developer: Reload Window'"
 echo ""
-[ "$DO_COPILOT" = "1" ] && echo "  GitHub Copilot: VS Code will prompt you to Trust the codekg server on first use."
+[ "$DO_COPILOT" = "1" ] && echo "  GitHub Copilot: VS Code will prompt you to Trust the dockg server on first use."
 echo ""
-echo "  Full docs: https://github.com/Flux-Frontiers/code_kg/blob/main/docs/MCP.md"
+echo "  Full docs: https://github.com/Flux-Frontiers/doc_kg/blob/main/docs/MCP.md"
