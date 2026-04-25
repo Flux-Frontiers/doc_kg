@@ -5,7 +5,6 @@ import hashlib
 
 from doc_kg.entry_chunk import EntryChunk, SourceProvenance, make_chunk_id
 
-
 # ---------------------------------------------------------------------------
 # SourceProvenance
 # ---------------------------------------------------------------------------

@@ -9,8 +9,27 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
-        exclude: '^(src|docs|article)/.*\.(png|jpg|jpeg|gif|pdf)$|^\.codekg/'
+        exclude: '^(src|docs)/.*\.(png|jpg|jpeg|gif|pdf)$|^\.pycodekg/'
       - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+        exclude: '^\.claude/'
+        pass_filenames: false
+        always_run: true
+      - id: ruff-format
+        exclude: '^\.claude/'
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline', '--exclude-files', '\.pycodekg/snapshots/.*', '--exclude-files', '\.dockg/snapshots/.*']
 
   - repo: local
     hooks:
@@ -31,22 +50,5 @@ repos:
         name: pytest
         entry: poetry run pytest --tb=short -q
         language: system
-        pass_filenames: false
-        always_run: true
-
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
-    hooks:
-      - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline', '--exclude-files', '\.codekg/snapshots/.*', '--exclude-files', '\.dockg/snapshots/.*', '--exclude-files', '\.dockg/.*']
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
-    hooks:
-      - id: ruff
-        args: [--fix]
-        exclude: '^\.claude/'
-      - id: ruff-format
-        exclude: '^\.claude/'
         pass_filenames: false
         always_run: true

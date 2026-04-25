@@ -21,17 +21,17 @@ Usage:
     python benchmarks/convomem_bench.py --mode aaak              # test AAAK compression
 """
 
-import os
-import sys
+import argparse
 import json
+import os
 import shutil
 import ssl
+import sys
 import tempfile
-import argparse
 import urllib.request
-from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import chromadb
 

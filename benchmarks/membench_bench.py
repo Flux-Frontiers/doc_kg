@@ -29,13 +29,13 @@ Usage:
     python benchmarks/membench_bench.py /tmp/membench/MemData/FirstAgent --limit 50
 """
 
-import sys
+import argparse
 import json
 import re
-import argparse
-from pathlib import Path
-from datetime import datetime
+import sys
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
 
 import chromadb
 
@@ -286,7 +286,7 @@ def index_turns(collection, message_list, item_key: str):
             metas.append(
                 {
                     "item_key": item_key,
-                    "sid": int(sid) if isinstance(sid, (int, float)) else global_idx,
+                    "sid": int(sid) if isinstance(sid, int | float) else global_idx,
                     "s_idx": s_idx,
                     "t_idx": t_idx,
                     "global_idx": global_idx,

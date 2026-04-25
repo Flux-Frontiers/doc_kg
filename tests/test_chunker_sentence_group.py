@@ -2,7 +2,6 @@
 
 from doc_kg.chunker import SentenceGroupChunker, TextChunker, chunker_for
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -142,11 +141,6 @@ def test_markdown_sections_respected_as_boundaries():
     """Chunks must not span across Markdown heading boundaries."""
     chunker = SentenceGroupChunker(sentences_per_chunk=8, min_chunk_chars=1)
     chunks = chunker.chunk(_MD_TEXT, file_path="doc.md")
-
-    # Chunks from the Introduction section should have section_title == "Introduction"
-    intro_chunks = [c for c in chunks if c.get("section_title") == "Introduction"]
-    bg_chunks = [c for c in chunks if c.get("section_title") == "Background"]
-    impl_chunks = [c for c in chunks if c.get("section_title") == "Implementation"]
 
     # We should have chunks in at least two different sections
     sections_found = {c.get("section_title") for c in chunks if c.get("section_title")}

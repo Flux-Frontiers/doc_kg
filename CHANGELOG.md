@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- `.pre-commit-config.yaml`: ruff hooks moved before local hooks (pylint/mypy/pytest) so auto-fixes run first; `pass_filenames: false` + `always_run: true` added to both `ruff` and `ruff-format` so they check the entire tree on every commit, not just staged files; `.codekg/` references updated to `.pycodekg/`; `article/` removed from large-file exclude (directory does not exist); redundant `.dockg/.*` detect-secrets exclude removed.
+- `benchmarks/convomem_bench.py`, `benchmarks/locomo_bench.py`, `benchmarks/longmemeval_bench.py`, `benchmarks/membench_bench.py`: import blocks sorted; removed unused `socket` import; replaced `_socket.timeout` with built-in `TimeoutError`.
+- `tests/test_chunker_sentence_group.py`: removed unused `intro_chunks`, `bg_chunks`, `impl_chunks` assignments.
+- `tests/test_pipeline.py`: renamed ambiguous loop variable `l` → `line`.
+- `tests/test_embedder_worker.py`, `tests/test_entry_chunk.py`, `tests/test_topics_hybrid.py`: removed unused imports and blank-line style fixes.
 
 ### Removed
 

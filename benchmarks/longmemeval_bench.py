@@ -29,15 +29,15 @@ Usage:
     python benchmarks/longmemeval_bench.py data/longmemeval_s_cleaned.json --limit 20
 """
 
-import os
-import sys
-import re
-import json
 import argparse
+import json
 import math
-from pathlib import Path
+import os
+import re
+import sys
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import chromadb
 
@@ -124,8 +124,8 @@ def _make_embed_fn(model_name: str):
     hf_name = MODEL_MAP.get(model_name, model_name)
 
     try:
+        from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
         from fastembed import TextEmbedding
-        from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 
         class _FastEmbedFn(EmbeddingFunction):
             def __init__(self, name):
@@ -2789,8 +2789,8 @@ def llm_rerank(
     Returns:
         Reordered rankings list with LLM's best pick promoted to rank 1.
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     candidates = rankings[:top_k]
     if not candidates:
@@ -2832,8 +2832,6 @@ def llm_rerank(
         method="POST",
     )
 
-    import socket as _socket
-
     for _attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
@@ -2848,7 +2846,7 @@ def llm_rerank(
                     reordered = [chosen_idx] + [i for i in rankings if i != chosen_idx]
                     return reordered
             break  # Got a response, even if unparseable — don't retry
-        except (_socket.timeout, TimeoutError):
+        except TimeoutError:
             if _attempt < 2:
                 import time as _time
 

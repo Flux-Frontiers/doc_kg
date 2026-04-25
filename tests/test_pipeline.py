@@ -5,7 +5,6 @@ from pathlib import Path
 from doc_kg.entry_chunk import EntryChunk, SourceProvenance
 from doc_kg.pipeline import AnalysisPipeline, PipelineConfig, PipelineResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -273,7 +272,7 @@ def test_pipeline_run_psv_contains_pipe_delimited_entries(tmp_path):
 
     content = result.output_path.read_text(encoding="utf-8")
     # Non-comment lines that contain pipe characters are data entries
-    data_lines = [l for l in content.splitlines() if "|" in l and not l.startswith("#")]
+    data_lines = [line for line in content.splitlines() if "|" in line and not line.startswith("#")]
     assert len(data_lines) > 0
 
 

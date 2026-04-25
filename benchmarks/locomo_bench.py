@@ -19,19 +19,19 @@ Usage:
     python benchmarks/locomo_bench.py /path/to/locomo/data/locomo10.json --mode hybrid --llm-rerank
 """
 
-import os
-import sys
-import json
-import re
-import string
-import shutil
-import tempfile
 import argparse
-import urllib.request
+import json
+import os
+import re
+import shutil
+import string
+import sys
+import tempfile
 import urllib.error
-from pathlib import Path
+import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import chromadb
 
@@ -553,8 +553,6 @@ def llm_rerank_locomo(
         method="POST",
     )
 
-    import socket as _socket
-
     for _attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -568,7 +566,7 @@ def llm_rerank_locomo(
                     reordered = [chosen_id] + [cid for cid in retrieved_ids if cid != chosen_id]
                     return reordered
             break
-        except (_socket.timeout, TimeoutError):
+        except TimeoutError:
             if _attempt < 2:
                 import time as _time
 
