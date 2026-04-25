@@ -1,85 +1,151 @@
-# DocKG - Knowledge Graph Builder for Markdown and Text Documents
-#
-# DocKG builds a semantically searchable knowledge graph from .md and .txt files.
-# It chunks text semantically, embeds the chunks, discovers relations (edges),
-# and supports hybrid graph+vector querying — the same architecture as CodeKG
-# but for natural-language documents instead of Python source code.
+# pyproject.toml — DocKG package configuration (PEP 621)
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-04-22 20:47:56
+# Last Revision: 2026-04-25
 #
-
-# poetry install --all-extras
-# poetry install --with dev
-# poetry install --extras kg
+# Build system : Poetry 2.x with PEP 621 [project] table
 #
+# Quick install (pip)
+# -------------------
+#   pip install -e ".[dev]"             core + dev tools (pytest, ruff, mypy, etc.)
+#   pip install -e ".[viz]"             core + Streamlit/Plotly/PyVis visualizer
+#   pip install -e ".[kgdeps]"          core + KG integrations (pycode-kg)
+#   pip install -e ".[all]"             everything above
+#   pip install -e "."                  core runtime only
+#
+# Quick install (poetry)
+# ----------------------
+#   poetry install --all-extras         everything
+#   poetry install --extras "dev"       core + dev tools only
+#   poetry install --extras "viz"       core + Streamlit/Plotly visualizer only
+#   poetry install --extras "kgdeps"    core + KG integrations only
+#   poetry install                      core runtime only
+#
+# First-time setup
+# ----------------
+#   python -m venv .venv
+#   source .venv/bin/activate       # Windows: .venv\Scripts\activate
+#   pip install -e ".[dev]"
+#
+# Run tests
+# ---------
+#   pytest                          uses pytest.ini (testpaths = tests/)
+#   pytest -m "not slow"            skip slow tests
+#   pytest --cov=doc_kg             with coverage
+#
+# Build KG indices (after code changes)
+# --------------------------------------
+#   dockg build --repo .
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[[tool.poetry.source]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+priority = "supplemental"
+
 [tool.poetry]
+packages = [{ include = "doc_kg", from = "src" }]
+
+# ---------------------------------------------------------------------------
+# PEP 621 project metadata
+# ---------------------------------------------------------------------------
+[project]
 name = "doc-kg"
-version = "0.11.0"
+version = "0.12.0"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
-authors = ["Eric G. Suchanek, PhD <suchanek@flux-frontiers.com>"]
-license = "Elastic-2.0"
 readme = "README.md"
-homepage = "https://github.com/Flux-Frontiers/doc_kg"
-repository = "https://github.com/Flux-Frontiers/doc_kg"
+license = "Elastic-2.0"
+authors = [
+    { name = "Eric G. Suchanek, PhD", email = "suchanek@mac.com" }
+]
 keywords = ["knowledge-graph", "document-analysis", "markdown", "lancedb", "sqlite", "semantic-search"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
-packages = [{ include = "doc_kg", from = "src" }]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "click>=8.1.0,<9",
+    "einops>=0.8.2",
+    "kg-snapshot>=0.3.0",
+    "lancedb>=0.29.0",
+    "markdown-it-py>=3.0.0",
+    "mcp>=1.0.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0.0",
+    "rich>=13.0.0",
+    "sentence-transformers>=5.4.1",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12,<3.14"
-lancedb = ">=0.29.0"
-numpy = ">=1.24.0"
-sentence-transformers = "^5.4.1"
-pandas = ">=2.0.0"
-rich = ">=13.0.0"
-click = ">=8.1.0"
-pyyaml = ">=6.0.0"
-mcp = ">=1.0.0"
-markdown-it-py = ">=3.0.0"
-einops = "^0.8.2"
-kg-snapshot = ">=0.3.0"
+[project.optional-dependencies]
+dev = [
+    "detect-secrets>=1.5.0",
+    "mypy>=1.10.0",
+    "pdoc>=14.0.0",
+    "pre-commit>=4.5.1",
+    "pylint>=4.0.5",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "pycode-kg>=0.16.0",
+    # agent-kg not yet on PyPI — install manually: pip install git+https://github.com/Flux-Frontiers/agent_kg.git
+]
+viz = [
+    "plotly>=5.14.0",
+    "pyvis>=0.3.2",
+    "streamlit>=1.35.0",
+]
 
-[tool.poetry.extras]
-viz = ["streamlit", "pyvis", "plotly"]
+# pycode-kg is on PyPI; agent-kg is not yet — install manually from git
+kgdeps = [
+    "pycode-kg>=0.16.0",
+]
+all = [
+    "detect-secrets>=1.5.0",
+    "mypy>=1.10.0",
+    "pdoc>=14.0.0",
+    "plotly>=5.14.0",
+    "pre-commit>=4.5.1",
+    "pylint>=4.0.5",
+    "pycode-kg>=0.16.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pyvis>=0.3.2",
+    "ruff>=0.4.0",
+    "streamlit>=1.35.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">=8.0.0"
-pytest-cov = ">=5.0.0"
-ruff = ">=0.4.0"
-mypy = ">=1.10.0"
-pre-commit = "^4.5.1"
-detect-secrets = "^1.5.0"
-pylint = "^4.0.5"
-pdoc = ">=14.0.0"
-pycode-kg = { git = "https://github.com/Flux-Frontiers/pycode_kg.git" }
-agent-kg  = { git = "https://github.com/Flux-Frontiers/agent_kg.git" }
+[project.urls]
+Homepage = "https://github.com/Flux-Frontiers/doc_kg"
+Repository = "https://github.com/Flux-Frontiers/doc_kg"
 
-[tool.poetry.scripts]
-dockg          = "doc_kg.cli.main:cli"
-dockg-snapshot = "doc_kg.cli.cmd_snapshot:snapshot"
-dockg-mcp      = "doc_kg.mcp_server:main"
-dockg-build    = "doc_kg.cli.cmd_build:build"
+[project.scripts]
+dockg             = "doc_kg.cli.main:cli"
+dockg-analyze     = "doc_kg.cli.cmd_analyze:analyze"
+dockg-build       = "doc_kg.cli.cmd_build:build"
 dockg-build-graph = "doc_kg.cli.cmd_build:build_graph"
 dockg-build-index = "doc_kg.cli.cmd_build:build_index"
-dockg-query    = "doc_kg.cli.cmd_query:query"
-dockg-pack     = "doc_kg.cli.cmd_query:pack"
-dockg-analyze  = "doc_kg.cli.cmd_analyze:analyze"
-dockg-viz      = "doc_kg.cli.cmd_viz:viz"
-dockg-pipeline = "doc_kg.cli.cmd_pipeline:pipeline"
+dockg-mcp         = "doc_kg.mcp_server:main"
+dockg-pack        = "doc_kg.cli.cmd_query:pack"
+dockg-pipeline    = "doc_kg.cli.cmd_pipeline:pipeline"
+dockg-query       = "doc_kg.cli.cmd_query:query"
+dockg-snapshot    = "doc_kg.cli.cmd_snapshot:snapshot"
+dockg-viz         = "doc_kg.cli.cmd_viz:viz"
 
+# ---------------------------------------------------------------------------
+# Tool configuration
+# ---------------------------------------------------------------------------
 [tool.ruff]
-line-length = 100
+line-length    = 100
 target-version = "py312"
 exclude = [".claude"]
 
@@ -88,27 +154,30 @@ select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
-strict = false
+python_version        = "3.12"
+strict                = false
 ignore_missing_imports = true
-mypy_path = "src"
+mypy_path             = "src"
 explicit_package_bases = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-v --tb=short"
+testpaths  = ["tests"]
+addopts    = "-v --tb=short"
 pythonpath = ["src"]
 
 [tool.pylint.messages_control]
 disable = ["all"]
 enable = [
-    "cyclic-import",           # R0401
-    "broad-exception-caught",  # W0718
-    "cell-var-from-loop",      # W0640
-    "undefined-variable",      # E0602
-    "import-outside-toplevel", # C0415
+    "broad-exception-caught",   # W0718
+    "cell-var-from-loop",       # W0640
+    "cyclic-import",            # R0401
+    "import-outside-toplevel",  # C0415
+    "undefined-variable",       # E0602
 ]
 
+# ---------------------------------------------------------------------------
+# PyCodeKG / DocKG index configuration
+# ---------------------------------------------------------------------------
 [tool.pycodekg]
 # Exclude test directories from the knowledge graph.
 # Tests skew architectural metrics (fan-in, public API surface, docstring coverage)
@@ -116,12 +185,16 @@ exclude = ["tests"]
 include = ["src"]
 
 [tool.dockg]
-# Exclude directories from the knowledge graph by default.
-exclude = [".dockg", ".pycodekg", "src", ".git", ".venv", "venv", "__pycache__",
-".mypy_cache", ".pytest_cache", "bundles", "dist", "benchmarks"]
+exclude = [
+    ".dockg", ".pycodekg", ".git", ".mypy_cache", ".pytest_cache", ".venv",
+    "__pycache__", "bundles", "dist", "src", "venv", "benchmarks",
+]
 
+# ---------------------------------------------------------------------------
+# Poe tasks
+# ---------------------------------------------------------------------------
 [tool.poe.tasks.docs]
-help = "Generate project documentation and user guide PDFs"
+help     = "Generate project documentation and user guide PDFs"
 sequence = [
-  { shell = "cd src && pdoc --o ../docs --logo ./logo.png doc_kg" },
+    { shell = "cd src && pdoc --o ../docs --logo ./logo.png doc_kg" },
 ]

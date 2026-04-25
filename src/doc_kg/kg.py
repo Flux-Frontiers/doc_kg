@@ -353,6 +353,9 @@ class DocKG:
     :param cooccur_window: Co-occurrence window metadata.
     :param topic_threshold: Topic confidence threshold.
     :param topics_file: Optional topic catalog file (JSON/YAML).
+    :param embedder: Optional embedding backend.  When provided, pre-sets ``_embedder``
+                     so the lazy-init never fires ``SentenceTransformerEmbedder``.
+                     Defaults to ``None`` (preserves existing behaviour).
     """
 
     def __init__(
@@ -376,6 +379,7 @@ class DocKG:
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
         exclude: set[str] | None = None,
+        embedder: Embedder | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.exclude: set[str] = exclude or set()
@@ -406,7 +410,7 @@ class DocKG:
         self._graph: DocGraph | None = None
         self._store: GraphStore | None = None
         self._index: SemanticIndex | None = None
-        self._embedder: Embedder | None = None
+        self._embedder: Embedder | None = embedder
 
     # ------------------------------------------------------------------
     # Layer accessors (lazy init)
