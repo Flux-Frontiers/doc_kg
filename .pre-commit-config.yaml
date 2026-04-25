@@ -48,3 +48,5 @@ repos:
         exclude: '^\.claude/'
       - id: ruff-format
         exclude: '^\.claude/'
+        pass_filenames: false
+        always_run: true

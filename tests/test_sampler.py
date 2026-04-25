@@ -4,7 +4,6 @@ from pathlib import Path
 
 from doc_kg.sampler import CorpusSampler, DocFeatures
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -60,11 +59,11 @@ def test_doc_features_to_vector_values():
     )
     vec = feat.to_vector()
     assert vec[0] == 100.0  # n_tokens
-    assert vec[1] == 10.0   # n_sentences
-    assert vec[2] == 80.0   # n_unique_words
-    assert vec[3] == 5.0    # n_entities
+    assert vec[1] == 10.0  # n_sentences
+    assert vec[2] == 80.0  # n_unique_words
+    assert vec[3] == 5.0  # n_entities
     assert vec[4] == 500.0  # text_length
-    assert vec[5] == 3.0    # temporal_index
+    assert vec[5] == 3.0  # temporal_index
 
 
 def test_doc_features_to_vector_all_floats():

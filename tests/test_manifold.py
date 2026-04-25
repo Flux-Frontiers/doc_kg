@@ -4,7 +4,6 @@ import numpy as np
 
 from doc_kg.manifold import ManifoldAnalyzer, ManifoldReport
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -17,7 +16,9 @@ def _make_vectors(n: int, dim: int, seed: int = 0) -> list[list[float]]:
     return X.tolist()
 
 
-def _make_structured_vectors(n: int, true_dim: int, ambient_dim: int, seed: int = 0) -> list[list[float]]:
+def _make_structured_vectors(
+    n: int, true_dim: int, ambient_dim: int, seed: int = 0
+) -> list[list[float]]:
     """Create low-rank vectors embedded in ambient_dim-dimensional space."""
     rng = np.random.default_rng(seed)
     # Low-dimensional signal
