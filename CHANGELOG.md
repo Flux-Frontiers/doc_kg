@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.12.0] - 2026-04-25
+
+### Added
+- `kg.py`: `DocKG.__init__` now accepts an optional `embedder: Embedder | None` parameter — allows callers to inject a pre-built embedding backend, bypassing lazy `SentenceTransformerEmbedder` initialization. Defaults to `None` (existing behaviour preserved).
+
 ## [0.11.0] - 2026-04-24
 
 ### Added
