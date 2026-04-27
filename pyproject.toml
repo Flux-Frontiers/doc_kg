@@ -57,7 +57,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.12.1"
+version = "0.12.2"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -78,7 +78,6 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
     "einops>=0.8.2",
-    "kg-snapshot>=0.3.0",
     "lancedb>=0.29.0",
     "markdown-it-py>=3.0.0",
     "mcp>=1.0.0",

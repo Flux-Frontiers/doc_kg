@@ -1277,9 +1277,10 @@ referencing = ">=0.31.0"
 name = "kg-snapshot"
 version = "0.3.0"
 description = "Shared snapshot infrastructure for KG modules — zero stdlib-only deps."
-optional = false
+optional = true
 python-versions = ">=3.12,<3.14"
 groups = ["main"]
+markers = "extra == \"dev\" or extra == \"kgdeps\" or extra == \"all\""
 files = []
 develop = false
 
@@ -4534,4 +4535,4 @@ viz = ["plotly", "pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "3dd8a30aaedd66678ab13df7e8783051f5a8f63d85ec65a9cacdbea5add8052f"
+content-hash = "83c28d72f95395cd7ae5cf3d6d222daaec90d57b04f99c9c72bcd1a42e0c3999"
