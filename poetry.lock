@@ -1279,6 +1279,18 @@ reference = "HEAD"
 resolved_reference = "2fbdf488b55b382ae625300b1cbbfc4cf32296c2"
 
 [[package]]
+name = "kgmodule-utils"
+version = "0.2.0"
+description = "Shared types and snapshot infrastructure for the KGModule SDK"
+optional = false
+python-versions = "<3.14,>=3.12"
+groups = ["main"]
+files = [
+    {file = "kgmodule_utils-0.2.0-py3-none-any.whl", hash = "sha256:94de2ae1b526de75b0db4e3c2b9d29d5413220bd6e03e4c53b88e6fd6170e7d9"},
+    {file = "kgmodule_utils-0.2.0.tar.gz", hash = "sha256:445fbd2f6506d66727e42217fb57dc8426108a0cb1d14983ff8e2535e1f5edf9"},
+]
+
+[[package]]
 name = "lance-namespace"
 version = "0.7.1"
 description = "Lance Namespace interface and plugin registry"
@@ -4395,4 +4407,4 @@ viz = ["plotly", "pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "706e41e4c8a875f3c7bffe214340594d46dbe4b992633007be8216fa8152f0c6"
+content-hash = "92649e2c1936f29541b1a8e2f075af1b9b9985f125b0346d1b76afb6070b2ca8"

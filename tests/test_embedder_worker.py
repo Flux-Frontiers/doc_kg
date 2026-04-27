@@ -1,8 +1,19 @@
 """Tests for embedder_worker.py — PIPELINE_MODEL, EmbeddingCache, save/load roundtrip."""
 
 import json
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from doc_kg.embedder_worker import PIPELINE_MODEL, CorpusEmbedder, EmbeddingCache
+import numpy as np
+
+from doc_kg.embedder_worker import (
+    PIPELINE_MODEL,
+    CorpusEmbedder,
+    EmbeddingCache,
+    _embed_shard,
+    _local_model_path,
+)
 
 # ---------------------------------------------------------------------------
 # PIPELINE_MODEL constant
@@ -75,8 +86,6 @@ def test_embedding_cache_auto_generates_created_at():
 
 def test_embedding_cache_auto_created_at_is_iso_format():
     """created_at should be parseable as an ISO timestamp."""
-    from datetime import datetime
-
     cache = EmbeddingCache(model="m", dim=4, texts=[], vectors=[])
     # Should not raise
     dt = datetime.fromisoformat(cache.created_at)
@@ -258,3 +267,123 @@ def test_save_cache_n_vectors_matches(tmp_path):
 
     assert data["n_vectors"] == 3
     assert len(data["embeddings"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# _local_model_path
+# ---------------------------------------------------------------------------
+
+
+def test_local_model_path_returns_path_object(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+    result = _local_model_path("BAAI/bge-small-en-v1.5")
+    assert isinstance(result, Path)
+
+
+def test_local_model_path_uses_dockg_models_fallback(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+    result = _local_model_path("BAAI/bge-small-en-v1.5")
+    assert ".dockg" in result.parts
+    assert "models" in result.parts
+
+
+def test_local_model_path_respects_kgrag_model_dir(tmp_path, monkeypatch):
+    custom_dir = tmp_path / "custom_cache"
+    monkeypatch.setenv("KGRAG_MODEL_DIR", str(custom_dir))
+    result = _local_model_path("BAAI/bge-small-en-v1.5")
+    assert str(result).startswith(str(custom_dir))
+
+
+def test_local_model_path_nomic_model(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+    result = _local_model_path("nomic-ai/nomic-embed-text-v1")
+    assert result != tmp_path / ".dockg" / "models"
+
+
+# ---------------------------------------------------------------------------
+# _embed_shard model resolution
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_st(dim: int = 4):
+    """Return a mock SentenceTransformer that produces deterministic vectors."""
+    fake = MagicMock()
+    fake.encode.return_value = np.zeros((1, dim), dtype="float32")
+    return fake
+
+
+def test_embed_shard_uses_local_path_when_exists(tmp_path, monkeypatch):
+    """When the local cache path exists, SentenceTransformer is loaded from it."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+
+    model_name = "BAAI/bge-small-en-v1.5"
+    local_path = _local_model_path(model_name)
+    local_path.mkdir(parents=True, exist_ok=True)
+
+    fake_st = _make_fake_st()
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls:
+        _embed_shard((["hello"], model_name, 8, 0, None))
+
+    called_arg = mock_cls.call_args[0][0]
+    assert called_arg == str(local_path)
+
+
+def test_embed_shard_skips_local_path_when_missing(tmp_path, monkeypatch):
+    """When local cache is absent, SentenceTransformer is NOT called with the local path."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+
+    model_name = "BAAI/bge-small-en-v1.5"
+    # Ensure local path does not exist
+    local_path = _local_model_path(model_name)
+    assert not local_path.exists()
+
+    fake_st = _make_fake_st()
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls:
+        _embed_shard((["hello"], model_name, 8, 0, None))
+
+    called_arg = mock_cls.call_args[0][0]
+    assert called_arg != str(local_path)
+    assert called_arg == model_name
+
+
+def test_embed_shard_falls_back_to_network_when_local_files_only_fails(tmp_path, monkeypatch):
+    """When local_files_only raises OSError, falls back to a plain network load."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+
+    model_name = "BAAI/bge-small-en-v1.5"
+    fake_st = _make_fake_st()
+
+    def side_effect(name, **kwargs):
+        if kwargs.get("local_files_only"):
+            raise OSError("not cached")
+        return fake_st
+
+    with patch("sentence_transformers.SentenceTransformer", side_effect=side_effect) as mock_cls:
+        _embed_shard((["hello"], model_name, 8, 0, None))
+
+    call_args = [c[0][0] for c in mock_cls.call_args_list]
+    assert model_name in call_args
+
+
+def test_embed_shard_returns_correct_shape(tmp_path, monkeypatch):
+    """_embed_shard returns (worker_id, list_of_vectors) of expected length."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
+
+    texts = ["a", "b", "c"]
+    model_name = "BAAI/bge-small-en-v1.5"
+    fake_st = MagicMock()
+    fake_st.encode.side_effect = lambda batch, **kw: np.zeros((len(batch), 4), dtype="float32")
+
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st):
+        worker_id, vectors = _embed_shard((texts, model_name, 8, 7, None))
+
+    assert worker_id == 7
+    assert len(vectors) == 3
+    assert len(vectors[0]) == 4

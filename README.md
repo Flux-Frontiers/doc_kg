@@ -1,9 +1,9 @@
 [![CI](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml/badge.svg)](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.12.0-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
+[![Version](https://img.shields.io/badge/version-0.12.1-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
-[![DOI](https://zenodo.org/badge/1176162360.svg)](https://zenodo.org/badge/latestdoi/1176162360)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
 
 **DocKG** — A Hybrid Knowledge Graph for Document Corpora
 with Semantic Indexing and Source-Grounded Passage Packing
@@ -547,26 +547,30 @@ After running `dockg build`, the following files are created:
 
 ---
 
-## Contributing
+## Citation
 
-1. Fork the repository and create a feature branch
-2. Install dev dependencies: `poetry install`
-3. Run the test suite: `pytest`
-4. Submit a pull request
+If you use DocKG in your research or project, please cite it:
 
-```bash
-# Install with viz extras for full local development
-poetry install -E viz
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
 
-# Run all tests
-pytest
+**APA**
 
-# Lint and format
-ruff check src/ tests/
-ruff format src/ tests/
+> Suchanek, E. G. (2026). *DocKG: Hybrid Knowledge Graph for Document Corpora* (Version 0.12.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.19770973
+
+**BibTeX**
+
+```bibtex
+@software{suchanek_doc_kg,
+  author    = {Suchanek, Eric G.},
+  title     = {{DocKG}: Hybrid Knowledge Graph for Document Corpora},
+  version   = {0.12.1},
+  year      = {2026},
+  publisher = {Flux-Frontiers},
+  url       = {https://github.com/Flux-Frontiers/doc_kg},
+  doi       = {10.5281/zenodo.19770973},
+}
 ```
 
----
 
 ## License
 

@@ -40,6 +40,11 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+# ============================================================================
+# Configuration
+# ============================================================================
+from kg_utils.embed import DEFAULT_MODEL as DEFAULT_MODEL  # noqa: F401 — re-exported
+
 from doc_kg.relations import (
     cooccur_pairs,
     extract_entities,
@@ -48,16 +53,6 @@ from doc_kg.relations import (
     stable_topic_id,
 )
 from doc_kg.topics import TopicExtractor
-
-# ============================================================================
-# Configuration
-# ============================================================================
-
-#: Default sentence-transformer model for document retrieval.
-#: BAAI/bge-small-en-v1.5 wins across all query types (literary and technical)
-#: and produces L2 distances that map cleanly to [0, 1] similarity scores.
-#: Override via the ``DOCKG_MODEL`` environment variable.
-DEFAULT_MODEL: str = os.environ.get("DOCKG_MODEL", "BAAI/bge-small-en-v1.5")
 
 # ============================================================================
 # Graph primitives (LOCKED v0 CONTRACT)
@@ -143,7 +138,7 @@ SKIP_DIRS = {
     "node_modules",  # JS/Node dependencies
 }
 
-TEXT_EXTENSIONS = {".md", ".txt", ".rst"}
+TEXT_EXTENSIONS = {".md", ".txt", ".rst", ".pdf"}
 
 
 # ============================================================================
@@ -351,7 +346,14 @@ def parse_corpus(
             doc_id = doc_node_id(file_path)
 
             try:
-                raw_text = abs_path.read_text(encoding="utf-8")
+                if abs_path.suffix.lower() == ".pdf":
+                    from doc_kg.pdf_reader import (  # pylint: disable=import-outside-toplevel
+                        extract_pdf_markdown,
+                    )
+
+                    raw_text = extract_pdf_markdown(abs_path)
+                else:
+                    raw_text = abs_path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 try:
                     raw_text = abs_path.read_text(encoding="utf-8", errors="ignore")
@@ -359,6 +361,10 @@ def parse_corpus(
                     if prog is not None and task_id is not None:
                         prog.advance(task_id, 1)
                     continue
+            except RuntimeError:
+                if prog is not None and task_id is not None:
+                    prog.advance(task_id, 1)
+                continue
 
             # Build the document node
             doc_title = _extract_doc_title(raw_text, abs_path)
@@ -605,7 +611,7 @@ def _resolve_reference(href: str, source_file: str, path_to_doc_id: dict[str, st
         for known in path_to_doc_id:
             if resolved.endswith(known) or known.endswith(href):
                 return known
-    except Exception:  # pylint: disable=broad-exception-caught
+    except (OSError, ValueError):
         pass
 
     # Direct match

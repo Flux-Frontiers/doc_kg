@@ -106,7 +106,7 @@ class TextChunker:
         :return: List of chunk dicts (see module docstring for schema).
         """
         ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
-        if ext in ("md", "markdown"):
+        if ext in ("md", "markdown", "pdf"):
             return self._chunk_markdown(text)
         return self._chunk_plain(text)
 
@@ -438,7 +438,7 @@ class SentenceGroupChunker:
         :return: List of chunk dicts (same schema as ``TextChunker.chunk()``).
         """
         ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
-        if ext in ("md", "markdown"):
+        if ext in ("md", "markdown", "pdf"):
             return self._chunk_markdown(text)
         return self._chunk_plain(text)
 

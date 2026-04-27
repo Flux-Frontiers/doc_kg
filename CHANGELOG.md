@@ -10,15 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- `.pre-commit-config.yaml`: ruff hooks moved before local hooks (pylint/mypy/pytest) so auto-fixes run first; `pass_filenames: false` + `always_run: true` added to both `ruff` and `ruff-format` so they check the entire tree on every commit, not just staged files; `.codekg/` references updated to `.pycodekg/`; `article/` removed from large-file exclude (directory does not exist); redundant `.dockg/.*` detect-secrets exclude removed.
-- `benchmarks/convomem_bench.py`, `benchmarks/locomo_bench.py`, `benchmarks/longmemeval_bench.py`, `benchmarks/membench_bench.py`: import blocks sorted; removed unused `socket` import; replaced `_socket.timeout` with built-in `TimeoutError`.
-- `tests/test_chunker_sentence_group.py`: removed unused `intro_chunks`, `bg_chunks`, `impl_chunks` assignments.
-- `tests/test_pipeline.py`: renamed ambiguous loop variable `l` → `line`.
-- `tests/test_embedder_worker.py`, `tests/test_entry_chunk.py`, `tests/test_topics_hybrid.py`: removed unused imports and blank-line style fixes.
 
 ### Removed
 
 ### Fixed
+
+## [0.12.1] - 2026-04-26
+
+### Added
+- `src/doc_kg/pdf_reader.py`: New module — `extract_pdf_markdown(path)` converts a PDF to Markdown via `pymupdf4llm`, inferring heading structure from font size/weight so PDFs flow into the existing `_chunk_markdown()` path and produce proper section nodes.
+- `tests/test_pdf_reader.py`: 9 tests covering `extract_pdf_markdown` (returns string, extracts headings, raises `RuntimeError` on corrupt input), `TEXT_EXTENSIONS` inclusion, `iter_text_files` PDF discovery, chunker markdown dispatch, and `parse_corpus` end-to-end (document node, chunk nodes, section nodes from PDF headings).
+- `tests/test_embedder_worker.py`: Added tests for `_local_model_path` (path type, `.dockg/models/` fallback, `KGRAG_MODEL_DIR` override) and `_embed_shard` model-resolution (local cache hit, cache miss, `OSError` network fallback, output shape).
+
+### Changed
+- `dockg.py`: `.pdf` added to `TEXT_EXTENSIONS`; `parse_corpus` branches on `.pdf` suffix to call `extract_pdf_markdown` before chunking, with `RuntimeError` caught and the file skipped gracefully; `_resolve_reference` exception narrowed from broad `Exception` to `(OSError, ValueError)`.
+- `chunker.py`: `TextChunker.chunk()` and `SentenceGroupChunker.chunk()` now route `.pdf` through `_chunk_markdown` (since `pymupdf4llm` output is ATX-heading Markdown).
+- `pyproject.toml`: `pymupdf4llm>=0.0.17` added as a core runtime dependency (not optional).
+- `dockg.py`, `index.py`: `DEFAULT_MODEL` and model-path resolution extracted to `kg_utils.embed` — `DEFAULT_MODEL` is now re-exported from `kg_utils.embed.DEFAULT_MODEL`; `_local_model_path` delegates to `kg_utils.embed.resolve_model_path`, which checks `KGRAG_MODEL_DIR` first then falls back to `.dockg/models/`.
+- `pyproject.toml`, `poetry.lock`: Added `kgmodule-utils` as a project dependency to centralise embedding constants and model-path resolution shared across KGModule packages.
+- `README.md`: Replaced Contributing section with a Citation section containing the official Zenodo DOI (`10.5281/zenodo.19770973`) in APA and BibTeX formats; header DOI badge updated from GitHub repo-ID URL to direct Zenodo DOI link.
+- `.dockg/snapshots/manifest.json`: Added six new DocKG snapshots captured during v0.11.0 and v0.12.0 development.
+- `.pre-commit-config.yaml`: ruff hooks moved before local hooks (pylint/mypy/pytest) so auto-fixes run first; `pass_filenames: false` + `always_run: true` added to both `ruff` and `ruff-format` so they check the entire tree on every commit, not just staged files; `.codekg/` references updated to `.pycodekg/`; `article/` removed from large-file exclude (directory does not exist); redundant `.dockg/.*` detect-secrets exclude removed.
+- `benchmarks/convomem_bench.py`, `benchmarks/locomo_bench.py`, `benchmarks/longmemeval_bench.py`, `benchmarks/membench_bench.py`: import blocks sorted; removed unused `socket` import; replaced `_socket.timeout` with built-in `TimeoutError`.
+- `tests/test_chunker_sentence_group.py`: removed unused `intro_chunks`, `bg_chunks`, `impl_chunks` assignments.
+- `tests/test_pipeline.py`: renamed ambiguous loop variable `l` → `line`.
+- `tests/test_entry_chunk.py`, `tests/test_topics_hybrid.py`: removed unused imports and blank-line style fixes.
+
+### Fixed
+- `embedder_worker.py`: `_embed_shard` (multiprocessing worker) now checks the local model cache via `_local_model_path` before falling back to `local_files_only=True` and then network download — previously workers always fetched from HuggingFace, bypassing any cached model.
+- `.github/workflows/ci.yml`: Removed duplicate `--extras dev` flag from `poetry install` command in the lint job.
 
 ## [0.12.0] - 2026-04-25
 

@@ -35,12 +35,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
+from kg_utils.embed import resolve_model_path
 
 logger = logging.getLogger(__name__)
 
 #: Default embedding model for the multipass pipeline.
 #: Matches diary_kg: nomic-embed-text-v1 (768-d, asymmetric retrieval).
 PIPELINE_MODEL: str = "nomic-ai/nomic-embed-text-v1"
+
+
+def _local_model_path(model_name: str) -> Path:
+    """Return the local cache path for *model_name* (dockg-scoped fallback)."""
+    return resolve_model_path(model_name, local_fallback=Path.cwd() / ".dockg" / "models")
 
 
 # ============================================================================
@@ -72,7 +78,16 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
     )
 
     trust_remote = "nomic-ai/" in model_name
-    model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
+    local_path = _local_model_path(model_name)
+    if local_path.exists():
+        model = SentenceTransformer(str(local_path), trust_remote_code=trust_remote)
+    else:
+        try:
+            model = SentenceTransformer(
+                model_name, local_files_only=True, trust_remote_code=trust_remote
+            )
+        except OSError:
+            model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
 
     # Nomic v1 requires a task prefix for asymmetric retrieval mode
     if "nomic-ai/" in model_name:

@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from doc_kg.dockg import DEFAULT_MODEL
+from kg_utils.embed import DEFAULT_MODEL, resolve_model_path
 
 if TYPE_CHECKING:
     from doc_kg.store import GraphStore
@@ -43,18 +43,13 @@ if TYPE_CHECKING:
 def _local_model_path(model_name: str) -> Path:
     """Return the local cache path for *model_name*.
 
-    Defaults to ``.dockg/models/<model>`` under the current working directory.
-    Override via the ``DOCKG_MODEL_DIR`` environment variable.
+    Checks ``KGRAG_MODEL_DIR`` first (system-wide override), then falls back
+    to ``.dockg/models/`` under the current working directory.
 
-    :param model_name: HuggingFace model identifier.
+    :param model_name: HuggingFace model identifier or short alias.
     :return: Absolute :class:`~pathlib.Path` to the cached model directory.
     """
-    import os  # pylint: disable=import-outside-toplevel
-
-    default = str(Path.cwd() / ".dockg" / "models")
-    cache_root = Path(os.environ.get("DOCKG_MODEL_DIR", default))
-    safe_name = model_name.replace("/", "--")
-    return cache_root / safe_name
+    return resolve_model_path(model_name, local_fallback=Path.cwd() / ".dockg" / "models")
 
 
 # ---------------------------------------------------------------------------
