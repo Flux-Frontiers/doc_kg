@@ -160,7 +160,7 @@ Output files are written to `.dockg/pipeline/`:
 | Pipeline | Model | Dims | Notes |
 |---|---|---|---|
 | Core build (`dockg build`) | `BAAI/bge-small-en-v1.5` | 384 | Default; fast, general-text, SIMILAR_TO discovery |
-| Multipass (`dockg pipeline`) | `BAAI/bge-small-en-v1.5` | 768 | Asymmetric retrieval with `search_document:` prefix, matches diary_kg |
+| Multipass (`dockg pipeline`) | `BAAI/bge-small-en-v1.5` | 384 | Asymmetric retrieval with `search_document:` prefix, matches diary_kg |
 
 ## Configure Claude Code / Kilo Code (.mcp.json)
 
@@ -325,7 +325,6 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 
 - `k=8, hop=1, rels="CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"`
 - `max_chars=2000` (pack_docs), `max_nodes=15` (pack_docs), `max_nodes=25` (query_docs)
-- Embedding model (all pipelines): `BAAI/bge-small-en-v1.5` (384-d)
 - Embedding model (all pipelines): `BAAI/bge-small-en-v1.5` (384-d)
 - Storage: `.dockg/graph.sqlite` (SQLite) + `.dockg/lancedb/` (LanceDB)
 - Pipeline output: `.dockg/pipeline/` (`.psv` runs, `embeddings.json` cache)
