@@ -28,25 +28,34 @@ doc-kg = { git = "https://github.com/Flux-Frontiers/doc_kg.git", extras = ["mcp"
 DocKG uses a **single build command** that runs corpus parsing, SQLite persistence, and LanceDB vector indexing in one step:
 
 ```bash
-# Build from a corpus directory
-dockg build docs --wipe
+# Full rebuild from scratch (default — wipes existing data)
+dockg build docs
 
 # Build from an absolute path
-dockg build /absolute/path/to/corpus --wipe
+dockg build /absolute/path/to/corpus
+
+# Incremental update — keep existing graph, upsert new/changed files only
+dockg build docs --update
 ```
 
-Add `--wipe` to rebuild from scratch. Omit it for incremental upserts.
+**Default is a full wipe-and-rebuild.** Add `--update` to preserve existing data and only process changes.
 
 ### Granular build steps (advanced)
 
 For large corpora you can run steps independently:
 
 ```bash
-# Step 1 — parse corpus and write SQLite graph
-dockg build-graph docs --wipe
+# Step 1 — parse corpus and write SQLite graph (full rebuild by default)
+dockg build-graph docs
 
-# Step 2 — build LanceDB vector index from existing SQLite
-dockg build-index --wipe
+# Step 1 incremental — keep existing SQLite, upsert changes
+dockg build-graph docs --update
+
+# Step 2 — build LanceDB vector index from existing SQLite (full rebuild by default)
+dockg build-index
+
+# Step 2 incremental — keep existing vectors, upsert changes
+dockg build-index --update
 ```
 
 ### Excluding directories
@@ -59,7 +68,7 @@ exclude = ["archive", "vendor", "generated"]
 
 **Via CLI flags (per-command override):**
 ```bash
-dockg build docs --wipe --exclude-dir archive --exclude-dir vendor
+dockg build docs --exclude-dir archive --exclude-dir vendor
 ```
 
 Both are additive — CLI flags extend `pyproject.toml` excludes. Excluded names are matched at every depth.
@@ -72,12 +81,12 @@ The knowledge graph is a snapshot of the corpus at build time. It does **not** u
 
 | Change | Action |
 |---|---|
-| Added / deleted documents | Full rebuild (`--wipe`) |
-| Large content updates across many files | Full rebuild (`--wipe`) |
-| Minor edits within existing documents | Incremental (no `--wipe`) is usually sufficient |
-| New file added | Incremental is sufficient |
+| Added / deleted documents | Full rebuild (plain `dockg build`) |
+| Large content updates across many files | Full rebuild (plain `dockg build`) |
+| Minor edits within existing documents | `dockg build --update` is usually sufficient |
+| New file added | `dockg build --update` is sufficient |
 
-> **Why `--wipe` matters:** Deleted or renamed documents remain as phantom entries without it. `--wipe` clears orphan nodes from both SQLite and LanceDB.
+> **Why full rebuild matters:** Deleted or renamed documents remain as phantom entries in `--update` mode. The default full rebuild clears orphan nodes from both SQLite and LanceDB automatically.
 
 ## Additional CLI Commands
 
@@ -150,7 +159,7 @@ Output files are written to `.dockg/pipeline/`:
 
 | Pipeline | Model | Dims | Notes |
 |---|---|---|---|
-| Core build (`dockg build`) | `all-mpnet-base-v2` | 768 | General-text, SIMILAR_TO discovery |
+| Core build (`dockg build`) | `BAAI/bge-small-en-v1.5` | 384 | Default; fast, general-text, SIMILAR_TO discovery |
 | Multipass (`dockg pipeline`) | `nomic-ai/nomic-embed-text-v1` | 768 | Asymmetric retrieval with `search_document:` prefix, matches diary_kg |
 
 ## Configure Claude Code / Kilo Code (.mcp.json)
@@ -336,7 +345,7 @@ The `.dockg/` directory holds the SQLite graph, LanceDB vector index, snapshots,
 To pre-download the embedding model for air-gapped or CI environments:
 
 ```bash
-dockg build docs --wipe  # model is cached on first run
+dockg build docs  # model is cached on first run
 ```
 
 Set `DOCKG_MODEL_DIR` to cache elsewhere:
@@ -351,9 +360,9 @@ export DOCKG_MODEL_DIR=/path/to/shared/models
 | `WARNING: SQLite database not found` | Run `dockg build <corpus_root>` first |
 | `mcp package not found` | `poetry install` (ensure `[mcp]` extra is included) |
 | No tools visible in MCP client | Use absolute paths in config; restart the client |
-| Empty query results | Run `dockg build <corpus_root> --wipe` |
+| Empty query results | Run `dockg build <corpus_root>` (full rebuild, no flags needed) |
 | Wrong corpus queried | Verify `--repo`, `--db`, and `--lancedb` all point to the same repo |
-| Stale nodes after deleting files | Always use `--wipe` after deletions or renames |
+| Stale nodes after deleting files | Run `dockg build` without `--update` — default is a full wipe-and-rebuild |
 
 ## Full Reference
 

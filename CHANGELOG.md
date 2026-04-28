@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.12.3] - 2026-04-28
+
+### Added
 - `tests/test_cli.py`: Tests for the `download-model` command — verifies help text, already-cached path short-circuit, `--force` redownload, and save-to-path behaviour.
 
 ### Changed
@@ -15,8 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/doc_kg/embedder_worker.py`: `PIPELINE_MODEL` switched from `nomic-ai/nomic-embed-text-v1` to `BAAI/bge-small-en-v1.5`, aligning with DocKG and PyCodeKG defaults. Replaced manual local/remote model loading logic with `load_sentence_transformer()` from `kg_utils.embedder`.
 - `src/doc_kg/cli/cmd_model.py`: `download-model` command now resolves model cache path via `kg_utils.embed.resolve_model_path` instead of the removed local `_local_model_path`.
 - `pyproject.toml`, `poetry.lock`: Version bumped to 0.12.3; major dependency updates — `transformers` 4.57.6→5.6.2, `huggingface-hub` 0.36.2→1.12.0, `safetensors` 0.5.3→0.7.0, `pycode-kg` 0.16.0→0.17.2, `kgmodule-utils` 0.2.0→0.2.2; removed `kg-snapshot` (absorbed into `kgmodule-utils`); added `typer`, `rich`, `shellingham` as transitive deps.
-- `.dockg/snapshots/manifest.json`: New DocKG snapshot for `feat/viz3d` branch (v0.12.2, 2521 nodes / 18884 edges, coverage 0.908).
+- `.dockg/snapshots/manifest.json`: New DocKG snapshot for `feat/viz3d` branch (v0.12.2, 2521 nodes / 18884 edges, coverage 0.908); v0.12.3 snapshot added (2576 nodes / 19466 edges, coverage 0.911).
 - `tests/test_embedder_worker.py`: Replaced `_local_model_path` tests with a `resolve_model_path` availability check against `kg_utils.embed`; updated `_embed_shard` tests to patch `kg_utils.embedder.resolve_model_path`.
+- `.claude/commands/pycodekg-rebuild.md`: Rewrote to use single `pycodekg build --repo` command (replaces stale two-step `pycodekg-build-sqlite`/`pycodekg-build-lancedb --wipe`); corrected artifact path from `.codekg/` to `.pycodekg/`.
+- `.claude/commands/release.md`: Fixed `src/code_kg/__init__.py` → `src/doc_kg/__init__.py`; replaced stale `codekg-build-sqlite/lancedb --wipe` with `.venv/bin/pycodekg build`; corrected `.codekg/` → `.pycodekg/snapshots/`; removed `--wipe` from `dockg build`.
+- `.claude/commands/setup-mcp.md`: Replaced stale `poetry run codekg-build-sqlite/lancedb --wipe` with `.venv/bin/pycodekg build`.
+- `.claude/skills/dockg/SKILL.md`: Corrected build CLI semantics — default is full wipe-and-rebuild; `--update` is incremental. Removed all `--wipe` references (flag does not exist). Updated core build embedding model to `BAAI/bge-small-en-v1.5` (384-d).
+- `.claude/skills/pycodekg/SKILL.md`, `clinerules.md`, `references/CHEATSHEET.md`: Removed stale `pycodekg build-lancedb --wipe` and `pycodekg build --repo . --wipe`; replaced with `pycodekg build --repo .`.
 
 ### Removed
 - `src/doc_kg/index.py`: Removed `_local_model_path()`, `Embedder`, and `SentenceTransformerEmbedder` — now provided by `kg_utils`.

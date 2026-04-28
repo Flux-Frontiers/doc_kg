@@ -588,4 +588,4 @@ DB:    .pycodekg/graph.sqlite
 Model: all-MiniLM-L6-v2
 ```
 
-*Rebuild after significant code changes: `pycodekg build --repo . --wipe`*
+*Rebuild after significant code changes: `pycodekg build --repo .`*

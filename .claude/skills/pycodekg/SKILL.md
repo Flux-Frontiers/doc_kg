@@ -296,7 +296,7 @@ Add this to `.gitignore` when installing PyCodeKG in a new repo. Commit snapshot
 | `ERROR: 'mcp' package not found` | `poetry add mcp` |
 | `WARNING: SQLite database not found` | Run both build commands first |
 | MCP server not appearing | Use absolute paths; restart Claude Code |
-| Empty query results | Run `pycodekg build-lancedb --wipe` |
+| Empty query results | Run `pycodekg build --repo .` |
 
 ## Full Reference
 

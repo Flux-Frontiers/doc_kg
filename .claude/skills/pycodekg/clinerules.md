@@ -88,8 +88,7 @@ pycodekg update --repo .
 Or step by step (with explicit wipe control):
 
 ```bash
-pycodekg build-sqlite  --repo . --wipe
-pycodekg build-lancedb --repo . --wipe
+pycodekg build --repo .
 ```
 
 ### Cline MCP config

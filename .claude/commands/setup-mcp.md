@@ -75,7 +75,7 @@ The package is managed via Poetry, so all checks use `poetry run`.
 
 3. Run the static analysis build:
    ```bash
-   poetry run codekg-build-sqlite --repo "$REPO_ROOT" --wipe
+   .venv/bin/pycodekg build --repo "$REPO_ROOT"
    ```
 4. Verify the database was created and is non-empty:
    ```bash
@@ -98,7 +98,7 @@ The package is managed via Poetry, so all checks use `poetry run`.
 
 3. Run the embedding build:
    ```bash
-   poetry run codekg-build-lancedb --repo "$REPO_ROOT" --wipe
+
    ```
 4. Confirm the LanceDB directory was populated:
    ```bash
@@ -352,8 +352,7 @@ When the target codebase changes, the graph must be rebuilt. Remind the user:
 
 ```bash
 # Rebuild both artifacts (idempotent — safe to re-run)
-poetry run codekg-build-sqlite  --repo "$REPO_ROOT" --wipe
-poetry run codekg-build-lancedb --repo "$REPO_ROOT" --wipe
+.venv/bin/pycodekg build --repo "$REPO_ROOT"
 ```
 
 The MCP client configs do not need to change — they point to the same file paths.

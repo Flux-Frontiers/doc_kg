@@ -7,7 +7,7 @@ You will create a new versioned release by promoting the `[Unreleased]` section 
 ## Step 0: Gather Release Context
 
 1. Read `CHANGELOG.md` in full.
-2. Read `pyproject.toml` and `src/code_kg/__init__.py` to find the current version string.
+2. Read `pyproject.toml` and `src/doc_kg/__init__.py` to find the current version string.
 3. Run `git status` and `git log --oneline -10` to understand the state of the working tree.
 4. Confirm there is content under `## [Unreleased]`; if the section is empty, stop and tell the user there is nothing to release.
 
@@ -35,7 +35,7 @@ You will create a new versioned release by promoting the `[Unreleased]` section 
 Update the version string in **both** of the following files:
 
 - `pyproject.toml` — the `version = "..."` field under `[tool.poetry]`
-- `src/code_kg/__init__.py` — the `__version__` assignment
+- `src/doc_kg/__init__.py` — the `__version__` assignment
 
 Set both to the new version string (without the `v` prefix).
 
@@ -78,19 +78,18 @@ Replace `<current_version>` with `<new_version>` (e.g. `0.2.3` → `0.2.4`).
 **CodeKG Build & Snapshot:**
 1. Rebuild the CodeKG index against the current source:
    ```bash
-   .venv/bin/codekg-build-sqlite --repo . --wipe
-   .venv/bin/codekg-build-lancedb --repo . --wipe
+   .venv/bin/pycodekg build --repo .
    ```
-2. CodeKG snapshot is automatically saved by pre-commit hook; verify `.codekg/snapshots/manifest.json` was updated.
+2. CodeKG snapshot is automatically saved by pre-commit hook; verify `.pycodekg/snapshots/manifest.json` was updated.
 3. Stage the CodeKG artifacts:
    ```bash
-   git add .codekg/
+   git add .pycodekg/snapshots/
    ```
 
 **DocKG Build & Analysis:**
-1. Rebuild the DocKG index against the current source:
+1. Rebuild the DocKG index against the current source (default is full wipe-and-rebuild; no flag needed):
    ```bash
-   poetry run dockg build --repo . --wipe
+   poetry run dockg build --repo .
    ```
 2. Run the thorough analysis:
    ```bash
@@ -122,8 +121,8 @@ Replace `<current_version>` with `<new_version>` (e.g. `0.2.3` → `0.2.4`).
    - `src/doc_kg/__init__.py`
    - `README.md`
    - `analysis/doc_kg_analysis_*.md`
-   - `.codekg/` (CodeKG indices and snapshots)
-   - `.dockg/` (DocKG indices and snapshots)
+   - `.pycodekg/snapshots/` (CodeKG snapshots — lancedb/sqlite are gitignored)
+   - `.dockg/snapshots/` (DocKG snapshots — lancedb/sqlite are gitignored)
 3. Create a commit with message:
    ```
    chore(release): v<new_version> release notes
@@ -171,7 +170,7 @@ After all steps succeed, print a summary:
 ✓ README.md version badge updated
 ✓ CodeKG indices rebuilt (SQLite + LanceDB) with snapshot
 ✓ DocKG indices rebuilt with analysis generated
-✓ Both .codekg/ and .dockg/ snapshots staged
+✓ Both .pycodekg/snapshots/ and .dockg/snapshots/ staged
 ✓ Commit created (chore(release): v<new_version>)
 ✓ Tag v<new_version> created
 ✓ Tag pushed to origin   (or: tag ready to push manually)
