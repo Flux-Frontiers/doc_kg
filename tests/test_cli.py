@@ -88,3 +88,67 @@ def test_status_command_missing_db(tmp_path):
     )
     assert result.exit_code != 0
     assert "not found" in result.output.lower() or "not found" in (result.output + "").lower()
+
+
+# ---------------------------------------------------------------------------
+# download-model command
+# ---------------------------------------------------------------------------
+
+
+def test_download_model_in_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "download-model" in result.output
+
+
+def test_download_model_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download-model", "--help"])
+    assert result.exit_code == 0
+    assert "--model" in result.output
+    assert "--force" in result.output
+
+
+def test_download_model_already_cached(tmp_path):
+    """When the model path already exists, report cached and exit cleanly."""
+    from unittest.mock import patch
+
+    with patch("doc_kg.cli.cmd_model.resolve_model_path", return_value=tmp_path):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["download-model"])
+    assert result.exit_code == 0
+    assert "cached" in result.output.lower()
+    assert "--force" in result.output
+
+
+def test_download_model_force_redownloads(tmp_path):
+    """--force bypasses the cached-path check and saves the model."""
+    from unittest.mock import MagicMock, patch
+
+    mock_st_instance = MagicMock()
+    with (
+        patch("doc_kg.cli.cmd_model.resolve_model_path", return_value=tmp_path / "model"),
+        patch("sentence_transformers.SentenceTransformer", return_value=mock_st_instance),
+    ):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["download-model", "--force"])
+    assert result.exit_code == 0
+    assert "downloading" in result.output.lower() or "saved" in result.output.lower()
+    mock_st_instance.save.assert_called_once()
+
+
+def test_download_model_saves_to_path(tmp_path):
+    """Model is saved to the resolved local path."""
+    from unittest.mock import MagicMock, patch
+
+    save_target = tmp_path / "BAAI" / "bge-small-en-v1.5"
+    mock_st_instance = MagicMock()
+    with (
+        patch("doc_kg.cli.cmd_model.resolve_model_path", return_value=save_target),
+        patch("sentence_transformers.SentenceTransformer", return_value=mock_st_instance),
+    ):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["download-model", "--model", "BAAI/bge-small-en-v1.5"])
+    assert result.exit_code == 0
+    mock_st_instance.save.assert_called_once_with(str(save_target))

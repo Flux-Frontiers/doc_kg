@@ -8,11 +8,13 @@ CLI command for managing the DocKG embedding model cache.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
+from kg_utils.embed import resolve_model_path
 
 from doc_kg.cli.group import cli
 from doc_kg.dockg import DEFAULT_MODEL
-from doc_kg.index import _local_model_path
 
 
 @cli.command("download-model")
@@ -39,7 +41,7 @@ def download_model(model: str, force: bool) -> None:
         SentenceTransformer,
     )
 
-    local_path = _local_model_path(model)
+    local_path = resolve_model_path(model, local_fallback=Path.cwd() / ".dockg" / "models")
 
     if local_path.exists() and not force:
         click.echo(f"Model already cached at {local_path}")

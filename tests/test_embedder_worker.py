@@ -12,7 +12,6 @@ from doc_kg.embedder_worker import (
     CorpusEmbedder,
     EmbeddingCache,
     _embed_shard,
-    _local_model_path,
 )
 
 # ---------------------------------------------------------------------------
@@ -21,7 +20,7 @@ from doc_kg.embedder_worker import (
 
 
 def test_pipeline_model_constant_value():
-    assert PIPELINE_MODEL == "nomic-ai/nomic-embed-text-v1"
+    assert PIPELINE_MODEL == "BAAI/bge-small-en-v1.5"
 
 
 def test_pipeline_model_is_string():
@@ -270,37 +269,17 @@ def test_save_cache_n_vectors_matches(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# _local_model_path
+# resolve_model_path (moved to kg_utils.embed in 0.12.3)
 # ---------------------------------------------------------------------------
 
 
-def test_local_model_path_returns_path_object(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-    result = _local_model_path("BAAI/bge-small-en-v1.5")
+def test_resolve_model_path_available_from_kg_utils():
+    """_local_model_path was removed; canonical function lives in kg_utils.embed."""
+    from kg_utils.embed import resolve_model_path
+
+    result = resolve_model_path("BAAI/bge-small-en-v1.5")
     assert isinstance(result, Path)
-
-
-def test_local_model_path_uses_dockg_models_fallback(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-    result = _local_model_path("BAAI/bge-small-en-v1.5")
-    assert ".dockg" in result.parts
-    assert "models" in result.parts
-
-
-def test_local_model_path_respects_kgrag_model_dir(tmp_path, monkeypatch):
-    custom_dir = tmp_path / "custom_cache"
-    monkeypatch.setenv("KGRAG_MODEL_DIR", str(custom_dir))
-    result = _local_model_path("BAAI/bge-small-en-v1.5")
-    assert str(result).startswith(str(custom_dir))
-
-
-def test_local_model_path_nomic_model(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-    result = _local_model_path("nomic-ai/nomic-embed-text-v1")
-    assert result != tmp_path / ".dockg" / "models"
+    assert "bge-small-en-v1.5" in str(result)
 
 
 # ---------------------------------------------------------------------------
@@ -315,73 +294,54 @@ def _make_fake_st(dim: int = 4):
     return fake
 
 
-def test_embed_shard_uses_local_path_when_exists(tmp_path, monkeypatch):
-    """When the local cache path exists, SentenceTransformer is loaded from it."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-
+def test_embed_shard_uses_local_path_when_exists(tmp_path):
+    """When the resolved local path exists, ST is loaded with local_files_only=True."""
     model_name = "BAAI/bge-small-en-v1.5"
-    local_path = _local_model_path(model_name)
-    local_path.mkdir(parents=True, exist_ok=True)
+    fake_local = tmp_path / "BAAI" / "bge-small-en-v1.5"
+    fake_local.mkdir(parents=True)
 
     fake_st = _make_fake_st()
-    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls:
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=fake_local),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls,
+    ):
         _embed_shard((["hello"], model_name, 8, 0, None))
 
-    called_arg = mock_cls.call_args[0][0]
-    assert called_arg == str(local_path)
+    assert mock_cls.call_args.kwargs.get("local_files_only") is True
 
 
-def test_embed_shard_skips_local_path_when_missing(tmp_path, monkeypatch):
-    """When local cache is absent, SentenceTransformer is NOT called with the local path."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-
-    model_name = "BAAI/bge-small-en-v1.5"
-    # Ensure local path does not exist
-    local_path = _local_model_path(model_name)
-    assert not local_path.exists()
-
-    fake_st = _make_fake_st()
-    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls:
-        _embed_shard((["hello"], model_name, 8, 0, None))
-
-    called_arg = mock_cls.call_args[0][0]
-    assert called_arg != str(local_path)
-    assert called_arg == model_name
-
-
-def test_embed_shard_falls_back_to_network_when_local_files_only_fails(tmp_path, monkeypatch):
+def test_embed_shard_falls_back_to_network_when_local_files_only_fails(tmp_path):
     """When local_files_only raises OSError, falls back to a plain network load."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-
     model_name = "BAAI/bge-small-en-v1.5"
     fake_st = _make_fake_st()
+    missing = tmp_path / "nonexistent"
 
     def side_effect(name, **kwargs):
         if kwargs.get("local_files_only"):
             raise OSError("not cached")
         return fake_st
 
-    with patch("sentence_transformers.SentenceTransformer", side_effect=side_effect) as mock_cls:
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", side_effect=side_effect) as mock_cls,
+    ):
         _embed_shard((["hello"], model_name, 8, 0, None))
 
-    call_args = [c[0][0] for c in mock_cls.call_args_list]
-    assert model_name in call_args
+    assert mock_cls.call_count == 2
 
 
-def test_embed_shard_returns_correct_shape(tmp_path, monkeypatch):
+def test_embed_shard_returns_correct_shape(tmp_path):
     """_embed_shard returns (worker_id, list_of_vectors) of expected length."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("KGRAG_MODEL_DIR", raising=False)
-
     texts = ["a", "b", "c"]
     model_name = "BAAI/bge-small-en-v1.5"
     fake_st = MagicMock()
     fake_st.encode.side_effect = lambda batch, **kw: np.zeros((len(batch), 4), dtype="float32")
+    missing = tmp_path / "nonexistent"
 
-    with patch("sentence_transformers.SentenceTransformer", return_value=fake_st):
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
         worker_id, vectors = _embed_shard((texts, model_name, 8, 7, None))
 
     assert worker_id == 7

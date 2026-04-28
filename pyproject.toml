@@ -57,7 +57,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.12.2"
+version = "0.12.3"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"

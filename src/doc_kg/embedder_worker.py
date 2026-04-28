@@ -35,18 +35,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
-from kg_utils.embed import resolve_model_path
+from kg_utils.embedder import load_sentence_transformer
 
 logger = logging.getLogger(__name__)
 
 #: Default embedding model for the multipass pipeline.
 #: Matches diary_kg: nomic-embed-text-v1 (768-d, asymmetric retrieval).
-PIPELINE_MODEL: str = "nomic-ai/nomic-embed-text-v1"
-
-
-def _local_model_path(model_name: str) -> Path:
-    """Return the local cache path for *model_name* (dockg-scoped fallback)."""
-    return resolve_model_path(model_name, local_fallback=Path.cwd() / ".dockg" / "models")
+PIPELINE_MODEL: str = "BAAI/bge-small-en-v1.5"
 
 
 # ============================================================================
@@ -69,25 +64,10 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
     texts, model_name, batch_size, worker_id, progress_queue = args
 
     # Suppress noisy logging in workers
-    os.environ["TQDM_DISABLE"] = "1"
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
 
-    from sentence_transformers import (  # pylint: disable=import-outside-toplevel
-        SentenceTransformer,
-    )
-
-    trust_remote = "nomic-ai/" in model_name
-    local_path = _local_model_path(model_name)
-    if local_path.exists():
-        model = SentenceTransformer(str(local_path), trust_remote_code=trust_remote)
-    else:
-        try:
-            model = SentenceTransformer(
-                model_name, local_files_only=True, trust_remote_code=trust_remote
-            )
-        except OSError:
-            model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
+    model = load_sentence_transformer(model_name)
 
     # Nomic v1 requires a task prefix for asymmetric retrieval mode
     if "nomic-ai/" in model_name:

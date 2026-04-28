@@ -30,26 +30,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from kg_utils.embed import DEFAULT_MODEL, resolve_model_path
+from kg_utils.embed import DEFAULT_MODEL
+from kg_utils.embedder import Embedder, SentenceTransformerEmbedder
 
 if TYPE_CHECKING:
     from doc_kg.store import GraphStore
-
-# ---------------------------------------------------------------------------
-# Local model cache (same logic as CodeKG)
-# ---------------------------------------------------------------------------
-
-
-def _local_model_path(model_name: str) -> Path:
-    """Return the local cache path for *model_name*.
-
-    Checks ``KGRAG_MODEL_DIR`` first (system-wide override), then falls back
-    to ``.dockg/models/`` under the current working directory.
-
-    :param model_name: HuggingFace model identifier or short alias.
-    :return: Absolute :class:`~pathlib.Path` to the cached model directory.
-    """
-    return resolve_model_path(model_name, local_fallback=Path.cwd() / ".dockg" / "models")
 
 
 # ---------------------------------------------------------------------------
@@ -91,109 +76,8 @@ def suppress_ingestion_logging() -> None:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Embedder interface (identical to CodeKG — pluggable)
-# ---------------------------------------------------------------------------
-
-
-class Embedder:
-    """Abstract embedding backend.
-
-    :param dim: Embedding dimension (must be set by subclass ``__init__``).
-    """
-
-    dim: int
-
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Embed a list of strings.
-
-        :param texts: Input strings.
-        :return: List of float32 vectors, one per input.
-        """
-        raise NotImplementedError
-
-    def embed_query(self, query: str) -> list[float]:
-        """Embed a single query string.
-
-        :param query: Query string.
-        :return: Float32 vector.
-        """
-        return self.embed_texts([query])[0]
-
-
-class SentenceTransformerEmbedder(Embedder):
-    """Local embedding via ``sentence-transformers``.
-
-    Defaults to ``BAAI/bge-small-en-v1.5`` — benchmarked winner across
-    literary and technical retrieval (384 dimensions, fast).  Override by
-    changing ``DEFAULT_MODEL`` or setting the ``DOCKG_MODEL`` environment
-    variable.
-
-    :param model_name: HuggingFace model name or local path.
-    """
-
-    def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
-        import os  # pylint: disable=import-outside-toplevel
-
-        from sentence_transformers import (  # pylint: disable=import-outside-toplevel
-            SentenceTransformer,
-        )
-        from transformers import (  # pylint: disable=import-outside-toplevel
-            logging as hf_logging,
-        )
-
-        hf_logging.set_verbosity_error()
-
-        trust_remote = "nomic-ai/" in model_name
-        local_path = _local_model_path(model_name)
-        _prev_tqdm = os.environ.get("TQDM_DISABLE")
-        os.environ["TQDM_DISABLE"] = "1"
-        try:
-            if local_path.exists():
-                self.model = SentenceTransformer(str(local_path), trust_remote_code=trust_remote)
-            else:
-                try:
-                    self.model = SentenceTransformer(
-                        model_name,
-                        local_files_only=True,
-                        trust_remote_code=trust_remote,
-                    )
-                except OSError:
-                    self.model = SentenceTransformer(model_name, trust_remote_code=trust_remote)
-        finally:
-            if _prev_tqdm is None:
-                os.environ.pop("TQDM_DISABLE", None)
-            else:
-                os.environ["TQDM_DISABLE"] = _prev_tqdm
-        self.model_name = model_name
-        self.dim: int = self.model.get_embedding_dimension() or 384
-
-    def embed_texts(self, texts: list[str], encode_batch_size: int = 512) -> list[list[float]]:
-        """Embed a list of strings into float32 vectors.
-
-        :param texts: Input strings.
-        :param encode_batch_size: Internal batch size passed to ``model.encode()``
-                                  (higher = better GPU utilisation on MPS/CUDA).
-        """
-        import numpy as np  # pylint: disable=import-outside-toplevel
-
-        vecs = self.model.encode(
-            texts,
-            batch_size=encode_batch_size,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
-        return [np.asarray(v, dtype="float32").tolist() for v in vecs]
-
-    def embed_query(self, query: str) -> list[float]:
-        """Embed a single query string into a float32 vector."""
-        import numpy as np  # pylint: disable=import-outside-toplevel
-
-        vec = self.model.encode([query], normalize_embeddings=True)[0]
-        return np.asarray(vec, dtype="float32").tolist()
-
-    def __repr__(self) -> str:
-        return f"SentenceTransformerEmbedder(model={self.model_name!r}, dim={self.dim})"
+# Embedder and SentenceTransformerEmbedder are imported from kg_utils.embedder
+# above — re-exported here for backward compatibility.
 
 
 # ---------------------------------------------------------------------------
