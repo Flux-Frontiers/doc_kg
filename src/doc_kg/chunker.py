@@ -90,7 +90,7 @@ class TextChunker:
         chunk_overlap: int = 64,
         similarity_threshold: float = 0.75,
         embedder: Embedder | None = None,
-        min_chunk_chars: int = 1,
+        min_chunk_chars: int = 50,
     ) -> None:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -536,5 +536,5 @@ def chunker_for(
         chunk_overlap=kwargs.get("chunk_overlap", 64),
         similarity_threshold=kwargs.get("similarity_threshold", 0.75),
         embedder=kwargs.get("embedder"),
-        min_chunk_chars=kwargs.get("min_chunk_chars", 1),
+        min_chunk_chars=kwargs.get("min_chunk_chars", 50),
     )

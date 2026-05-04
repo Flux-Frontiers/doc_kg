@@ -52,7 +52,12 @@ def test_chunker_plain_no_embedder():
 
 
 def test_chunker_markdown_sections():
-    md = "# Introduction\n\nThis is the intro.\n\n# Background\n\nThis is background.\n"
+    md = (
+        "# Introduction\n\n"
+        "This is the intro section with enough text to exceed the minimum chunk size threshold.\n\n"
+        "# Background\n\n"
+        "This is the background section providing additional context and detail for the reader.\n"
+    )
     chunker = TextChunker(chunk_size=512)
     chunks = chunker.chunk(md, file_path="test.md")
     assert len(chunks) >= 2
@@ -69,7 +74,7 @@ def test_chunker_markdown_no_headings():
 
 
 def test_chunker_references_extracted():
-    md = "# Links\n\nSee [other doc](other.md) for details.\n"
+    md = "# Links\n\nSee [other doc](other.md) for more details about configuration and usage.\n"
     chunker = TextChunker()
     chunks = chunker.chunk(md, file_path="notes.md")
     all_refs = [r for c in chunks for r in c["references"]]

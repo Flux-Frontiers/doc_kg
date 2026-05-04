@@ -1,7 +1,7 @@
 # pyproject.toml — DocKG package configuration (PEP 621)
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-04-25
+# Last Revision: 2026-05-03
 #
 # Build system : Poetry 2.x with PEP 621 [project] table
 #
@@ -9,7 +9,7 @@
 # -------------------
 #   pip install -e ".[dev]"             core + dev tools (pytest, ruff, mypy, etc.)
 #   pip install -e ".[viz]"             core + Streamlit/Plotly/PyVis visualizer
-#   pip install -e ".[kgdeps]"          core + KG integrations (pycode-kg)
+#   pip install -e ".[kgdeps]"          core + KG integrations (pycode-kg, kg-rag)
 #   pip install -e ".[all]"             everything above
 #   pip install -e "."                  core runtime only
 #
@@ -41,8 +41,6 @@
 requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.dependencies]
-kgmodule-utils = "^0.2.0"
 [tool.poetry]
 packages = [{ include = "doc_kg", from = "src" }]
 
@@ -51,7 +49,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.12.3"
+version = "0.13.0"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -103,9 +101,10 @@ viz = [
     "streamlit>=1.35.0",
 ]
 
-# pycode-kg is on PyPI; agent-kg is not yet — install manually from git
+# pycode-kg is on PyPI; agent-kg and kg-rag are not yet — install manually from git
 kgdeps = [
     "pycode-kg>=0.16.0",
+    "kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git",
 ]
 all = [
     "detect-secrets>=1.5.0",
@@ -115,6 +114,7 @@ all = [
     "pre-commit>=4.5.1",
     "pylint>=4.0.5",
     "pycode-kg>=0.16.0",
+    "kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git",
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
     "pyvis>=0.3.2",

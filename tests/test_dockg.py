@@ -49,9 +49,15 @@ def test_iter_text_files_skips_hidden(tmp_path):
 
 def test_parse_corpus_basic(tmp_path):
     (tmp_path / "doc1.md").write_text(
-        "# Introduction\n\nThis is the introduction.\n\n# Background\n\nThis is background.\n"
+        "# Introduction\n\n"
+        "This is the introduction section with enough content to exceed the minimum chunk size.\n\n"
+        "# Background\n\n"
+        "This is the background section providing additional context for the reader.\n"
     )
-    (tmp_path / "doc2.txt").write_text("Plain text content here. More text follows.")
+    (tmp_path / "doc2.txt").write_text(
+        "Plain text content here covering several sentences. "
+        "More text follows to ensure it meets the minimum chunk character threshold."
+    )
 
     nodes, edges = parse_corpus(tmp_path)
 
@@ -65,7 +71,10 @@ def test_parse_corpus_basic(tmp_path):
 
 def test_parse_corpus_sections(tmp_path):
     (tmp_path / "guide.md").write_text(
-        "# Setup\n\nInstall the package.\n\n# Usage\n\nRun the command.\n"
+        "# Setup\n\n"
+        "Install the package using pip or poetry to get started with the library.\n\n"
+        "# Usage\n\n"
+        "Run the command from the terminal with the appropriate flags and arguments.\n"
     )
     nodes, edges = parse_corpus(tmp_path)
 
@@ -76,8 +85,12 @@ def test_parse_corpus_sections(tmp_path):
 
 
 def test_parse_corpus_references(tmp_path):
-    (tmp_path / "a.md").write_text("# Links\n\nSee [b](b.md) for more.\n")
-    (tmp_path / "b.md").write_text("# B Document\n\nContent here.\n")
+    (tmp_path / "a.md").write_text(
+        "# Links\n\nSee [b](b.md) for more details about the configuration and setup process.\n"
+    )
+    (tmp_path / "b.md").write_text(
+        "# B Document\n\nContent here describes the configuration options available to the user.\n"
+    )
 
     nodes, edges = parse_corpus(tmp_path)
     ref_edges = [e for e in edges if e.rel == "REFERENCES"]

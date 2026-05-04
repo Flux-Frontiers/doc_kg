@@ -23,7 +23,7 @@ types and adds:
   - ``metrics_to_dict`` / ``metrics_from_dict`` — helpers for converting
     between ``SnapshotMetrics`` dataclass and the underlying dict
 
-``Snapshot`` is re-exported from ``kg_snapshot.snapshots``.  For backwards
+``Snapshot`` is re-exported from ``kg_utils.snapshots``.  For backwards
 compatibility ``snapshot.metrics`` returns a ``SnapshotMetrics``-shaped
 view object when the snapshot was constructed via this module's helpers.
 
@@ -158,7 +158,7 @@ def _delta_from_dict(d: dict[str, Any] | None) -> SnapshotDelta | None:
 class Snapshot(_BaseSnapshot):
     """DocKG-flavoured snapshot with attribute-style access to metrics and deltas.
 
-    Extends the shared ``kg_snapshot.snapshots.Snapshot`` (which stores metrics
+    Extends the shared ``kg_utils.snapshots.Snapshot`` (which stores metrics
     as a free-form dict) with ``@property`` accessors that return the typed
     ``SnapshotMetrics`` and ``SnapshotDelta`` objects that the CLI and tests
     expect.

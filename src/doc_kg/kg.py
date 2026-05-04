@@ -266,12 +266,15 @@ _REL_RANK_WEIGHTS: dict[str, float] = {
 }
 
 
+_MIN_CHUNK_CHARS = 50  # micro-fragments below this are noise, not factual asides
+
+
 def _short_chunk_boost(node: dict, *, threshold: int = 200) -> float:
     """Return a boost for short chunk nodes to surface factual asides.
 
     Single-sentence factual asides (< *threshold* chars) get a positive boost
     so they rank ahead of same-hop nodes whose embeddings are diluted by longer,
-    topically mixed context.  Non-chunk nodes are unaffected.
+    topically mixed context.  Non-chunk nodes and micro-fragments are unaffected.
 
     :param node: Node dict with optional ``text`` and ``kind`` keys.
     :param threshold: Character length below which the boost is applied.
@@ -283,9 +286,9 @@ def _short_chunk_boost(node: dict, *, threshold: int = 200) -> float:
     if not text:
         return 0.0
     n = len(text)
-    if n >= threshold:
+    if n < _MIN_CHUNK_CHARS or n >= threshold:
         return 0.0
-    # Linear scale: 200 chars → 0.0 boost, 0 chars → 1.5 boost
+    # Linear scale: 200 chars → 0.0 boost, 50 chars → ~1.1 boost
     return round(1.5 * (1.0 - n / threshold), 4)
 
 
@@ -735,15 +738,21 @@ class DocKG:
 
         raw_nodes.sort(key=lambda x: x["_rank_key"])
 
-        # Deduplicate: skip document/section nodes whose chunks are already included
+        # Deduplicate: skip document/section nodes whose chunks are already included.
+        # Chunks rank first (priority 0), so populate the seen set in a pre-pass.
+        seen_files_with_chunks: set[str] = {
+            n["file_path"] for n in raw_nodes if n["kind"] == "chunk" and n.get("file_path")
+        }
         kept: list[dict] = []
-        seen_files_with_chunks: set[str] = set()
 
         for n in raw_nodes:
             if max_nodes is not None and len(kept) >= max_nodes:
                 break
-            if n["kind"] == "chunk" and n.get("file_path"):
-                seen_files_with_chunks.add(n["file_path"])
+            if (
+                n["kind"] in ("document", "section")
+                and n.get("file_path") in seen_files_with_chunks
+            ):
+                continue
             kept.append(n)
 
         kept_ids: set[str] = {n["id"] for n in kept}
