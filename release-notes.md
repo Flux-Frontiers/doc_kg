@@ -1,19 +1,20 @@
-# Release Notes — v0.13.0
+# Release Notes — v0.14.0
 
-> Released: 2026-05-03
+> Released: 2026-05-04
 
-### Added
-- `tests/test_pack_dedup.py`: New test module (8 tests) covering `DocKG.pack()` deduplication, `_short_chunk_boost` micro-fragment guard, `TextChunker` and `chunker_for()` `min_chunk_chars` defaults, and `CrossSnippetPack.render()` micro-fragment filtering.
+## Highlights
 
-### Changed
-- `src/doc_kg/chunker.py`: `TextChunker.__init__` and `chunker_for()` — `min_chunk_chars` default raised from 1 → 50; the old default of 1 allowed micro-fragments (e.g. `"see"`, `"cf."`) to be stored and indexed, polluting pack results.
-- `src/doc_kg/kg.py`: Added `_MIN_CHUNK_CHARS = 50` module constant; `_short_chunk_boost()` now returns `0.0` for chunks shorter than `_MIN_CHUNK_CHARS` so micro-fragments cannot float to the top of `pack()` results via the short-chunk boost; `pack()` deduplication pre-pass now builds `seen_files_with_chunks` before the ranking loop so document/section nodes are always suppressed when their file's chunks are present (fixes edge case where chunks and coarse nodes shared the same rank).
-- `pyproject.toml`: `kgdeps` and `all` extras now include `kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git`; removed stale `[[tool.poetry.source]]` TestPyPI block; version bumped to 0.13.0.
-- `.github/workflows/publish.yml`: Added `poetry publish` step so tag pushes automatically publish to PyPI via `PYPI_TOKEN` secret.
-- `tests/test_chunker.py`, `tests/test_dockg.py`: Test fixture strings lengthened to meet the new 50-char `min_chunk_chars` floor so fixture chunks are not silently dropped during corpus parsing.
+**Bounded SIMILAR_TO graph density.** On stylistically homogeneous corpora — academic papers, internal docs, code from a single author — the legacy "every pair above the cosine threshold" rule for `SIMILAR_TO` edges was effectively quadratic: most chunk pairs sat just above 0.85 similarity, and the edge table grew with `O(N²)` per build. v0.14.0 caps each chunk at the **top-`k` most-similar peers** (default `k=5`), keeping recall on the genuine semantic neighbours while preventing edge blow-up.
 
-### Fixed
-- `src/doc_kg/snapshots.py`: Docstring references corrected from `kg_snapshot.snapshots` → `kg_utils.snapshots` (the canonical package since v0.12.2).
+## What changed
+
+- **New CLI flags on `dockg build`:** `--similar-k` (default `5`) and `--similar-threshold` (default `0.85`). Set `--similar-k 0` to opt back into the v0.13.0 "all pairs above threshold" behaviour.
+- **New kwargs on `DocKG.build()` / `build_index()` / `build_from_cache()`:** `similar_k` and `similarity_edge_threshold`. The defaults match the CLI, so existing callers get the bounded behaviour automatically.
+- **Edges are now canonical and undirected.** Each pair `(a, b)` is emitted exactly once with `src=min(a, b)`, `dst=max(a, b)`. The SQLite `(src, rel, dst)` PRIMARY KEY handles the asymmetric top-k case where `A` picks `B` but `B` doesn't pick `A`. Self-similarity is masked to `-inf` so it can never occupy a top-k slot.
+
+## Compatibility
+
+Backward compatible. The defaults change the *shape* of the SIMILAR_TO subgraph (fewer, higher-quality edges) but no public API was renamed or removed. Rebuilding the index against an existing graph store is sufficient to adopt the new behaviour.
 
 ---
 

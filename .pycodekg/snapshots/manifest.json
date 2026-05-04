@@ -1,0 +1,86 @@
+{
+  "format": "1.0",
+  "last_update": "2026-05-04T14:08:03.243964+00:00",
+  "snapshots": [
+    {
+      "key": "82f8a5e4ab8598cc656ce350b2c206524c6a9f43",
+      "branch": "main",
+      "timestamp": "2026-05-04T14:08:03.243585+00:00",
+      "version": "0.14.0",
+      "file": "82f8a5e4ab8598cc656ce350b2c206524c6a9f43.json",
+      "metrics": {
+        "db_path": ".pycodekg/graph.sqlite",
+        "total_nodes": 4368,
+        "meaningful_nodes": 321,
+        "total_edges": 4172,
+        "node_counts": {
+          "class": 37,
+          "function": 90,
+          "method": 156,
+          "module": 38,
+          "symbol": 4047
+        },
+        "edge_counts": {
+          "ATTR_ACCESS": 1293,
+          "CALLS": 1528,
+          "CONTAINS": 283,
+          "IMPORTS": 297,
+          "INHERITS": 2,
+          "RESOLVES_TO": 769
+        },
+        "module_count": 38,
+        "class_count": 37,
+        "function_count": 90,
+        "method_count": 156,
+        "docstring_coverage": 0.7879999999999999,
+        "snapshot_count": 0,
+        "critical_issues": 3,
+        "complexity_median": 4,
+        "module_node_counts": {
+          "src/__init__.py": 3,
+          "src/doc_kg/__init__.py": 3,
+          "src/doc_kg/__main__.py": 1,
+          "src/doc_kg/app.py": 148,
+          "src/doc_kg/chunker.py": 209,
+          "src/doc_kg/cli/__init__.py": 1,
+          "src/doc_kg/cli/cmd_analyze.py": 8,
+          "src/doc_kg/cli/cmd_build.py": 128,
+          "src/doc_kg/cli/cmd_hooks.py": 22,
+          "src/doc_kg/cli/cmd_mcp.py": 13,
+          "src/doc_kg/cli/cmd_model.py": 16,
+          "src/doc_kg/cli/cmd_pipeline.py": 100,
+          "src/doc_kg/cli/cmd_query.py": 62,
+          "src/doc_kg/cli/cmd_semantic_analyze.py": 8,
+          "src/doc_kg/cli/cmd_snapshot.py": 168,
+          "src/doc_kg/cli/cmd_status.py": 52,
+          "src/doc_kg/cli/cmd_viz.py": 21,
+          "src/doc_kg/cli/group.py": 2,
+          "src/doc_kg/cli/main.py": 1,
+          "src/doc_kg/cli/options.py": 10,
+          "src/doc_kg/config.py": 16,
+          "src/doc_kg/dockg.py": 160,
+          "src/doc_kg/dockg_semantic_analysis.py": 278,
+          "src/doc_kg/dockg_thorough_analysis.py": 170,
+          "src/doc_kg/embedder_worker.py": 180,
+          "src/doc_kg/entry_chunk.py": 21,
+          "src/doc_kg/graph.py": 72,
+          "src/doc_kg/index.py": 328,
+          "src/doc_kg/kg.py": 369,
+          "src/doc_kg/manifold.py": 143,
+          "src/doc_kg/mcp_server.py": 73,
+          "src/doc_kg/pdf_reader.py": 7,
+          "src/doc_kg/pipeline.py": 187,
+          "src/doc_kg/relations.py": 51,
+          "src/doc_kg/sampler.py": 208,
+          "src/doc_kg/snapshots.py": 149,
+          "src/doc_kg/store.py": 193,
+          "src/doc_kg/topics.py": 126
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": null
+      }
+    }
+  ]
+}
