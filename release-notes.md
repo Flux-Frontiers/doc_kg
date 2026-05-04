@@ -1,24 +1,19 @@
-# Release Notes — v0.12.3
+# Release Notes — v0.13.0
 
-> Released: 2026-04-28
+> Released: 2026-05-03
 
 ### Added
-- `tests/test_cli.py`: Tests for the `download-model` command — verifies help text, already-cached path short-circuit, `--force` redownload, and save-to-path behaviour.
+- `tests/test_pack_dedup.py`: New test module (8 tests) covering `DocKG.pack()` deduplication, `_short_chunk_boost` micro-fragment guard, `TextChunker` and `chunker_for()` `min_chunk_chars` defaults, and `CrossSnippetPack.render()` micro-fragment filtering.
 
 ### Changed
-- `src/doc_kg/index.py`: Removed duplicate `Embedder` and `SentenceTransformerEmbedder` definitions; both are now imported from `kg_utils.embedder` (shared KGModule embedding infrastructure). Removed `_local_model_path` helper — delegates to `kg_utils.embed.resolve_model_path`.
-- `src/doc_kg/embedder_worker.py`: `PIPELINE_MODEL` switched from `nomic-ai/nomic-embed-text-v1` to `BAAI/bge-small-en-v1.5`, aligning with DocKG and PyCodeKG defaults. Replaced manual local/remote model loading logic with `load_sentence_transformer()` from `kg_utils.embedder`.
-- `src/doc_kg/cli/cmd_model.py`: `download-model` command now resolves model cache path via `kg_utils.embed.resolve_model_path` instead of the removed local `_local_model_path`.
-- `pyproject.toml`, `poetry.lock`: Version bumped to 0.12.3; major dependency updates — `transformers` 4.57.6→5.6.2, `huggingface-hub` 0.36.2→1.12.0, `safetensors` 0.5.3→0.7.0, `pycode-kg` 0.16.0→0.17.2, `kgmodule-utils` 0.2.0→0.2.2; removed `kg-snapshot` (absorbed into `kgmodule-utils`); added `typer`, `rich`, `shellingham` as transitive deps.
-- `.dockg/snapshots/manifest.json`: New DocKG snapshot for `feat/viz3d` branch (v0.12.2, 2521 nodes / 18884 edges, coverage 0.908).
-- `tests/test_embedder_worker.py`: Replaced `_local_model_path` tests with a `resolve_model_path` availability check against `kg_utils.embed`; updated `_embed_shard` tests to patch `kg_utils.embedder.resolve_model_path`.
-
-### Removed
-- `src/doc_kg/index.py`: Removed `_local_model_path()`, `Embedder`, and `SentenceTransformerEmbedder` — now provided by `kg_utils`.
-- `src/doc_kg/embedder_worker.py`: Removed `_local_model_path()` — replaced by `kg_utils.embed.resolve_model_path` via `load_sentence_transformer`.
+- `src/doc_kg/chunker.py`: `TextChunker.__init__` and `chunker_for()` — `min_chunk_chars` default raised from 1 → 50; the old default of 1 allowed micro-fragments (e.g. `"see"`, `"cf."`) to be stored and indexed, polluting pack results.
+- `src/doc_kg/kg.py`: Added `_MIN_CHUNK_CHARS = 50` module constant; `_short_chunk_boost()` now returns `0.0` for chunks shorter than `_MIN_CHUNK_CHARS` so micro-fragments cannot float to the top of `pack()` results via the short-chunk boost; `pack()` deduplication pre-pass now builds `seen_files_with_chunks` before the ranking loop so document/section nodes are always suppressed when their file's chunks are present (fixes edge case where chunks and coarse nodes shared the same rank).
+- `pyproject.toml`: `kgdeps` and `all` extras now include `kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git`; removed stale `[[tool.poetry.source]]` TestPyPI block; version bumped to 0.13.0.
+- `.github/workflows/publish.yml`: Added `poetry publish` step so tag pushes automatically publish to PyPI via `PYPI_TOKEN` secret.
+- `tests/test_chunker.py`, `tests/test_dockg.py`: Test fixture strings lengthened to meet the new 50-char `min_chunk_chars` floor so fixture chunks are not silently dropped during corpus parsing.
 
 ### Fixed
-- `src/doc_kg/embedder_worker.py`: Removed spurious `os.environ["TQDM_DISABLE"] = "1"` from `_embed_shard` — `transformers` ≥5.x ignores that env var and requires `hf_logging.disable_progress_bar()`, which `load_sentence_transformer()` in `kg_utils.embedder` now calls internally. The "Loading weights" tqdm bar during `dockg build` is suppressed correctly.
+- `src/doc_kg/snapshots.py`: Docstring references corrected from `kg_snapshot.snapshots` → `kg_utils.snapshots` (the canonical package since v0.12.2).
 
 ---
 
