@@ -108,47 +108,6 @@ A **short-chunk boost** surfaces factual asides and single-sentence callouts tha
 
 ---
 
-## Knowledge graph schema
-
-### Node kinds
-
-| Kind | Description |
-|---|---|
-| `document` | A source `.md`, `.txt`, `.rst`, or `.pdf` file |
-| `section` | A heading-delimited region within a document |
-| `chunk` | A semantically coherent text passage |
-| `topic` | A topic extracted from chunk text |
-| `entity` | A named entity (person, place, org, concept) |
-| `keyword` | A keyword or key phrase |
-
-### Edge types
-
-| Type | Description |
-|---|---|
-| `CONTAINS` | Parent → child (document→section, section→chunk) |
-| `NEXT` | Sequential ordering between same-level nodes |
-| `REFERENCES` | Chunk cites another document or section |
-| `SIMILAR_TO` | Semantic similarity between chunks (LanceDB-derived) |
-| `HAS_TOPIC` | Chunk → topic |
-| `MENTIONS_ENTITY` | Chunk → named entity |
-| `HAS_KEYWORD` | Chunk → keyword |
-| `CO_OCCURS_WITH` | Co-occurrence between topics/entities within a chunk |
-
----
-
-## Storage layout
-
-```
-.dockg/
-  graph.sqlite        # SQLite knowledge graph (nodes + edges)
-  lancedb/            # LanceDB vector index
-  snapshots/          # Temporal metric snapshots (JSON)
-    manifest.json
-    <sha>.json
-```
-
----
-
 ## Documentation map
 
 | Doc | What it covers |
@@ -156,9 +115,12 @@ A **short-chunk boost** surfaces factual asides and single-sentence callouts tha
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | All install variants, MCP setup, git hooks, troubleshooting |
 | [docs/CLI.md](docs/CLI.md) | Every `dockg` subcommand and flag |
 | [docs/MCP.md](docs/MCP.md) | MCP server setup for Claude / Kilo / Copilot / Cline, tool reference |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | Node kinds, edge types, storage layout, node ID format |
 | [docs/SNAPSHOTS.md](docs/SNAPSHOTS.md) | Temporal snapshots, diffing across corpus versions |
 | [docs/CHEATSHEET.md](docs/CHEATSHEET.md) | Quick-reference: CLI flags and MCP tools on one page |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
+
+[Technical Paper (PDF)](https://github.com/Flux-Frontiers/KGRAG/blob/main/articles/kgrag.pdf) — the KGRAG architecture paper covering the full federated KG-RAG stack of which DocKG is a part.
 
 ---
 

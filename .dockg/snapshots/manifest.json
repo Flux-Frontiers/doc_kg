@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-05-04T03:47:24.365576+00:00",
+  "last_update": "2026-05-04T03:59:12.942699+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -2530,44 +2530,49 @@
       }
     },
     {
-      "key": "b8c958f47b6f335da555717f19bd917d16d25949",
+      "key": "05d3fb9e5257368d1c443679653d073062583bd0",
       "branch": "main",
-      "timestamp": "2026-05-04T02:04:35.723820+00:00",
-      "version": "0.12.3",
-      "file": "b8c958f47b6f335da555717f19bd917d16d25949.json",
+      "timestamp": "2026-05-04T03:59:12.941384+00:00",
+      "version": "0.13.0",
+      "file": "05d3fb9e5257368d1c443679653d073062583bd0.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
-        "total_nodes": 2340,
-        "total_edges": 18590,
+        "total_nodes": 2460,
+        "total_edges": 19507,
         "node_counts": {
-          "chunk": 458,
-          "document": 28,
-          "entity": 669,
-          "keyword": 552,
-          "section": 331,
-          "topic": 302
+          "chunk": 486,
+          "document": 30,
+          "entity": 693,
+          "keyword": 580,
+          "section": 346,
+          "topic": 325
         },
         "edge_counts": {
-          "CONTAINS": 789,
-          "CO_OCCURS_WITH": 10988,
-          "HAS_KEYWORD": 1822,
-          "HAS_TOPIC": 471,
-          "MENTIONS_ENTITY": 2107,
-          "NEXT": 87,
-          "REFERENCES": 15,
-          "SIMILAR_TO": 2311
+          "CONTAINS": 832,
+          "CO_OCCURS_WITH": 11556,
+          "HAS_KEYWORD": 1934,
+          "HAS_TOPIC": 502,
+          "MENTIONS_ENTITY": 2205,
+          "NEXT": 100,
+          "REFERENCES": 24,
+          "SIMILAR_TO": 2354
         },
-        "meaningful_nodes": 2312,
-        "coverage_score": 0.9745269286754003,
+        "meaningful_nodes": 2430,
+        "coverage_score": 0.977366255144033,
         "issues_count": 1,
         "complexity_median": 56.0
       },
       "deltas": {
-        "vs_previous": null,
+        "vs_previous": {
+          "nodes": 120,
+          "edges": 918,
+          "coverage_delta": 0.002839326468632719,
+          "issues_delta": 0
+        },
         "vs_baseline": {
-          "nodes": 373,
-          "edges": 6901,
-          "coverage_delta": 0.08964720358948963,
+          "nodes": 493,
+          "edges": 7818,
+          "coverage_delta": 0.09248653005812235,
           "issues_delta": 1
         }
       }
