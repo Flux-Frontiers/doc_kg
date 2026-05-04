@@ -1274,62 +1274,6 @@ files = [
 referencing = ">=0.31.0"
 
 [[package]]
-name = "kg-rag"
-version = "0.5.3"
-description = "Orchestration layer for the KGRAG(tm) components."
-optional = true
-python-versions = ">=3.12,<3.14"
-groups = ["main"]
-markers = "extra == \"kgdeps\" or extra == \"all\""
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.1.0"
-kg-snapshot = {git = "https://github.com/Flux-Frontiers/kg_snapshot.git"}
-lancedb = ">=0.29.0"
-mcp = ">=1.0.0"
-numpy = ">=1.24.0"
-pandas = ">=2.0.0"
-pip = "^26.0.1"
-rich = "^14.3.3"
-safetensors = "^0.5.0"
-sentence-transformers = "^5.2.0"
-torch = ">=2.5.1"
-transformers = "^4.57.6"
-
-[package.extras]
-kg = ["agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git", "diary-kg @ git+https://github.com/Flux-Frontiers/diary_kg.git", "doc-kg (>=0.12.3)", "ftree-kg @ git+https://github.com/Flux-Frontiers/ftree_kg.git", "memory-kg @ git+https://github.com/Flux-Frontiers/memory_kg.git", "metabo-kg @ git+https://github.com/Flux-Frontiers/metabo_kg.git", "pycode-kg (>=0.18.1)"]
-pi = ["llama-cpp-python (>=0.3.0)"]
-qt = ["PyQt5 (>=5.15.0)"]
-viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
-viz2d = ["PyQt5 (>=5.15.0)"]
-viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/KGRAG.git"
-reference = "HEAD"
-resolved_reference = "ad68779ce5ad73f530637678dc5e31f8018f370d"
-
-[[package]]
-name = "kg-snapshot"
-version = "0.3.0"
-description = "Shared snapshot infrastructure for KG modules — zero stdlib-only deps."
-optional = true
-python-versions = ">=3.12,<3.14"
-groups = ["main"]
-markers = "extra == \"kgdeps\" or extra == \"all\""
-files = []
-develop = false
-
-[package.source]
-type = "git"
-url = "https://github.com/Flux-Frontiers/kg_snapshot.git"
-reference = "HEAD"
-resolved_reference = "2fbdf488b55b382ae625300b1cbbfc4cf32296c2"
-
-[[package]]
 name = "kgmodule-utils"
 version = "0.2.2"
 description = "Shared types and snapshot infrastructure for the KGModule SDK"
@@ -2519,19 +2463,6 @@ mic = ["olefile"]
 test-arrow = ["arro3-compute", "arro3-core", "nanoarrow", "pyarrow"]
 tests = ["check-manifest", "coverage (>=7.4.2)", "defusedxml", "markdown2", "olefile", "packaging", "pyroma (>=5)", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "trove-classifiers (>=2024.10.12)"]
 xmp = ["defusedxml"]
-
-[[package]]
-name = "pip"
-version = "26.1"
-description = "The PyPA recommended tool for installing Python packages."
-optional = true
-python-versions = ">=3.10"
-groups = ["main"]
-markers = "extra == \"kgdeps\" or extra == \"all\""
-files = [
-    {file = "pip-26.1-py3-none-any.whl", hash = "sha256:4e8486d821d814b77319acb7b9e8bf5a4ee7590a643e7cb21029f209be8573c1"},
-    {file = "pip-26.1.tar.gz", hash = "sha256:81e13ebcca3ffa8cc85e4deff5c27e1ee26dea0aa7fc2f294a073ac208806ff3"},
-]
 
 [[package]]
 name = "platformdirs"
@@ -4580,12 +4511,12 @@ files = [
 ]
 
 [extras]
-all = ["detect-secrets", "kg-rag", "mypy", "pdoc", "plotly", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit"]
+all = ["detect-secrets", "mypy", "pdoc", "plotly", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit"]
 dev = ["detect-secrets", "mypy", "pdoc", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "ruff"]
-kgdeps = ["kg-rag", "pycode-kg"]
+kgdeps = ["pycode-kg"]
 viz = ["plotly", "pyvis", "streamlit"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "152ad6944233c42594685d9e8e0e28665a87b62dd0a0e7715fac8a2e57859351"
+content-hash = "6281b7974dfb831ed112ac0ea24ceb68756f7c06e13477c7f5fdcde51771b39a"
