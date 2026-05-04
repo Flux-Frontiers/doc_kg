@@ -109,6 +109,24 @@ _console = Console()
     help="Skip SIMILAR_TO edge discovery after indexing.",
 )
 @click.option(
+    "--similar-k",
+    type=int,
+    default=5,
+    show_default=True,
+    help=(
+        "Max SIMILAR_TO out-edges per chunk (top-k by cosine similarity). "
+        "Bounds the graph density on stylistically homogeneous corpora. "
+        "Set to 0 to disable the cap (legacy: every pair above --similar-threshold)."
+    ),
+)
+@click.option(
+    "--similar-threshold",
+    type=float,
+    default=0.85,
+    show_default=True,
+    help="Minimum cosine similarity for a SIMILAR_TO edge.",
+)
+@click.option(
     "--update",
     is_flag=True,
     default=False,
@@ -147,6 +165,8 @@ def build(
     topic_threshold: float,
     topics_file: str | None,
     no_similar: bool,
+    similar_k: int,
+    similar_threshold: float,
     update: bool,
     ext: tuple[str, ...],
     exclude_dir: tuple[str, ...],
@@ -223,6 +243,8 @@ def build(
         kg.store,
         wipe=wipe,
         discover_similar=not no_similar,
+        similar_k=similar_k,
+        similarity_edge_threshold=similar_threshold,
         quiet=False,
     )
     _console.print(f"  model    : {idx_stats['model_name']}  dim={idx_stats['dim']}")

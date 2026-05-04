@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-05-04T03:59:12.942699+00:00",
+  "last_update": "2026-05-04T14:04:04.393531+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -2530,11 +2530,11 @@
       }
     },
     {
-      "key": "05d3fb9e5257368d1c443679653d073062583bd0",
+      "key": "3757b1d81ba1b46c310c4bdb509aa55768efd1ce",
       "branch": "main",
-      "timestamp": "2026-05-04T03:59:12.941384+00:00",
+      "timestamp": "2026-05-04T12:44:37.769410+00:00",
       "version": "0.13.0",
-      "file": "05d3fb9e5257368d1c443679653d073062583bd0.json",
+      "file": "3757b1d81ba1b46c310c4bdb509aa55768efd1ce.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 2460,
@@ -2616,6 +2616,49 @@
           "nodes": 475,
           "edges": 7618,
           "coverage_delta": 0.09225125204506657,
+          "issues_delta": 1
+        }
+      }
+    },
+    {
+      "key": "0c46835a1145de59a34839521c0fd4ec370c3d77",
+      "branch": "main",
+      "timestamp": "2026-05-04T14:04:04.390812+00:00",
+      "version": "0.13.0",
+      "file": "0c46835a1145de59a34839521c0fd4ec370c3d77.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 2465,
+        "total_edges": 18180,
+        "node_counts": {
+          "chunk": 489,
+          "document": 30,
+          "entity": 694,
+          "keyword": 578,
+          "section": 346,
+          "topic": 328
+        },
+        "edge_counts": {
+          "CONTAINS": 835,
+          "CO_OCCURS_WITH": 11556,
+          "HAS_KEYWORD": 1946,
+          "HAS_TOPIC": 505,
+          "MENTIONS_ENTITY": 2211,
+          "NEXT": 101,
+          "REFERENCES": 24,
+          "SIMILAR_TO": 1002
+        },
+        "meaningful_nodes": 2435,
+        "coverage_score": 0.9781867757327879,
+        "issues_count": 1,
+        "complexity_median": 23.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 498,
+          "edges": 6491,
+          "coverage_delta": 0.09330705064687728,
           "issues_delta": 1
         }
       }

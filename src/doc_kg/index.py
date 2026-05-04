@@ -533,18 +533,25 @@ class SemanticIndex:
         Only chunk nodes participate in SIMILAR_TO (sections and documents
         are already structurally connected via CONTAINS).
 
-        Uses batched numpy matmul — no LanceDB queries, no ``seen`` set.
-        Deduplication is handled by enforcing ``src_global_idx < dst_global_idx``
-        (upper-triangle only), which is a pure numpy mask operation and
-        guarantees each pair appears exactly once across all batches.
+        Per-row top-``k`` cap: for each chunk, keep at most the top-``k``
+        most-similar peers above ``threshold``. After per-row pruning, an
+        upper-triangle filter (``src_global_idx < dst_global_idx``) deduplicates
+        the pair (a, b) so it is emitted exactly once. Bounded out-degree
+        prevents quadratic blow-up on stylistically homogeneous corpora where
+        most pairs sit just above the threshold.
 
+        Setting ``k <= 0`` disables the cap and falls back to pure threshold
+        filtering (legacy behavior).
+
+        Uses batched numpy matmul — no LanceDB queries, no ``seen`` set.
         Edges are flushed to SQLite every *flush_every* entries to bound peak
         memory regardless of how many qualifying pairs exist.
 
         :param store: GraphStore to write edges into.
         :param node_ids: Node IDs in the same order as *vecs*.
         :param vecs: Float32 numpy array of shape ``(N, dim)``.
-        :param k: Unused (kept for API compatibility).
+        :param k: Maximum SIMILAR_TO out-edges per source chunk (top-k by score).
+                  ``k <= 0`` disables the cap.
         :param threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :param quiet: Suppress progress output.
         :param row_batch: Matmul row-batch size to bound peak memory.
@@ -601,26 +608,50 @@ class SemanticIndex:
                 batch_end = min(batch_start + row_batch, n_chunks)
                 sims = chunk_vecs[batch_start:batch_end] @ chunk_vecs.T
 
-                # All pairs above threshold
-                row_idxs, col_idxs = np.where(sims >= threshold)
+                # Suppress self-similarity so it can't occupy a top-k slot
+                # (and never produces a self-loop in the threshold path).
+                rows_in_batch = batch_end - batch_start
+                local = np.arange(rows_in_batch)
+                sims[local, batch_start + local] = -np.inf
 
-                # Upper-triangle filter: src_global < dst_global
-                # — eliminates self-pairs and ensures each pair appears once
-                # across all batches without a Python seen-set.
+                if k and k > 0:
+                    # Per-row top-k above threshold. argpartition gets the indices
+                    # of the k highest-scoring columns per row in O(N) per row,
+                    # then we filter by threshold so weak matches are still excluded.
+                    n_cols = sims.shape[1]
+                    k_eff = min(k, max(n_cols - 1, 1))  # -1 because self is masked
+                    top_idx = np.argpartition(-sims, k_eff - 1, axis=1)[:, :k_eff]
+                    row_idxs = np.repeat(np.arange(rows_in_batch), k_eff)
+                    col_idxs = top_idx.reshape(-1)
+                    above = sims[row_idxs, col_idxs] >= threshold
+                    row_idxs = row_idxs[above]
+                    col_idxs = col_idxs[above]
+                else:
+                    # Legacy: every pair above threshold (no cap).
+                    row_idxs, col_idxs = np.where(sims >= threshold)
+
+                # Canonicalize undirected edges: always emit src=min(a,b), dst=max(a,b).
+                # The (src, rel, dst) PRIMARY KEY in SQLite dedups cross-batch
+                # AND across the asymmetry of per-row top-k (where A picks B but B
+                # may not pick A). Self-loops are already excluded by the -inf mask
+                # above and would be filtered here anyway by the equality check.
                 src_global = batch_start + row_idxs
-                mask = src_global < col_idxs
-                if mask.any():
-                    filt_ri = row_idxs[mask]  # local row indices into sims
-                    filt_ci = col_idxs[mask]  # global col indices
-                    filt_src = src_global[mask]  # global src indices
+                lo = np.minimum(src_global, col_idxs)
+                hi = np.maximum(src_global, col_idxs)
+                non_self = lo != hi
+                if non_self.any():
+                    filt_ri = row_idxs[non_self]  # local row indices for sim lookup
+                    filt_ci = col_idxs[non_self]  # local col indices for sim lookup
+                    lo = lo[non_self]
+                    hi = hi[non_self]
                     sim_vals = sims[filt_ri, filt_ci]
 
-                    for i in range(len(filt_src)):
+                    for i in range(len(lo)):
                         edges.append(
                             DocEdge(
-                                src=chunk_ids[filt_src[i]],
+                                src=chunk_ids[lo[i]],
                                 rel="SIMILAR_TO",
-                                dst=chunk_ids[filt_ci[i]],
+                                dst=chunk_ids[hi[i]],
                                 evidence={"similarity": round(float(sim_vals[i]), 4)},
                             )
                         )

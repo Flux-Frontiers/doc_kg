@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `src/doc_kg/cli/cmd_build.py`: `dockg build` gains `--similar-k` (default `5`) and `--similar-threshold` (default `0.85`) options to bound SIMILAR_TO graph density. `--similar-k 0` disables the cap and restores the legacy "every pair above threshold" behavior.
+- `src/doc_kg/kg.py`: `DocKG.build()`, `build_index()`, and `build_from_cache()` now accept `similar_k` and `similarity_edge_threshold` keyword arguments, threading the new caps through to `SemanticIndex`.
 
 ### Changed
+- `src/doc_kg/index.py`: SIMILAR_TO edge discovery enforces a per-row top-`k` cap before threshold filtering (argpartition over each chunk's similarity row), preventing quadratic edge blow-up on stylistically homogeneous corpora where most pairs sit just above the threshold. Self-similarity is masked to `-inf` so it cannot occupy a top-k slot. Edges are now emitted in canonical undirected form (`src=min(a,b)`, `dst=max(a,b)`), so the SQLite `(src, rel, dst)` PRIMARY KEY deduplicates cross-batch pairs and the asymmetric top-k case where `A` picks `B` but `B` does not pick `A`.
+- `.dockg/snapshots/manifest.json`: Refreshed snapshot for `main` at v0.13.0.
 
 ### Removed
 

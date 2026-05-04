@@ -470,15 +470,30 @@ class DocKG:
     # Build
     # ------------------------------------------------------------------
 
-    def build(self, *, wipe: bool = False, discover_similar: bool = True) -> BuildStats:
+    def build(
+        self,
+        *,
+        wipe: bool = False,
+        discover_similar: bool = True,
+        similar_k: int = 5,
+        similarity_edge_threshold: float = 0.85,
+    ) -> BuildStats:
         """Full pipeline: corpus parsing → SQLite → LanceDB + SIMILAR_TO edges.
 
         :param wipe: Clear existing data before writing.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
+        :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
+                          Set to 0 to disable the cap.
+        :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :return: :class:`BuildStats`.
         """
         graph_stats = self.build_graph(wipe=wipe)
-        index_stats = self.build_index(wipe=wipe, discover_similar=discover_similar)
+        index_stats = self.build_index(
+            wipe=wipe,
+            discover_similar=discover_similar,
+            similar_k=similar_k,
+            similarity_edge_threshold=similarity_edge_threshold,
+        )
         graph_stats.indexed_rows = index_stats.indexed_rows
         graph_stats.index_dim = index_stats.index_dim
         graph_stats.similar_edges_added = index_stats.similar_edges_added
@@ -538,6 +553,8 @@ class DocKG:
         *,
         wipe: bool = False,
         discover_similar: bool = True,
+        similar_k: int = 5,
+        similarity_edge_threshold: float = 0.85,
     ) -> BuildStats:
         """Build the LanceDB index from a pre-computed embedding cache.
 
@@ -547,10 +564,18 @@ class DocKG:
         :param cache_path: Path to the embedding cache JSON.
         :param wipe: Delete existing vectors before indexing.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
+        :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
+                          Set to 0 to disable the cap.
+        :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :return: :class:`BuildStats`.
         """
         idx_stats = self.index.build_from_cache(
-            self.store, Path(cache_path), wipe=wipe, discover_similar=discover_similar
+            self.store,
+            Path(cache_path),
+            wipe=wipe,
+            discover_similar=discover_similar,
+            similar_k=similar_k,
+            similarity_edge_threshold=similarity_edge_threshold,
         )
         s = self.store.stats()
         return BuildStats(
@@ -565,11 +590,21 @@ class DocKG:
             similar_edges_added=idx_stats.get("similar_edges_added"),
         )
 
-    def build_index(self, *, wipe: bool = False, discover_similar: bool = True) -> BuildStats:
+    def build_index(
+        self,
+        *,
+        wipe: bool = False,
+        discover_similar: bool = True,
+        similar_k: int = 5,
+        similarity_edge_threshold: float = 0.85,
+    ) -> BuildStats:
         """SQLite → LanceDB only (graph must already exist).
 
         :param wipe: Delete existing vectors before indexing.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
+        :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
+                          Set to 0 to disable the cap.
+        :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :return: :class:`BuildStats` with ``indexed_rows``, ``index_dim``, and
                  ``similar_edges_added`` set.
         """
@@ -577,7 +612,13 @@ class DocKG:
 
         with Console().status("  Loading embedding model\u2026"):
             _ = self.embedder  # warm up: loads SentenceTransformer weights
-        idx_stats = self.index.build(self.store, wipe=wipe, discover_similar=discover_similar)
+        idx_stats = self.index.build(
+            self.store,
+            wipe=wipe,
+            discover_similar=discover_similar,
+            similar_k=similar_k,
+            similarity_edge_threshold=similarity_edge_threshold,
+        )
         s = self.store.stats()
         return BuildStats(
             corpus_root=str(self.corpus_root),
