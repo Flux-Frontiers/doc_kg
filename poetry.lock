@@ -1274,6 +1274,41 @@ files = [
 referencing = ">=0.31.0"
 
 [[package]]
+name = "kg-rag"
+version = "0.6.0"
+description = "Orchestration layer for the KGRAG(tm) components."
+optional = true
+python-versions = "<3.14,>=3.12"
+groups = ["main"]
+markers = "extra == \"kgdeps\" or extra == \"all\""
+files = [
+    {file = "kg_rag-0.6.0-py3-none-any.whl", hash = "sha256:2d58b6a2af5df61664f5ed8529fa12225d3d6ad9d24a701c0a1961b65a40fad3"},
+    {file = "kg_rag-0.6.0.tar.gz", hash = "sha256:d6b67c38aaf77e15a01abddce785ef944fc3f35a9791330ea8e7ed4d7ad9ef86"},
+]
+
+[package.dependencies]
+click = ">=8.1.0"
+kgmodule-utils = ">=0.2.0"
+lancedb = ">=0.29.0"
+mcp = ">=1.0.0"
+numpy = ">=1.24.0"
+pandas = ">=2.0.0"
+pip = ">=26.0.1,<27.0.0"
+rich = ">=14.3.3,<15.0.0"
+safetensors = ">=0.5.0,<0.6.0"
+sentence-transformers = ">=5.2.0,<6.0.0"
+torch = ">=2.5.1"
+transformers = ">=4.57.6,<5.0.0"
+
+[package.extras]
+kg = ["doc-kg (>=0.12.3)", "ftree-kg (>=0.8.0)", "pycode-kg (>=0.18.1)"]
+pi = ["llama-cpp-python (>=0.3.0)"]
+qt = ["PyQt5 (>=5.15.0)"]
+viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
+viz2d = ["PyQt5 (>=5.15.0)"]
+viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
+
+[[package]]
 name = "kgmodule-utils"
 version = "0.2.2"
 description = "Shared types and snapshot infrastructure for the KGModule SDK"
@@ -2463,6 +2498,19 @@ mic = ["olefile"]
 test-arrow = ["arro3-compute", "arro3-core", "nanoarrow", "pyarrow"]
 tests = ["check-manifest", "coverage (>=7.4.2)", "defusedxml", "markdown2", "olefile", "packaging", "pyroma (>=5)", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "trove-classifiers (>=2024.10.12)"]
 xmp = ["defusedxml"]
+
+[[package]]
+name = "pip"
+version = "26.1"
+description = "The PyPA recommended tool for installing Python packages."
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"kgdeps\" or extra == \"all\""
+files = [
+    {file = "pip-26.1-py3-none-any.whl", hash = "sha256:4e8486d821d814b77319acb7b9e8bf5a4ee7590a643e7cb21029f209be8573c1"},
+    {file = "pip-26.1.tar.gz", hash = "sha256:81e13ebcca3ffa8cc85e4deff5c27e1ee26dea0aa7fc2f294a073ac208806ff3"},
+]
 
 [[package]]
 name = "platformdirs"
@@ -4511,12 +4559,12 @@ files = [
 ]
 
 [extras]
-all = ["detect-secrets", "mypy", "pdoc", "plotly", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit"]
+all = ["detect-secrets", "kg-rag", "mypy", "pdoc", "plotly", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit"]
 dev = ["detect-secrets", "mypy", "pdoc", "pre-commit", "pycode-kg", "pylint", "pytest", "pytest-cov", "ruff"]
-kgdeps = ["pycode-kg"]
+kgdeps = ["kg-rag", "pycode-kg"]
 viz = ["plotly", "pyvis", "streamlit"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "6281b7974dfb831ed112ac0ea24ceb68756f7c06e13477c7f5fdcde51771b39a"
+content-hash = "dbb4e87c0f16db2bd926988d7f81d283b7b914650ec2d19c07121460c9cef400"

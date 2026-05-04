@@ -93,7 +93,6 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.4.0",
     "pycode-kg>=0.16.0",
-    # agent-kg not yet on PyPI — install manually: pip install git+https://github.com/Flux-Frontiers/agent_kg.git
 ]
 viz = [
     "plotly>=5.14.0",

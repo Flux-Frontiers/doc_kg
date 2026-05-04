@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/dockg_logo_256.png" alt="DocKG logo" width="200"/>
+</p>
+
 [![CI](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml/badge.svg)](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
@@ -5,203 +9,156 @@
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
 
-<p align="center">
-  <img src="assets/dockg_logo_256.png" alt="DocKG logo" width="256"/>
-</p>
+# DocKG — A Knowledge Graph for Document Corpora
 
-**DocKG** — A Hybrid Knowledge Graph for Document Corpora
-with Semantic Indexing and Source-Grounded Passage Packing
+**DocKG turns a document corpus into a deterministic, queryable knowledge graph — and uses it to produce source-grounded passage packs that LLMs can actually trust.**
 
-*Author: Eric G. Suchanek, PhD*
-*Flux-Frontiers, Liberty TWP, OH*
+It walks every `.md`, `.txt`, `.rst`, and `.pdf` file in your corpus, chunks the text with heading-aware segmentation, extracts topics, named entities, keywords, and cross-document references, and stores the result in SQLite. A LanceDB vector index sits alongside the graph so that both *"authentication flow"* and *"configure the webhook"* find the right passage to start from. From there you can rank chunks by structural importance, trace how documents reference each other, snapshot corpus health metrics across time, or hand the whole thing to Claude over MCP.
 
----
+The design philosophy is borrowed from its sibling [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg): **structure is ground truth; embeddings are an acceleration layer**. This is a deliberate departure from standard RAG. Vanilla RAG embeds chunks in isolation and retrieves by cosine similarity alone — it has no model of which section a chunk belongs to, no awareness of cross-document references, and no way to suppress a redundant document-level summary when a more specific chunk is already in the result set. The retrieved context looks plausible but is structurally blind. DocKG keeps the vector index for semantic seeding, then expands through a typed graph so that structural relationships — containment, sequencing, citation, similarity — shape what gets returned. When the graph and the vector index disagree, the graph wins. Every retrieved passage is traceable to a specific file, heading, and character offset. There are no hallucinated citations because there is no inference — every result is computed from the graph.
 
-## Overview
+Everything runs on your laptop. No cloud APIs, no quotas, no documents leaving the machine.
 
-DocKG constructs a **deterministic, explainable knowledge graph** from a corpus of Markdown, plain-text, and PDF documents. It semantically chunks text, discovers structural and semantic relationships between sections and chunks, stores them in SQLite, and augments retrieval with vector embeddings via LanceDB.
-
-Structure is treated as **ground truth**; semantic search is strictly an acceleration layer. The result is a searchable, auditable representation of a document corpus — an ideal retrieval engine for LLMs and a practical foundation for **Knowledge-Graph RAG (KRAG)**.
-
-DocKG uses the same architecture as [CodeKG](https://github.com/Flux-Frontiers/code_kg) but targets natural-language documents rather than Python source code.
+*Author: Eric G. Suchanek, PhD — Flux-Frontiers, Liberty TWP, OH*
 
 ---
 
-## Features
+## Sister projects
 
-- **Multi-format ingestion** — `.md`, `.txt`, `.rst`, and `.pdf` (native — no inference)
-- **Semantic chunking** — Heading-structure and paragraph-aware segmentation
-- **Deterministic knowledge graph** — SQLite-backed canonical store with typed nodes and provenance-tracked edges
-- **Relation extraction** — Topics, named entities, and keywords per chunk; co-occurrence and similarity edges built automatically
-- **Hybrid query model** — Semantic seeding (LanceDB embeddings) + structural expansion (graph traversal)
-- **Passage packing** — Context-rich text passages grounded to source documents with headings
-- **Corpus health analysis** — Per-document metrics, hot chunks, orphan detection, coverage report
-- **Temporal snapshots** — Save and diff graph metrics over time
-- **MCP server** — Four tools for AI agent integration (`graph_stats`, `query_docs`, `pack_docs`, `get_node`)
-- **Streamlit web app** — Interactive graph browser, hybrid query UI, and passage pack explorer
+DocKG is part of the **KGRAG** family — a suite of knowledge-graph systems sharing the same hybrid semantic-plus-structural design, each targeting a different kind of corpus:
+
+- **[PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg)** — Python source code. AST-extracted modules, classes, functions, and their typed relationships.
+- **[MetaboKG](https://github.com/Flux-Frontiers/metabo_kg)** — metabolic pathway data (KEGG, SBML, BioPAX) with FBA / ODE simulation on top of the graph.
+- **[DiaryKG](https://github.com/Flux-Frontiers/diary_kg)** — personal journals and diary corpora; semantic search and graph traversal over a writer's body of work.
+- **[FTreeKG](https://github.com/Flux-Frontiers/FTreeKG)** — filesystem trees as a queryable graph of directories, files, and contents.
+- **[AgentKG](https://github.com/Flux-Frontiers/agent_kg)** — conversational memory as a knowledge graph: turns, decisions, commitments, and the relationships between them.
+
+Together they form **KGRAG**, a federated retrieval layer where one query can span documents, code, journals, filesystems, and agent memory simultaneously.
 
 ---
 
-## Quick Start
+## Two ways to use it
+
+DocKG is designed to be useful at both ends — as a standalone command-line tool for corpus analysis, and as a structured context layer for AI agents.
+
+### 1. Standalone — `dockg build` + `dockg pack`
+
+Build the index once, then query it:
 
 ```bash
-# Index a document corpus (SQLite + LanceDB in one step)
-dockg build docs/
-
-# Natural-language query — returns ranked document chunks
-dockg query "authentication flow"
-
-# Source-grounded passage pack — paste straight into an LLM prompt
-dockg pack "configuration reference" --format md --out context.md
+dockg build docs/                                     # full pipeline — graph + vectors
+dockg query "authentication flow"                     # hybrid search, ranked results
+dockg pack "configuration reference" --format md      # source-grounded passage pack
+dockg analyze docs/                                   # corpus health report + snapshot
 ```
+
+`pack` is the workhorse. It seeds on vector similarity, expands through the document graph (`CONTAINS`, `REFERENCES`, `SIMILAR_TO`, `NEXT`), deduplicates coarser nodes when their chunks are already present, and returns a ranked, excerpt-annotated set of passages ready to paste into an LLM prompt. The output is grounded: every snippet carries its source path, heading, and character range.
+
+`analyze` walks the graph and produces per-document metrics — chunk counts, section depth, entity density, hot chunks by connectivity — plus an overall coverage score and a timestamped JSON snapshot for CI gates and trend tracking.
+
+### 2. Agentic — MCP server for grounded AI workflows
+
+Run `dockg-mcp` and Claude (or any MCP-aware client) gets four focused tools backed by the same graph: `graph_stats`, `query_docs`, `pack_docs`, and `get_node`. Setup for Claude Code, Claude Desktop, Kilo Code, Copilot, and Cline is a single JSON entry — see [docs/MCP.md](docs/MCP.md).
+
+The agent benefit is the same as with PyCodeKG: tools return *actual text* with source attribution rather than the model's best reconstruction from training data. Multi-step workflows — *"find the deployment section, check what it references, summarise what would need updating if the port changes"* — become a handful of grounded calls instead of repeated file reads.
 
 ---
 
-## Installation
+## Get started in 60 seconds
 
 **Requirements:** Python ≥ 3.12, < 3.14
 
 ```bash
-# pip
 pip install doc-kg
 
-# With Streamlit web visualizer
-pip install 'doc-kg[viz]'
-
-# Poetry
-poetry add doc-kg
+cd /path/to/your/corpus
+dockg build .                     # index the corpus
+dockg query "your question"       # hybrid search
+dockg pack  "your question"       # LLM-ready passage pack
 ```
 
-> For advanced deployment options (Streamlit Cloud, Fly.io, offline model cache, git hooks) see [docs/deployment.md](docs/deployment.md).
+Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) are in [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ---
 
-## Usage
+## How retrieval works
 
-### Build and query
+Search is hybrid by design. A query runs in two phases:
 
-```bash
-dockg build docs/                                    # full pipeline
-dockg build docs/ --update                           # incremental (keep existing)
-dockg build docs/ --exclude-dir archive              # skip directories
-dockg query "deployment configuration"               # hybrid search
-dockg pack "error handling" --format md --out ctx.md # passage pack
-```
+1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and LanceDB returns the `k` closest chunks by cosine similarity.
+2. **Graph expansion phase** — each seed hit is expanded `hop` BFS steps along typed edges (`CONTAINS`, `REFERENCES`, `SIMILAR_TO`, `NEXT`) so co-cited passages and structurally adjacent sections surface alongside the direct semantic matches.
 
-### Analyze corpus health
+A **deduplication pass** then suppresses coarser nodes (document, section) from files where finer chunks are already present — the pack contains the most specific evidence available, not redundant summaries of the same content.
 
-```bash
-dockg analyze docs/             # full report + JSON snapshot
-dockg analyze docs/ --quiet     # CI mode — exits 1 on issues
-```
-
-### Snapshots
-
-```bash
-dockg snapshot save 0.12.0      # capture current metrics
-dockg snapshot diff 0.11.0 0.12.0  # compare two versions
-```
-
-> Full flag reference for every command: [docs/CLI.md](docs/CLI.md)
-> Query patterns and MCP examples: [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
+A **short-chunk boost** surfaces factual asides and single-sentence callouts that would otherwise be buried by longer, topically mixed passages. Micro-fragments below 50 characters are excluded from boosting and from the index entirely.
 
 ---
 
-## MCP Integration
+## What you can do with it
 
-Start the MCP server, then wire it into your AI agent:
-
-```bash
-dockg mcp --repo docs/
-```
-
-**Claude Code / Kilo Code** — add to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "dockg": { "command": "dockg-mcp", "args": ["--repo", "."] }
-  }
-}
-```
-
-**GitHub Copilot** — add to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "dockg": { "type": "stdio", "command": "dockg-mcp", "args": ["--repo", "."] }
-  }
-}
-```
-
-| Tool | Description |
-|------|-------------|
-| `graph_stats()` | Node and edge counts by kind |
-| `query_docs(q, k, hop)` | Hybrid semantic + structural search |
-| `pack_docs(q, k, hop)` | Source-grounded passages as Markdown |
-| `get_node(node_id)` | Fetch a single node by ID |
-
-> Full provider setup (Claude Desktop, Cline, SSE transport): [docs/MCP.md](docs/MCP.md)
+| If you want to… | Reach for | Detail |
+|---|---|---|
+| **Index a corpus** | `dockg build .` | [docs/CLI.md](docs/CLI.md) |
+| **Search for a topic** | `dockg query "..."` | [docs/CLI.md](docs/CLI.md) |
+| **Build an LLM context pack** | `dockg pack "..."` | [docs/CLI.md](docs/CLI.md) |
+| **Analyze corpus health** | `dockg analyze .` | [docs/CLI.md](docs/CLI.md) |
+| **Snapshot and diff metrics** | `dockg snapshot save / diff` | [docs/SNAPSHOTS.md](docs/SNAPSHOTS.md) |
+| **Browse the graph interactively** | `dockg viz` (Streamlit) | [docs/INSTALLATION.md](docs/INSTALLATION.md) |
+| **Wire it into Claude / Copilot / Cline** | `dockg-mcp` | [docs/MCP.md](docs/MCP.md) |
 
 ---
 
-## Python API
-
-```python
-from doc_kg import DocKG
-
-kg = DocKG(corpus_root="docs/")
-kg.build(wipe=True)
-
-result = kg.query("deployment configuration", k=8, hop=1)
-for node in result.nodes:
-    print(node["id"], node["name"])
-
-pack = kg.pack("authentication flow")
-pack.save("context.md")
-```
-
----
-
-## Knowledge Graph Schema
+## Knowledge graph schema
 
 ### Node kinds
 
-| Kind       | Description                                         |
-|------------|-----------------------------------------------------|
-| `document` | A source `.md`, `.txt`, or `.pdf` file              |
-| `section`  | A heading-delimited region within a document        |
-| `chunk`    | A semantically coherent text passage                |
-| `topic`    | A topic extracted from chunk text                   |
-| `entity`   | A named entity (person, place, org, concept)        |
-| `keyword`  | A keyword or key phrase                             |
+| Kind | Description |
+|---|---|
+| `document` | A source `.md`, `.txt`, `.rst`, or `.pdf` file |
+| `section` | A heading-delimited region within a document |
+| `chunk` | A semantically coherent text passage |
+| `topic` | A topic extracted from chunk text |
+| `entity` | A named entity (person, place, org, concept) |
+| `keyword` | A keyword or key phrase |
 
 ### Edge types
 
-| Type               | Description                                          |
-|--------------------|------------------------------------------------------|
-| `CONTAINS`         | Parent → child (document→section, section→chunk)     |
-| `NEXT`             | Sequential ordering between same-level nodes         |
-| `REFERENCES`       | Chunk references another document or section         |
-| `SIMILAR_TO`       | Semantic similarity between chunks (LanceDB-derived) |
-| `HAS_TOPIC`        | Chunk → topic                                        |
-| `MENTIONS_ENTITY`  | Chunk → named entity                                 |
-| `HAS_KEYWORD`      | Chunk → keyword                                      |
-| `CO_OCCURS_WITH`   | Co-occurrence between topics/entities within a chunk |
+| Type | Description |
+|---|---|
+| `CONTAINS` | Parent → child (document→section, section→chunk) |
+| `NEXT` | Sequential ordering between same-level nodes |
+| `REFERENCES` | Chunk cites another document or section |
+| `SIMILAR_TO` | Semantic similarity between chunks (LanceDB-derived) |
+| `HAS_TOPIC` | Chunk → topic |
+| `MENTIONS_ENTITY` | Chunk → named entity |
+| `HAS_KEYWORD` | Chunk → keyword |
+| `CO_OCCURS_WITH` | Co-occurrence between topics/entities within a chunk |
 
 ---
 
-## Storage Layout
+## Storage layout
 
 ```
 .dockg/
-  graph.sqlite      # SQLite knowledge graph (nodes + edges)
-  lancedb/          # LanceDB vector index
-  snapshots/        # Temporal metric snapshots (JSON)
+  graph.sqlite        # SQLite knowledge graph (nodes + edges)
+  lancedb/            # LanceDB vector index
+  snapshots/          # Temporal metric snapshots (JSON)
     manifest.json
-    <commit>.json
+    <sha>.json
 ```
+
+---
+
+## Documentation map
+
+| Doc | What it covers |
+|---|---|
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | All install variants, MCP setup, git hooks, troubleshooting |
+| [docs/CLI.md](docs/CLI.md) | Every `dockg` subcommand and flag |
+| [docs/MCP.md](docs/MCP.md) | MCP server setup for Claude / Kilo / Copilot / Cline, tool reference |
+| [docs/SNAPSHOTS.md](docs/SNAPSHOTS.md) | Temporal snapshots, diffing across corpus versions |
+| [docs/CHEATSHEET.md](docs/CHEATSHEET.md) | Quick-reference: CLI flags and MCP tools on one page |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
 
 ---
 
@@ -213,7 +170,7 @@ If you use DocKG in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *DocKG: Hybrid Knowledge Graph for Document Corpora* (Version 0.12.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.19770973
+> Suchanek, E. G. (2026). *DocKG: Hybrid Knowledge Graph for Document Corpora* (Version 0.13.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.19770973
 
 **BibTeX**
 
@@ -221,7 +178,7 @@ If you use DocKG in research or a project, please cite it:
 @software{suchanek_doc_kg,
   author    = {Suchanek, Eric G.},
   title     = {{DocKG}: Hybrid Knowledge Graph for Document Corpora},
-  version   = {0.12.1},
+  version   = {0.13.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/doc_kg},
@@ -229,6 +186,20 @@ If you use DocKG in research or a project, please cite it:
 }
 ```
 
+---
+
 ## License
 
-[Elastic License 2.0](LICENSE) — free for non-commercial and internal use; commercial redistribution requires a license from Flux-Frontiers.
+[Elastic License 2.0](LICENSE) — free for non-commercial and internal use; commercial redistribution or hosting requires a license from Flux-Frontiers.
+
+---
+
+## Support
+
+- **Issues** — [GitHub Issues](https://github.com/Flux-Frontiers/doc_kg/issues)
+- Sister projects: [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [AgentKG](https://github.com/Flux-Frontiers/agent_kg), [MetaboKG](https://github.com/Flux-Frontiers/metabo_kg)
+- Built on: LanceDB, sentence-transformers, SQLite, Streamlit, and FastMCP
+
+---
+
+*Built for writers, researchers, and AI agents that work alongside them — egs · Last updated May 2026*
