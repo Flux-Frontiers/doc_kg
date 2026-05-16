@@ -83,6 +83,10 @@ Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) 
 
 ## How retrieval works
 
+<p align="center">
+  <img src="assets/dockg_pipeline.png" alt="DocKG pipeline architecture" width="800"/>
+</p>
+
 Search is hybrid by design. A query runs in two phases:
 
 1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and LanceDB returns the `k` closest chunks by cosine similarity.

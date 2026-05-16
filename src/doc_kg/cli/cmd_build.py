@@ -26,6 +26,23 @@ from doc_kg.kg import DocKG
 _console = Console()
 
 
+def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
+    """Parse ``PREFIX=FILE`` pairs from ``--topics-prefix`` into a mapping.
+
+    :param topics_prefix: Tuple of ``"PREFIX=FILE"`` strings.
+    :return: ``{prefix: file_path}`` dict, empty if no entries provided.
+    """
+    result: dict[str, str] = {}
+    for entry in topics_prefix:
+        if "=" not in entry:
+            raise click.BadParameter(
+                f"--topics-prefix must be in PREFIX=FILE format, got: {entry!r}"
+            )
+        prefix, _, file_path = entry.partition("=")
+        result[prefix.strip()] = file_path.strip()
+    return result
+
+
 @cli.command("build")
 @repo_option
 @sqlite_option
@@ -103,6 +120,38 @@ _console = Console()
     help="Optional JSON/YAML topic catalog file.",
 )
 @click.option(
+    "--topics-prefix",
+    multiple=True,
+    metavar="PREFIX=FILE",
+    help=(
+        "Per-path topic catalog override (repeatable). "
+        "Format: PREFIX=PATH_TO_YAML, e.g. "
+        "'sacred-texts/=/path/to/sacred_texts_topics.yaml'. "
+        "First matching prefix wins; overrides --topics-file for matched files."
+    ),
+)
+@click.option(
+    "--chunk-strategy",
+    type=click.Choice(["semantic", "sentence_group", "fixed", "verse"]),
+    default="semantic",
+    show_default=True,
+    help=(
+        "Chunking strategy. 'semantic' (default) auto-detects verse documents "
+        "and switches to the verse chunker automatically. "
+        "Use 'verse' to force verse mode for all files."
+    ),
+)
+@click.option(
+    "--kmeans-model",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help=(
+        "Path to a *.kmeans.joblib model produced by 'dockg pipeline discover-topics'. "
+        "Enables embedding-based K-means topic assignment (near-100% coverage) "
+        "instead of keyword matching."
+    ),
+)
+@click.option(
     "--no-similar",
     is_flag=True,
     default=False,
@@ -164,6 +213,9 @@ def build(
     cooccur_window: int,
     topic_threshold: float,
     topics_file: str | None,
+    topics_prefix: tuple[str, ...],
+    chunk_strategy: str,
+    kmeans_model: str | None,
     no_similar: bool,
     similar_k: int,
     similar_threshold: float,
@@ -183,6 +235,7 @@ def build(
     wipe = not update
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
     exclude = load_exclude_dirs(repo_root) | set(exclude_dir)
+    topics_file_map = _parse_topics_prefix(topics_prefix)
 
     kg = DocKG(
         corpus_root=repo_root,
@@ -191,6 +244,7 @@ def build(
         lancedb_dir=lancedb_dir,
         model=model,
         table=table,
+        chunk_strategy=chunk_strategy,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         similarity_threshold=similarity_threshold,
@@ -201,6 +255,8 @@ def build(
         cooccur_window=cooccur_window,
         topic_threshold=topic_threshold,
         topics_file=topics_file,
+        topics_file_map=topics_file_map or None,
+        kmeans_model_path=kmeans_model,
     )
 
     # Override graph extensions if provided
@@ -326,6 +382,38 @@ def build(
     help="Optional JSON/YAML topic catalog file.",
 )
 @click.option(
+    "--topics-prefix",
+    multiple=True,
+    metavar="PREFIX=FILE",
+    help=(
+        "Per-path topic catalog override (repeatable). "
+        "Format: PREFIX=PATH_TO_YAML, e.g. "
+        "'sacred-texts/=/path/to/sacred_texts_topics.yaml'. "
+        "First matching prefix wins; overrides --topics-file for matched files."
+    ),
+)
+@click.option(
+    "--chunk-strategy",
+    type=click.Choice(["semantic", "sentence_group", "fixed", "verse"]),
+    default="semantic",
+    show_default=True,
+    help=(
+        "Chunking strategy. 'semantic' (default) auto-detects verse documents "
+        "and switches to the verse chunker automatically. "
+        "Use 'verse' to force verse mode for all files."
+    ),
+)
+@click.option(
+    "--kmeans-model",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help=(
+        "Path to a *.kmeans.joblib model produced by 'dockg pipeline discover-topics'. "
+        "Enables embedding-based K-means topic assignment (near-100% coverage) "
+        "instead of keyword matching."
+    ),
+)
+@click.option(
     "--update",
     is_flag=True,
     default=False,
@@ -361,6 +449,9 @@ def build_graph(
     cooccur_window: int,
     topic_threshold: float,
     topics_file: str | None,
+    topics_prefix: tuple[str, ...],
+    chunk_strategy: str,
+    kmeans_model: str | None,
     update: bool,
     ext: tuple[str, ...],
     exclude_dir: tuple[str, ...],
@@ -371,12 +462,14 @@ def build_graph(
     wipe = not update
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
     exclude = load_exclude_dirs(repo_root) | set(exclude_dir)
+    topics_file_map = _parse_topics_prefix(topics_prefix)
 
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
         exclude=exclude or None,
         model=model,
+        chunk_strategy=chunk_strategy,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         similarity_threshold=similarity_threshold,
@@ -387,6 +480,8 @@ def build_graph(
         cooccur_window=cooccur_window,
         topic_threshold=topic_threshold,
         topics_file=topics_file,
+        topics_file_map=topics_file_map or None,
+        kmeans_model_path=kmeans_model,
     )
 
     if extensions:

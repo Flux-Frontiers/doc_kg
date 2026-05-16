@@ -38,6 +38,12 @@ class SourceProvenance:
     :param section_title: Enclosing Markdown section title, if any.
     :param section_level: Heading level (1-6), or ``None``.
     :param chunk_index: Zero-based position of this chunk within its document.
+    :param content_type: Content kind — ``"prose"``, ``"verse"``, ``"poetry"``,
+                         ``"diary"``, or ``None`` for unspecified.
+    :param book: Canonical book name for verse content (e.g. ``"Genesis"``).
+    :param chapter: Chapter number for verse content.
+    :param verse_start: First verse number in this chunk.
+    :param verse_end: Last verse number in this chunk.
     """
 
     file_path: str
@@ -46,6 +52,11 @@ class SourceProvenance:
     section_title: str | None = None
     section_level: int | None = None
     chunk_index: int = 0
+    content_type: str | None = None
+    book: str | None = None
+    chapter: int | None = None
+    verse_start: int | None = None
+    verse_end: int | None = None
 
 
 @dataclass
@@ -101,6 +112,11 @@ class EntryChunk:
             "char_end": self.provenance.char_end,
             "heading_level": self.provenance.section_level,
             "text": self.text,
+            "content_type": self.provenance.content_type,
+            "book": self.provenance.book,
+            "chapter": self.provenance.chapter,
+            "verse_start": self.provenance.verse_start,
+            "verse_end": self.provenance.verse_end,
         }
 
 

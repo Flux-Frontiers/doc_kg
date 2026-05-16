@@ -55,6 +55,9 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"\'\(\[])")
 # Markdown ATX heading pattern
 _HEADING = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
+# Verse reference anchor: chapter:verse at the start of a line (e.g. "1:1 ", "12:31 ")
+_VERSE_REF = re.compile(r"^(\d+):(\d+)\s", re.MULTILINE)
+
 # Inline hyperlink [text](href)
 _LINK = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 
@@ -510,18 +513,263 @@ class SentenceGroupChunker:
 
 
 # ---------------------------------------------------------------------------
+# Verse chunker (sacred texts, poetry with chapter:verse anchors)
+# ---------------------------------------------------------------------------
+
+
+class VerseChunker:
+    """Chunker for verse-structured documents (sacred texts, annotated poetry).
+
+    Recognises lines of the form ``chapter:verse text…`` (e.g. KJV Bible) and
+    splits the document into chunks of *verses_per_chunk* consecutive verses,
+    preserving canonical address metadata (book, chapter, verse_start/end).
+
+    The algorithm:
+
+    1. Skip the preamble (anything before the first verse reference).
+    2. Use ``_split_by_headings`` to identify book sections (``##`` headings).
+    3. Within each book section, collect verses by scanning ``_VERSE_REF``
+       anchors and joining soft-wrapped continuation lines.
+    4. Group verses into chunks of *verses_per_chunk*.
+    5. Emit chunk dicts with the standard schema **plus** the extra fields
+       ``content_type``, ``book``, ``chapter``, ``verse_start``, ``verse_end``.
+
+    :param verses_per_chunk: Number of verses to group into each chunk (default: 5).
+    :param min_chunk_chars: Drop chunks shorter than this threshold.
+    """
+
+    VERSE_DETECTION_THRESHOLD = 0.10  # fraction of non-blank lines that must be verse refs
+
+    def __init__(
+        self,
+        *,
+        verses_per_chunk: int = 5,
+        min_chunk_chars: int = 30,
+    ) -> None:
+        self.verses_per_chunk = verses_per_chunk
+        self.min_chunk_chars = min_chunk_chars
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def is_verse_document(text: str) -> bool:
+        """Return ``True`` if *text* looks like a verse-structured document.
+
+        Heuristic: more than 10 % of non-blank lines start with a
+        ``chapter:verse`` reference pattern.
+
+        :param text: Raw document text.
+        :return: ``True`` if verse-structured.
+        """
+        lines = text.splitlines()
+        non_blank = [ln for ln in lines if ln.strip()]
+        if not non_blank:
+            return False
+        verse_lines = sum(1 for ln in non_blank if _VERSE_REF.match(ln))
+        return verse_lines / len(non_blank) > VerseChunker.VERSE_DETECTION_THRESHOLD
+
+    def chunk(self, text: str, *, file_path: str = "") -> list[dict]:
+        """Chunk *text* into verse-group segments.
+
+        :param text: Raw document text.
+        :param file_path: Corpus-relative path (unused here but kept for API parity).
+        :return: List of chunk dicts with verse metadata.
+        """
+        # Find the offset of the first real verse so we can skip TOC preamble
+        first_verse = _VERSE_REF.search(text)
+        if first_verse is None:
+            # No verse refs found — fall back to plain-text chunking
+            return _plain_verse_fallback(text, self.min_chunk_chars)
+
+        content_start = self._find_content_start(text, first_verse.start())
+        content_text = text[content_start:]
+
+        sections = _split_by_headings(content_text)
+        chunks: list[dict] = []
+
+        for section in sections:
+            book = section["title"]
+            section_level = section["level"]
+            section_text = section["text"]
+            # char offsets are relative to content_text; shift to full-file offsets
+            section_base = content_start + section["char_start"]
+
+            if not section_text.strip():
+                continue
+
+            book_chunks = self._chunk_book_section(
+                section_text,
+                book=book,
+                section_level=section_level,
+                base_offset=section_base,
+            )
+            chunks.extend(book_chunks)
+
+        return chunks
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _find_content_start(self, text: str, first_verse_pos: int) -> int:
+        """Return the start of the nearest preceding ``##`` heading or the first
+        verse position itself, whichever is earlier.
+
+        This lets us include the book heading that immediately precedes the
+        first verse block, rather than discarding it as TOC.
+
+        :param text: Full document text.
+        :param first_verse_pos: Character position of the first verse ref.
+        :return: Character position where content ingestion should start.
+        """
+        # Walk backwards through headings to find the last one before the first verse
+        last_heading_before = None
+        for m in _HEADING.finditer(text[:first_verse_pos]):
+            last_heading_before = m
+
+        if last_heading_before is not None:
+            return last_heading_before.start()
+        return first_verse_pos
+
+    def _chunk_book_section(
+        self,
+        section_text: str,
+        *,
+        book: str | None,
+        section_level: int | None,
+        base_offset: int,
+    ) -> list[dict]:
+        """Parse all verses in one book section and group them into chunks.
+
+        :param section_text: Text of the book section (after its ## heading).
+        :param book: Book name from the heading.
+        :param section_level: Heading level of the book heading.
+        :param base_offset: Character offset of *section_text* in the source file.
+        :return: List of chunk dicts.
+        """
+        verses = self._parse_verses(section_text, base_offset=base_offset)
+        if not verses:
+            return []
+
+        # Group by chapter, then into verse windows
+        chapters: dict[int, list[dict]] = {}
+        for v in verses:
+            chapters.setdefault(v["chapter"], []).append(v)
+
+        chunks: list[dict] = []
+        for chapter_num in sorted(chapters):
+            chapter_verses = chapters[chapter_num]
+            for i in range(0, len(chapter_verses), self.verses_per_chunk):
+                group = chapter_verses[i : i + self.verses_per_chunk]
+                chunk_text = " ".join(v["text"] for v in group)
+                if len(chunk_text) < self.min_chunk_chars:
+                    continue
+                chunks.append(
+                    {
+                        "text": chunk_text,
+                        "section_title": book,
+                        "section_level": section_level,
+                        "char_start": group[0]["char_start"],
+                        "char_end": group[-1]["char_end"],
+                        "references": [],
+                        "content_type": "verse",
+                        "book": book,
+                        "chapter": chapter_num,
+                        "verse_start": group[0]["verse"],
+                        "verse_end": group[-1]["verse"],
+                    }
+                )
+
+        return chunks
+
+    def _parse_verses(self, text: str, *, base_offset: int = 0) -> list[dict]:
+        """Extract individual verse dicts from a book section's text.
+
+        Each verse dict: ``{"chapter": int, "verse": int, "text": str,
+        "char_start": int, "char_end": int}``.
+
+        Soft-wrapped continuation lines (lines that do NOT start with a verse
+        ref) are joined to the preceding verse.
+
+        :param text: Book section text (no heading line).
+        :param base_offset: Byte offset of *text* in the full source file.
+        :return: List of verse dicts in document order.
+        """
+        matches = list(_VERSE_REF.finditer(text))
+        if not matches:
+            return []
+
+        verses: list[dict] = []
+        for idx, m in enumerate(matches):
+            chapter = int(m.group(1))
+            verse_num = int(m.group(2))
+            v_start = m.start()
+            v_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+
+            # Raw text from end of the ref prefix to the next verse (or EOF)
+            raw = text[m.end() : v_end]
+            # Normalise: collapse line breaks and extra whitespace
+            verse_text = " ".join(raw.split())
+
+            if not verse_text:
+                continue
+
+            verses.append(
+                {
+                    "chapter": chapter,
+                    "verse": verse_num,
+                    "text": verse_text,
+                    "char_start": base_offset + v_start,
+                    "char_end": base_offset + v_end,
+                }
+            )
+
+        return verses
+
+
+def _plain_verse_fallback(text: str, min_chunk_chars: int) -> list[dict]:
+    """Return a single chunk for documents with no verse refs.
+
+    :param text: Full document text.
+    :param min_chunk_chars: Minimum chunk size.
+    :return: List of chunk dicts (0 or 1 elements).
+    """
+    stripped = text.strip()
+    if len(stripped) < min_chunk_chars:
+        return []
+    return [
+        {
+            "text": stripped,
+            "section_title": None,
+            "section_level": None,
+            "char_start": 0,
+            "char_end": len(text),
+            "references": [],
+            "content_type": "verse",
+            "book": None,
+            "chapter": None,
+            "verse_start": None,
+            "verse_end": None,
+        }
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Chunker factory
 # ---------------------------------------------------------------------------
 
 
 def chunker_for(
-    strategy: Literal["semantic", "sentence_group", "fixed"] = "semantic",
+    strategy: Literal["semantic", "sentence_group", "fixed", "verse"] = "semantic",
     **kwargs,
-) -> TextChunker | SentenceGroupChunker:
+) -> TextChunker | SentenceGroupChunker | VerseChunker:
     """Factory: create the appropriate chunker for *strategy*.
 
     :param strategy: ``"semantic"`` (embedding-based), ``"sentence_group"``
-                     (fixed N sentences), or ``"fixed"`` (size-based).
+                     (fixed N sentences), ``"fixed"`` (size-based), or
+                     ``"verse"`` (verse-anchor structured documents).
     :param kwargs: Forwarded to the chosen chunker's ``__init__``.
     :return: A chunker instance.
     """
@@ -529,6 +777,11 @@ def chunker_for(
         return SentenceGroupChunker(
             sentences_per_chunk=kwargs.get("sentences_per_chunk", 4),
             min_chunk_chars=kwargs.get("min_chunk_chars", 50),
+        )
+    if strategy == "verse":
+        return VerseChunker(
+            verses_per_chunk=kwargs.get("sentences_per_chunk", 5),
+            min_chunk_chars=kwargs.get("min_chunk_chars", 30),
         )
     # "semantic" and "fixed" both use TextChunker; "fixed" just omits the embedder
     return TextChunker(

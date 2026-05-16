@@ -9,7 +9,7 @@ Document-centric knowledge graph building and querying.
 dockg build docs
 ```
 
-Build the authoritative SQLite knowledge graph from your documentation corpus (`.md` and `.txt` files).
+Build the authoritative SQLite knowledge graph from your documentation corpus (`.md`, `.txt`, `.rst`, and `.pdf` files).
 This runs corpus parsing, SQLite persistence, and LanceDB vector indexing in one step.
 Existing data is wiped by default; pass `--update` to keep existing data instead.
 

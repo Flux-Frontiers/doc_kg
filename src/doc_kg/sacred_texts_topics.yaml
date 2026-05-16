@@ -1,0 +1,201 @@
+# Sacred-text topic catalog for DocKG
+#
+# Used with parse_corpus(topics_file_map={"sacred-texts/": "..."}) to route
+# verse-structured documents through a domain-appropriate topic classifier.
+#
+# Format: flat mapping of topic_name -> list of keywords.
+# All matching is case-insensitive; multi-word phrases are matched as substrings.
+#
+# Coverage:
+#   Creation      — cosmogony, origins, making
+#   Covenant      — promises, oaths, blood rites, signs
+#   Law           — commandments, statutes, ordinances
+#   Prophecy      — oracles, visions, thus-saith formulae
+#   Gospel        — Jesus, kingdom preaching, salvation
+#   Epistle       — Pauline/general letter rhetoric
+#   Wisdom        — proverbs, practical ethics, fear of the Lord
+#   Lament        — grief, affliction, complaint psalms
+#   Praise        — worship, thanksgiving, hallelujah
+#   Narrative     — historical prose, war, kingship
+#   Apocalyptic   — visions, beasts, final judgment
+#   Ethics        — love, mercy, justice, forgiveness
+
+Creation:
+  - created
+  - creation
+  - beginning
+  - heaven and earth
+  - formed
+  - void
+  - darkness
+  - spirit of god
+  - breathed into
+  - dust of the ground
+  - let there be
+  - made the heaven
+
+Covenant:
+  - covenant
+  - promise
+  - oath
+  - swear
+  - everlasting covenant
+  - blood of the covenant
+  - sign of the covenant
+  - established my covenant
+  - keep my covenant
+  - covenant of peace
+  - new covenant
+
+Law:
+  - commandment
+  - statute
+  - ordinance
+  - shall not
+  - thou shalt not
+  - law of moses
+  - law of the lord
+  - transgress
+  - sabbath
+  - tithe
+  - unclean
+  - holy unto the lord
+  - abomination
+
+Prophecy:
+  - thus saith the lord
+  - thus saith
+  - behold the days come
+  - saith the lord
+  - vision
+  - prophesy
+  - thus speaketh
+  - oracle
+  - burden of the lord
+  - in that day
+  - word of the lord came
+  - speak unto the children of israel
+
+Gospel:
+  - jesus
+  - christ
+  - kingdom of god
+  - kingdom of heaven
+  - repent
+  - baptize
+  - baptism
+  - salvation
+  - grace
+  - son of god
+  - son of man
+  - good news
+  - gospel
+  - believe in him
+  - eternal life
+  - crucified
+  - resurrection
+
+Epistle:
+  - brethren
+  - therefore i beseech
+  - grace be unto you
+  - peace from god
+  - justified by faith
+  - sanctified
+  - holy spirit
+  - body of christ
+  - fellowship
+  - i write unto you
+  - greet one another
+  - in christ jesus
+
+Wisdom:
+  - wisdom
+  - understanding
+  - fear of the lord
+  - proverb
+  - heart of the wise
+  - counsel
+  - instruction
+  - folly
+  - knowledge
+  - discretion
+  - a wise man
+  - the fool
+
+Lament:
+  - cry
+  - mourn
+  - weep
+  - affliction
+  - sorrow
+  - forsake
+  - desolate
+  - grief
+  - anguish
+  - troubled
+  - my soul is
+  - how long o lord
+  - out of the depths
+  - cast me not off
+
+Praise:
+  - praise the lord
+  - praise ye the lord
+  - hallelujah
+  - bless the lord
+  - glorify
+  - exalt
+  - worship
+  - thanksgiving
+  - sing unto the lord
+  - make a joyful noise
+  - give thanks
+  - blessed is the man
+  - his mercy endureth
+
+Narrative:
+  - and it came to pass
+  - children of israel
+  - king of israel
+  - went up
+  - smote
+  - gathered together
+  - made war
+  - slew
+  - built an altar
+  - sojourned
+  - and the lord said unto
+  - rose up and went
+
+Apocalyptic:
+  - beast
+  - seal
+  - trumpet
+  - great tribulation
+  - dragon
+  - thousand years
+  - lake of fire
+  - white throne
+  - four horsemen
+  - mark of the beast
+  - new jerusalem
+  - armageddon
+  - book of life
+  - wrath of god
+  - revelation
+
+Ethics:
+  - love thy neighbour
+  - love your enemies
+  - do unto others
+  - mercy
+  - compassion
+  - forgive
+  - humble
+  - righteous
+  - just and true
+  - do justice
+  - kindness
+  - lay down his life
+  - blessed are the

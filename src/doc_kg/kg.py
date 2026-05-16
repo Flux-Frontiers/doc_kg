@@ -356,6 +356,10 @@ class DocKG:
     :param cooccur_window: Co-occurrence window metadata.
     :param topic_threshold: Topic confidence threshold.
     :param topics_file: Optional topic catalog file (JSON/YAML).
+    :param topics_file_map: Optional per-path-prefix topics catalog mapping.
+                            Keys are path prefixes matched against corpus-relative
+                            file paths (first match wins).
+                            Example: ``{"sacred-texts/": "topics/sacred-texts.yaml"}``.
     :param embedder: Optional embedding backend.  When provided, pre-sets ``_embedder``
                      so the lazy-init never fires ``SentenceTransformerEmbedder``.
                      Defaults to ``None`` (preserves existing behaviour).
@@ -381,6 +385,8 @@ class DocKG:
         cooccur_window: int = 1,
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
+        topics_file_map: dict[str, str] | None = None,
+        kmeans_model_path: str | None = None,
         exclude: set[str] | None = None,
         embedder: Embedder | None = None,
     ) -> None:
@@ -408,6 +414,8 @@ class DocKG:
         self.cooccur_window = cooccur_window
         self.topic_threshold = topic_threshold
         self.topics_file = topics_file
+        self.topics_file_map = topics_file_map
+        self.kmeans_model_path = kmeans_model_path
 
         # Lazy-initialised layers
         self._graph: DocGraph | None = None
@@ -438,6 +446,8 @@ class DocKG:
                 cooccur_window=self.cooccur_window,
                 topic_threshold=self.topic_threshold,
                 topics_file=self.topics_file,
+                topics_file_map=self.topics_file_map,
+                kmeans_model_path=self.kmeans_model_path,
             )
         return self._graph
 

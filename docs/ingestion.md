@@ -11,7 +11,7 @@ DocKG offers two ingestion paths: the **Core Build Pipeline** for fast, determin
 ```
                           ┌─────────────────────────────────────────┐
                           │            DOCUMENT CORPUS              │
-                          │        (.md, .txt, .rst files)          │
+                          │    (.md, .txt, .rst, .pdf files)        │
                           └─────────────┬───────────────────────────┘
                                         │
                   ┌─────────────────────┼─────────────────────┐
@@ -46,7 +46,7 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + LanceDB know
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 RAW CORPUS (.md / .txt / .rst)              │
+│             RAW CORPUS (.md / .txt / .rst / .pdf)           │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
@@ -101,7 +101,7 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + LanceDB know
 
 | Kind | ID Pattern | Description |
 |------|-----------|-------------|
-| `document` | `doc:<file_path>` | One per `.md`/`.txt` file |
+| `document` | `doc:<file_path>` | One per `.md`/`.txt`/`.rst`/`.pdf` file |
 | `section` | `sec:<file_path>:<slug>` | Markdown heading block |
 | `chunk` | `chunk:<file_path>:<0000>` | Semantic text block (~512 chars) |
 | `topic` | `topic:<slug>` | Classified topic label |
@@ -159,7 +159,7 @@ Deep NLP transformation pipeline inspired by diary_kg. Implements a 5-phase tran
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 RAW CORPUS (.md / .txt / .rst)              │
+│             RAW CORPUS (.md / .txt / .rst / .pdf)           │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
