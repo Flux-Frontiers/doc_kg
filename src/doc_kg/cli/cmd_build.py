@@ -297,20 +297,24 @@ def build(
     _console.print(f"  {'─' * 19}")
     _console.print(f"  {'nodes':<12} {graph_stats.total_nodes:>6}  edges {graph_stats.total_edges}")
 
-    # Step 2: SQLite → LanceDB + SIMILAR_TO
-    _console.print("\n[bold][2/2][/bold] Embedding nodes \u2192 vector index \u2026")
-    idx_stats = kg.index.build(
-        kg.store,
+    # Step 2a: SQLite → JSON embedding cache (embedding only, no LanceDB writes)
+    cache_path = kg.db_path.parent / "embeddings.json"
+    _console.print("\n[bold][2/3][/bold] Embedding nodes \u2192 JSON cache \u2026")
+    kg.build_embeddings(out=cache_path, quiet=False)
+
+    # Step 2b: JSON cache → LanceDB + SIMILAR_TO (no embedder in memory)
+    _console.print("\n[bold][3/3][/bold] JSON cache \u2192 vector index \u2026")
+    idx_stats = kg.build_index_from_cache(
+        cache_path=cache_path,
         wipe=wipe,
         discover_similar=not no_similar,
         similar_k=similar_k,
         similarity_edge_threshold=similar_threshold,
-        quiet=False,
     )
-    _console.print(f"  model    : {idx_stats['model_name']}  dim={idx_stats['dim']}")
-    _console.print(f"  indexed  : {idx_stats['indexed_rows']} vectors")
+    _console.print(f"  model    : {kg.model_name}  dim={idx_stats.index_dim}")
+    _console.print(f"  indexed  : {idx_stats.indexed_rows} vectors")
     if not no_similar:
-        _console.print(f"  SIMILAR_TO: {idx_stats.get('similar_edges_added', 0)} edges")
+        _console.print(f"  SIMILAR_TO: {idx_stats.similar_edges_added or 0} edges")
 
     _console.print("\n[green]Build complete.[/green]")
     kg.close()
