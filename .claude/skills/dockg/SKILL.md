@@ -92,6 +92,9 @@ The knowledge graph is a snapshot of the corpus at build time. It does **not** u
 
 | Command | Purpose |
 |---|---|
+| `dockg build-index` | Rebuild LanceDB index from existing SQLite (wipes by default; use `--update` to keep) |
+| `dockg build-index --no-similar` | Skip SIMILAR_TO edge discovery |
+| `dockg build-index --encode-batch N` | Embedding batch size (default: 1024; lower to reduce RAM on large corpora) |
 | `dockg query <QUERY>` | Hybrid semantic + graph query, prints ranked result summary |
 | `dockg pack <QUERY>` | Hybrid query + text excerpt pack, outputs Markdown or JSON |
 | `dockg analyze` | Structural analysis — metrics, coverage, hotspots, orphaned nodes |
@@ -102,6 +105,57 @@ The knowledge graph is a snapshot of the corpus at build time. It does **not** u
 | `dockg snapshot show <commit>` | Full details for a single snapshot |
 | `dockg snapshot diff <a> <b>` | Compare two snapshots side-by-side |
 | `dockg mcp` | Start the MCP server (stdio transport) |
+
+## Verse Corpus Ingestion (KJV Bible, Quran, Sacred Texts)
+
+DocKG auto-detects `chapter:verse`-structured files and uses `VerseChunker` automatically.
+
+### 5-Phase Workflow
+
+```bash
+# Phase 1 — discover topics from corpus (K-means on embeddings)
+dockg pipeline discover-topics --repo /path/to/corpus --n-clusters 16
+
+# Phase 2 — review/rename cluster labels in discovered_topics.yaml
+
+# Phase 3 — build graph with embedding-based topic assignment (~100% coverage)
+dockg build-graph /path/to/corpus \
+    --chunk-strategy verse \
+    --kmeans-model /path/to/corpus/discovered_topics.kmeans.joblib
+
+# Phase 4 — build LanceDB index (wipes by default)
+dockg build-index --repo /path/to/corpus
+
+# Phase 5 — query
+dockg pack "covenant and sacrifice"
+```
+
+### Key Options
+
+| Option | Purpose |
+|---|---|
+| `--chunk-strategy verse` | Force verse chunker (auto-detected by default) |
+| `--kmeans-model FILE` | Use embedding-based topic assignment (~100% coverage vs ~7% keyword) |
+| `--topics-file FILE` | Use keyword-based YAML topic catalog |
+| `--n-clusters N` | Number of K-means topic clusters (default: 16) |
+
+### Verse Chunk Metadata
+
+Verse chunks carry five extra fields: `content_type="verse"`, `book`, `chapter`, `verse_start`, `verse_end`.
+
+## Large Corpus Tips (>100K nodes)
+
+For very large corpora, tune `build-index` to avoid OOM:
+
+```bash
+# Reduce encode batch size if embedding OOMs (default: 1024)
+dockg build-index --encode-batch 256
+
+# Skip SIMILAR_TO on first pass, add later
+dockg build-index --no-similar
+```
+
+The indexer streams nodes from SQLite in `--encode-batch` pages — it never loads the full node list into RAM.
 
 ## Multipass Analysis Pipeline
 
@@ -114,6 +168,7 @@ DocKG includes a diary_kg-style multipass analysis pipeline for deep NLP transfo
 | `dockg pipeline run` | 5-phase analysis: sampling → chunking → classification → memory → output |
 | `dockg pipeline embed` | Multi-process corpus embedding (BAAI/bge-small-en-v1.5, 384-d) |
 | `dockg pipeline manifold` | Intrinsic dimensionality, PCA elbow, MRL truncation quality |
+| `dockg pipeline discover-topics` | K-means topic discovery — writes YAML catalog + `.kmeans.joblib` model |
 
 ### The 5 Phases
 

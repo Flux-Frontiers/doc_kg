@@ -26,6 +26,8 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rich.console import Console
+
 from doc_kg.dockg import DocEdge, DocNode
 
 # ---------------------------------------------------------------------------
@@ -232,8 +234,6 @@ class GraphStore:
         """
         if wipe:
             if not quiet:
-                from rich.console import Console  # pylint: disable=import-outside-toplevel
-
                 Console().print("  Clearing existing graph\u2026")
             self.clear()
         self._upsert_nodes(nodes, quiet=quiet, batch_size=batch_size)
@@ -418,31 +418,49 @@ class GraphStore:
         self.con.execute("DROP TABLE IF EXISTS _tmp_nids;")
         self.con.execute("CREATE TEMP TABLE _tmp_nids (id TEXT PRIMARY KEY);")
         self.con.executemany("INSERT INTO _tmp_nids (id) VALUES (?)", [(i,) for i in node_ids])
-        rows = self.con.execute(
-            """
+        rows = self.con.execute("""
             SELECT n.id, n.kind, n.name, n.title, n.file_path,
                    n.char_start, n.char_end, n.heading_level, n.text,
                    n.content_type, n.book, n.chapter, n.verse_start, n.verse_end
             FROM nodes n
             JOIN _tmp_nids t ON t.id = n.id
-            """
-        ).fetchall()
+            """).fetchall()
         return {r[0]: _row_to_node(r) for r in rows}
 
     # ------------------------------------------------------------------
     # Read — filtered node lists
     # ------------------------------------------------------------------
 
+    def count_nodes(self, *, kinds: Sequence[str] | None = None) -> int:
+        """Return total count of nodes matching optional kind filter.
+
+        :param kinds: Restrict to these node kinds.
+        :return: Row count.
+        """
+        if kinds:
+            placeholders = ",".join("?" for _ in kinds)
+            row = self.con.execute(
+                f"SELECT COUNT(*) FROM nodes WHERE kind IN ({placeholders})",
+                list(kinds),
+            ).fetchone()
+        else:
+            row = self.con.execute("SELECT COUNT(*) FROM nodes").fetchone()
+        return int(row[0]) if row else 0
+
     def query_nodes(
         self,
         *,
         kinds: Sequence[str] | None = None,
         file_path: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict]:
         """Return nodes matching optional filters.
 
         :param kinds: Restrict to these node kinds (e.g. ``["chunk", "section"]``).
         :param file_path: Restrict to nodes in this file path (exact match).
+        :param limit: Maximum rows to return (``None`` = all).
+        :param offset: Row offset for pagination.
         :return: List of node dicts.
         """
         clauses: list[str] = []
@@ -458,7 +476,44 @@ class GraphStore:
             params.append(file_path)
 
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        page = ""
+        if limit is not None:
+            page = f"LIMIT {int(limit)} OFFSET {int(offset)}"
+
         rows = self.con.execute(
+            f"""
+            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
+                   content_type, book, chapter, verse_start, verse_end
+            FROM nodes {where}
+            ORDER BY file_path, char_start
+            {page}
+            """,
+            params,
+        ).fetchall()
+        return [_row_to_node(r) for r in rows]
+
+    def iter_nodes(
+        self,
+        *,
+        kinds: Sequence[str] | None = None,
+        batch_size: int = 512,
+    ):
+        """Yield node dicts in batches without loading all rows into RAM.
+
+        :param kinds: Restrict to these node kinds.
+        :param batch_size: Rows per batch.
+        :return: Generator of ``list[dict]`` batches.
+        """
+        clauses: list[str] = []
+        params: list[object] = []
+
+        if kinds:
+            placeholders = ",".join("?" for _ in kinds)
+            clauses.append(f"kind IN ({placeholders})")
+            params.extend(kinds)
+
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        cursor = self.con.execute(
             f"""
             SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
                    content_type, book, chapter, verse_start, verse_end
@@ -466,8 +521,13 @@ class GraphStore:
             ORDER BY file_path, char_start
             """,
             params,
-        ).fetchall()
-        return [_row_to_node(r) for r in rows]
+        )
+
+        while True:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
+                break
+            yield [_row_to_node(r) for r in rows]
 
     # ------------------------------------------------------------------
     # Read — edges
@@ -485,14 +545,12 @@ class GraphStore:
         self.con.execute("DROP TABLE IF EXISTS _tmp_ids;")
         self.con.execute("CREATE TEMP TABLE _tmp_ids (id TEXT PRIMARY KEY);")
         self.con.executemany("INSERT INTO _tmp_ids (id) VALUES (?)", [(i,) for i in node_ids])
-        rows = self.con.execute(
-            """
+        rows = self.con.execute("""
             SELECT e.src, e.rel, e.dst, e.evidence
             FROM edges e
             JOIN _tmp_ids s ON s.id = e.src
             JOIN _tmp_ids d ON d.id = e.dst
-            """
-        ).fetchall()
+            """).fetchall()
         return [{"src": r[0], "rel": r[1], "dst": r[2], "evidence": r[3]} for r in rows]
 
     def edges_from(

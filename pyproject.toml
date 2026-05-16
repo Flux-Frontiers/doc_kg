@@ -49,7 +49,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.14.0"
+version = "0.15.0"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -184,8 +184,7 @@ include = ["src"]
 
 [tool.dockg]
 exclude = [
-    ".dockg", ".pycodekg", ".git", ".mypy_cache", ".pytest_cache", ".venv",
-    "__pycache__", "bundles", "dist", "src", "venv", "benchmarks",
+    ".dockg", ".pycodekg", ".git", ".mypy_cache", "src", "venv", "benchmarks", "corpus",
 ]
 
 # ---------------------------------------------------------------------------

@@ -25,7 +25,7 @@ from typing import Any
 
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.graph import DocGraph
-from doc_kg.index import Embedder, SemanticIndex, SentenceTransformerEmbedder
+from doc_kg.index import Embedder, SemanticIndex, make_embedder
 from doc_kg.store import DEFAULT_RELS, GraphStore, ProvMeta
 
 # ---------------------------------------------------------------------------
@@ -363,6 +363,7 @@ class DocKG:
     :param embedder: Optional embedding backend.  When provided, pre-sets ``_embedder``
                      so the lazy-init never fires ``SentenceTransformerEmbedder``.
                      Defaults to ``None`` (preserves existing behaviour).
+    :param device: Embedding device override: ``auto`` (default), ``cpu``, ``mps``, ``cuda``.
     """
 
     def __init__(
@@ -389,6 +390,7 @@ class DocKG:
         kmeans_model_path: str | None = None,
         exclude: set[str] | None = None,
         embedder: Embedder | None = None,
+        device: str = "auto",
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.exclude: set[str] = exclude or set()
@@ -401,6 +403,7 @@ class DocKG:
             else self.corpus_root / ".dockg" / "lancedb"
         )
         self.model_name = model
+        self.device = device
         self.table_name = table
         self.chunk_strategy = chunk_strategy
         self.sentences_per_chunk = sentences_per_chunk
@@ -462,7 +465,7 @@ class DocKG:
     def embedder(self) -> Embedder:
         """Embedding backend (lazy)."""
         if self._embedder is None:
-            self._embedder = SentenceTransformerEmbedder(self.model_name)
+            self._embedder = make_embedder(self.model_name, device=self.device)
         return self._embedder
 
     @property
