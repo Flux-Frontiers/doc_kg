@@ -49,6 +49,12 @@ class DocGraph:
     :param cooccur_window: Co-occurrence window metadata.
     :param topic_threshold: Topic confidence threshold.
     :param topics_file: Optional topics file path (JSON/YAML).
+    :param topics_file_map: Optional per-path-prefix topics catalog mapping.
+                            Keys are path prefixes matched against corpus-relative
+                            file paths (first match wins).
+                            Example: ``{"sacred-texts/": "topics/sacred-texts.yaml"}``.
+    :param kmeans_model_path: Path to a ``*.kmeans.joblib`` file from ``discover_topics()``.
+                              When set, uses embedding-based K-means assignment for all chunks.
     """
 
     def __init__(
@@ -70,6 +76,8 @@ class DocGraph:
         cooccur_window: int = 1,
         topic_threshold: float = 0.2,
         topics_file: str | None = None,
+        topics_file_map: dict[str, str] | None = None,
+        kmeans_model_path: str | None = None,
     ) -> None:
         self.corpus_root: Path = Path(corpus_root).resolve()
         self.extensions = extensions
@@ -87,6 +95,8 @@ class DocGraph:
         self.cooccur_window = cooccur_window
         self.topic_threshold = topic_threshold
         self.topics_file = topics_file
+        self.topics_file_map = topics_file_map
+        self.kmeans_model_path = kmeans_model_path
 
         self._nodes: list[DocNode] | None = None
         self._edges: list[DocEdge] | None = None
@@ -120,6 +130,8 @@ class DocGraph:
                 cooccur_window=self.cooccur_window,
                 topic_threshold=self.topic_threshold,
                 topics_file=self.topics_file,
+                topics_file_map=self.topics_file_map,
+                kmeans_model_path=self.kmeans_model_path,
                 quiet=quiet,
             )
         return self

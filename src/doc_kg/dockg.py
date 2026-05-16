@@ -75,6 +75,12 @@ class DocNode:
     :param char_end: End character offset
     :param heading_level: Markdown heading level (1–6) for section nodes; None otherwise
     :param text: Raw text content of this node
+    :param content_type: Content kind — ``"prose"``, ``"verse"``, ``"poetry"``,
+                         ``"diary"``, or ``None`` for unspecified.
+    :param book: Canonical book name for verse content (e.g. ``"Genesis"``).
+    :param chapter: Chapter number for verse content.
+    :param verse_start: First verse number in this chunk.
+    :param verse_end: Last verse number in this chunk.
     """
 
     id: str
@@ -86,6 +92,11 @@ class DocNode:
     char_end: int | None
     heading_level: int | None
     text: str | None
+    content_type: str | None = None
+    book: str | None = None
+    chapter: int | None = None
+    verse_start: int | None = None
+    verse_end: int | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +268,8 @@ def parse_corpus(
     cooccur_window: int = 1,
     topic_threshold: float = 0.2,
     topics_file: str | None = None,
+    topics_file_map: dict[str, str] | None = None,
+    kmeans_model_path: str | Path | None = None,
     quiet: bool = False,
 ) -> tuple[list[DocNode], list[DocEdge]]:
     """Extract a document knowledge graph from a corpus directory.
@@ -276,8 +289,10 @@ def parse_corpus(
     :param corpus_root: Root directory of the corpus.
     :param extensions: File extensions to include (default: .md, .txt, .rst).
     :param exclude: Extra directory names to skip.
-    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
-    :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
+    :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``,
+                           ``"fixed"``, or ``"verse"``.
+    :param sentences_per_chunk: Sentences per chunk for the ``sentence_group``
+                                strategy; verses per chunk for ``"verse"``.
     :param chunk_size: Approximate maximum characters per chunk.
     :param chunk_overlap: Character overlap between consecutive chunks.
     :param similarity_threshold: Cosine-similarity threshold for semantic split detection.
@@ -290,11 +305,26 @@ def parse_corpus(
                          noisy and dense; use MemoryKG for semantic memory instead).
     :param cooccur_window: Reserved for future windowed co-occurrence expansion.
     :param topic_threshold: Topic confidence threshold in [0, 1].
-    :param topics_file: Optional topics catalog (JSON/YAML).
+    :param topics_file: Optional global topics catalog (JSON/YAML).
+    :param topics_file_map: Optional per-path-pattern topics catalog mapping.
+                            Keys are glob-style prefixes matched against the
+                            corpus-relative file path (first match wins).
+                            Example: ``{"sacred-texts/": "topics/sacred-texts.topics.yaml"}``.
+                            Matched entries override *topics_file* for those files.
+    :param kmeans_model_path: Path to a ``*.kmeans.joblib`` file produced by
+                              ``discover_topics()``.  When provided, each chunk is embedded
+                              at build time and assigned to the nearest K-means centroid.
+                              This gives near-100% topic coverage without keyword matching
+                              and overrides *topics_file* / *topics_file_map* for chunks.
     :param quiet: Suppress progress output (default: ``False``).
     :return: ``(nodes, edges)`` tuple.
     """
-    from doc_kg.chunker import chunker_for  # pylint: disable=import-outside-toplevel
+    from doc_kg.chunker import (  # pylint: disable=import-outside-toplevel
+        SentenceGroupChunker,
+        TextChunker,
+        VerseChunker,
+        chunker_for,
+    )
 
     nodes: dict[str, DocNode] = {}
     edges: dict[tuple[str, str, str], DocEdge] = {}
@@ -309,6 +339,30 @@ def parse_corpus(
     )
 
     topic_extractor = TopicExtractor(topics_file=topics_file) if enable_topics else None
+
+    # Cache for per-path TopicExtractor instances keyed by resolved YAML path
+    _te_cache: dict[str | None, TopicExtractor | None] = {topics_file: topic_extractor}
+
+    # K-means embedding-based topic assignment (optional; overrides keyword matching)
+    _kmeans_data: dict | None = None
+    _kmeans_embedder = None
+    if kmeans_model_path is not None and enable_topics:
+        try:
+            import joblib  # pylint: disable=import-outside-toplevel
+            import numpy as _np  # pylint: disable=import-outside-toplevel
+            from kg_utils.embedder import (  # pylint: disable=import-outside-toplevel
+                SentenceTransformerEmbedder as _STE,
+            )
+            from sklearn.preprocessing import (  # pylint: disable=import-outside-toplevel
+                normalize as _sk_normalize,
+            )
+        except ImportError as _exc:
+            raise ImportError(
+                "kmeans_model_path requires scikit-learn, numpy, joblib, and kg_utils. "
+                "Install with: pip install scikit-learn joblib"
+            ) from _exc
+        _kmeans_data = joblib.load(kmeans_model_path)
+        _kmeans_embedder = _STE(_kmeans_data.get("model_name", DEFAULT_MODEL))
 
     files = iter_text_files(corpus_root, extensions=extensions, exclude=exclude)
 
@@ -380,8 +434,37 @@ def parse_corpus(
                 text=raw_text[:512],  # keep first 512 chars as document summary
             )
 
+            # Auto-detect verse documents when strategy is not already "verse"
+            active_chunker: TextChunker | SentenceGroupChunker | VerseChunker
+            if chunk_strategy != "verse" and VerseChunker.is_verse_document(raw_text):
+                active_chunker = VerseChunker(
+                    verses_per_chunk=sentences_per_chunk,
+                    min_chunk_chars=30,
+                )
+            else:
+                active_chunker = chunker
+
+            # Resolve per-file topics catalog via topics_file_map (first prefix match wins)
+            file_topic_extractor = topic_extractor
+            if enable_topics and topics_file_map:
+                for prefix, tf_path in topics_file_map.items():
+                    if file_path.startswith(prefix):
+                        if tf_path not in _te_cache:
+                            _te_cache[tf_path] = TopicExtractor(topics_file=tf_path)
+                        file_topic_extractor = _te_cache[tf_path]
+                        break
+
             # Chunk the document (returns structured chunks with section info)
-            chunks = chunker.chunk(raw_text, file_path=file_path)
+            chunks = active_chunker.chunk(raw_text, file_path=file_path)
+
+            # Batch K-means topic assignment for this file (embedding-based, near-100% coverage)
+            _chunk_kmeans_topics: list[str | None] = []
+            if _kmeans_data is not None and chunks:
+                batch_texts = [c["text"] for c in chunks]
+                raw_embs = _kmeans_embedder.embed_texts(batch_texts)  # type: ignore[union-attr]
+                arr = _sk_normalize(_np.asarray(raw_embs, dtype="float32"))  # type: ignore[name-defined]
+                cluster_idxs = _kmeans_data["kmeans"].predict(arr)
+                _chunk_kmeans_topics = [_kmeans_data["labels"][int(i)] for i in cluster_idxs]
 
             # Track the previous chunk id per section for NEXT edges
             prev_chunk_id: str | None = None
@@ -389,13 +472,19 @@ def parse_corpus(
             global_chunk_idx = 0
             section_nodes: dict[str, str] = {}  # slug → section_node_id
 
-            for chunk_info in chunks:
+            for _ci, chunk_info in enumerate(chunks):
                 section_title = chunk_info.get("section_title")
                 section_level = chunk_info.get("section_level", 1)
                 text = chunk_info["text"]
                 char_start = chunk_info.get("char_start", 0)
                 char_end = chunk_info.get("char_end", len(text))
                 references = chunk_info.get("references", [])
+                # Verse metadata (None for non-verse documents)
+                content_type = chunk_info.get("content_type")
+                verse_book = chunk_info.get("book")
+                verse_chapter = chunk_info.get("chapter")
+                verse_start = chunk_info.get("verse_start")
+                verse_end = chunk_info.get("verse_end")
 
                 # Create/reuse section node
                 if section_title:
@@ -435,6 +524,11 @@ def parse_corpus(
                     char_end=char_end,
                     heading_level=None,
                     text=text,
+                    content_type=content_type,
+                    book=verse_book,
+                    chapter=verse_chapter,
+                    verse_start=verse_start,
+                    verse_end=verse_end,
                 )
 
                 # section/document → chunk CONTAINS edge
@@ -467,8 +561,31 @@ def parse_corpus(
                 # Semantic nodes/edges (topic/entity/keyword + co-occurrence)
                 semantic_ids: list[str] = []
 
-                if topic_extractor is not None:
-                    topic_matches = topic_extractor.classify(
+                _kmeans_topic = _chunk_kmeans_topics[_ci] if _chunk_kmeans_topics else None
+                if _kmeans_topic is not None:
+                    # Embedding-based K-means assignment (near-100% coverage)
+                    topic_id = stable_topic_id(_kmeans_topic)
+                    semantic_ids.append(topic_id)
+                    if topic_id not in nodes:
+                        nodes[topic_id] = DocNode(
+                            id=topic_id,
+                            kind="topic",
+                            name=_kmeans_topic,
+                            title=_kmeans_topic,
+                            file_path=None,
+                            char_start=None,
+                            char_end=None,
+                            heading_level=None,
+                            text=None,
+                        )
+                    edges[(chunk_id, "HAS_TOPIC", topic_id)] = DocEdge(
+                        src=chunk_id,
+                        rel="HAS_TOPIC",
+                        dst=topic_id,
+                        evidence={"method": "kmeans"},
+                    )
+                elif file_topic_extractor is not None:
+                    topic_matches = file_topic_extractor.classify(
                         text,
                         threshold=topic_threshold,
                         top_k=3,
@@ -522,8 +639,8 @@ def parse_corpus(
                             evidence={"source": "titlecase+acronym"},
                         )
 
-                if topic_extractor is not None and enable_keywords:
-                    keywords = topic_extractor.extract_keywords(text, max_keywords=4)
+                if file_topic_extractor is not None and enable_keywords:
+                    keywords = file_topic_extractor.extract_keywords(text, max_keywords=4)
                     for keyword in keywords:
                         kw_id = stable_keyword_id(keyword)
                         if kw_id not in nodes:

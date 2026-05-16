@@ -45,7 +45,12 @@ CREATE TABLE IF NOT EXISTS nodes (
   char_start    INTEGER,
   char_end      INTEGER,
   heading_level INTEGER,
-  text          TEXT
+  text          TEXT,
+  content_type  TEXT,
+  book          TEXT,
+  chapter       INTEGER,
+  verse_start   INTEGER,
+  verse_end     INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -152,6 +157,19 @@ class GraphStore:
                 check_same_thread=False,
             )
             self._con.executescript(_SCHEMA_SQL)
+            # Migrate existing DBs: add verse columns if they don't exist yet
+            for col, typ in [
+                ("content_type", "TEXT"),
+                ("book", "TEXT"),
+                ("chapter", "INTEGER"),
+                ("verse_start", "INTEGER"),
+                ("verse_end", "INTEGER"),
+            ]:
+                try:
+                    self._con.execute(f"ALTER TABLE nodes ADD COLUMN {col} {typ}")
+                    self._con.commit()
+                except Exception:  # pylint: disable=broad-exception-caught  # column already exists — sqlite3.OperationalError
+                    pass
         return self._con
 
     def close(self) -> None:
@@ -263,8 +281,9 @@ class GraphStore:
                 self.con.executemany(
                     """
                     INSERT INTO nodes
-                      (id, kind, name, title, file_path, char_start, char_end, heading_level, text)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      (id, kind, name, title, file_path, char_start, char_end, heading_level,
+                       text, content_type, book, chapter, verse_start, verse_end)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                       kind=excluded.kind,
                       name=excluded.name,
@@ -273,7 +292,12 @@ class GraphStore:
                       char_start=excluded.char_start,
                       char_end=excluded.char_end,
                       heading_level=excluded.heading_level,
-                      text=excluded.text
+                      text=excluded.text,
+                      content_type=excluded.content_type,
+                      book=excluded.book,
+                      chapter=excluded.chapter,
+                      verse_start=excluded.verse_start,
+                      verse_end=excluded.verse_end
                     """,
                     [
                         (
@@ -286,6 +310,11 @@ class GraphStore:
                             n.char_end,
                             n.heading_level,
                             n.text,
+                            n.content_type,
+                            n.book,
+                            n.chapter,
+                            n.verse_start,
+                            n.verse_end,
                         )
                         for n in batch
                     ],
@@ -370,7 +399,8 @@ class GraphStore:
         """
         row = self.con.execute(
             """
-            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text
+            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
+                   content_type, book, chapter, verse_start, verse_end
             FROM nodes WHERE id = ?
             """,
             (node_id,),
@@ -391,7 +421,8 @@ class GraphStore:
         rows = self.con.execute(
             """
             SELECT n.id, n.kind, n.name, n.title, n.file_path,
-                   n.char_start, n.char_end, n.heading_level, n.text
+                   n.char_start, n.char_end, n.heading_level, n.text,
+                   n.content_type, n.book, n.chapter, n.verse_start, n.verse_end
             FROM nodes n
             JOIN _tmp_nids t ON t.id = n.id
             """
@@ -429,7 +460,8 @@ class GraphStore:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = self.con.execute(
             f"""
-            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text
+            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
+                   content_type, book, chapter, verse_start, verse_end
             FROM nodes {where}
             ORDER BY file_path, char_start
             """,
@@ -603,7 +635,7 @@ class GraphStore:
 
 def _row_to_node(row: tuple) -> dict:
     """Convert a raw SQLite row into a node dict."""
-    return {
+    d = {
         "id": row[0],
         "kind": row[1],
         "name": row[2],
@@ -614,3 +646,11 @@ def _row_to_node(row: tuple) -> dict:
         "heading_level": row[7],
         "text": row[8],
     }
+    # Verse metadata columns (present in schema v2+; None for older rows)
+    if len(row) > 9:
+        d["content_type"] = row[9]
+        d["book"] = row[10]
+        d["chapter"] = row[11]
+        d["verse_start"] = row[12]
+        d["verse_end"] = row[13]
+    return d

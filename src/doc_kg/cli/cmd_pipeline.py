@@ -4,9 +4,10 @@ cmd_pipeline.py
 CLI commands for the multipass analysis pipeline.
 
 Commands:
-    dockg pipeline run       — Run the 5-phase analysis pipeline
-    dockg pipeline embed     — Multi-process corpus embedding
-    dockg pipeline manifold  — Manifold & MRL analysis on embeddings
+    dockg pipeline run             — Run the 5-phase analysis pipeline
+    dockg pipeline embed           — Multi-process corpus embedding
+    dockg pipeline manifold        — Manifold & MRL analysis on embeddings
+    dockg pipeline discover-topics — K-means + TF-IDF topic catalog discovery
 
 Author: Eric G. Suchanek, PhD
 """
@@ -340,3 +341,93 @@ def pipeline_manifold(
     else:
         console.print()
         console.print(formatted)
+
+
+# ---------------------------------------------------------------------------
+# pipeline discover-topics
+# ---------------------------------------------------------------------------
+
+
+@pipeline.command("discover-topics")
+@repo_option
+@click.option(
+    "--output",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Output YAML path (default: <repo>/discovered_topics.yaml).",
+)
+@click.option(
+    "--n-clusters",
+    type=int,
+    default=16,
+    show_default=True,
+    help="Number of K-means clusters (= topics in the output catalog).",
+)
+@click.option(
+    "--n-keywords",
+    type=int,
+    default=15,
+    show_default=True,
+    help="Top TF-IDF keywords to retain per cluster.",
+)
+@click.option(
+    "--chunk-strategy",
+    type=click.Choice(["auto", "verse", "sentence_group"]),
+    default="auto",
+    show_default=True,
+    help=(
+        "'auto' detects verse documents automatically. "
+        "'verse' forces verse mode. 'sentence_group' uses sentence groups."
+    ),
+)
+@click.option(
+    "--sentences",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Verses (or sentences) per chunk.",
+)
+@pipeline_model_option
+@click.option("--quiet", is_flag=True, help="Suppress Rich console output.")
+def pipeline_discover_topics(
+    repo: str,
+    output: str | None,
+    n_clusters: int,
+    n_keywords: int,
+    chunk_strategy: str,
+    sentences: int,
+    model: str,
+    quiet: bool,
+) -> None:
+    """Discover topics from a corpus via K-means + TF-IDF.
+
+    Chunks the corpus, embeds each chunk, clusters with K-means, then extracts
+    the top discriminative TF-IDF terms per cluster.  Writes a YAML catalog
+    ready for use with ``build-graph --topics-file``.
+
+    Workflow:
+
+    \b
+        # 1. Discover topics
+        dockg pipeline discover-topics --repo /path/to/corpus \\
+            --n-clusters 20 --output my_topics.yaml
+
+        # 2. Review/rename clusters in my_topics.yaml, then:
+        dockg build-graph --repo /path/to/corpus \\
+            --topics-file my_topics.yaml --chunk-strategy verse
+    """
+    from doc_kg.discover_topics import discover_topics  # pylint: disable=import-outside-toplevel
+
+    corpus_root = Path(repo).resolve()
+    out = Path(output) if output else None
+
+    discover_topics(
+        corpus_root,
+        output_path=out,
+        n_clusters=n_clusters,
+        n_keywords=n_keywords,
+        chunk_strategy=chunk_strategy,
+        sentences_per_chunk=sentences,
+        model=model,
+        quiet=quiet,
+    )  # returns (yaml_path, kmeans_path) — output already printed by discover_topics

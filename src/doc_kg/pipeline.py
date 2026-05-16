@@ -42,7 +42,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from doc_kg.chunker import SentenceGroupChunker, TextChunker, chunker_for
+from doc_kg.chunker import SentenceGroupChunker, TextChunker, VerseChunker, chunker_for
 from doc_kg.dockg import iter_text_files
 from doc_kg.embedder_worker import PIPELINE_MODEL
 from doc_kg.entry_chunk import EntryChunk, SourceProvenance, make_chunk_id
@@ -248,7 +248,7 @@ class AnalysisPipeline:
         Returns a list of dicts with chunk text plus provenance metadata.
         """
         cfg = self.config
-        chunker: TextChunker | SentenceGroupChunker = chunker_for(
+        chunker: TextChunker | SentenceGroupChunker | VerseChunker = chunker_for(
             cfg.chunk_strategy,
             sentences_per_chunk=cfg.sentences_per_chunk,
             chunk_size=cfg.chunk_size,

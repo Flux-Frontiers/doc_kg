@@ -1,7 +1,7 @@
 # DocKG Query Cheatsheet
 
 A practical reference for the four MCP tools, with examples drawn from document corpora.
-All queries below work against a live DocKG knowledge graph built from `.md` and `.txt` files.
+All queries below work against a live DocKG knowledge graph built from `.md`, `.txt`, `.rst`, and `.pdf` files.
 
 ---
 
@@ -217,7 +217,7 @@ get_node("entity:postgresql")
 
 | Kind | ID prefix | Description |
 |---|---|---|
-| `document` | `document:<file>` | Top-level document (one per `.md` or `.txt` file) |
+| `document` | `document:<file>` | Top-level document (one per `.md`, `.txt`, `.rst`, or `.pdf` file) |
 | `section` | `section:<file>:<slug>` | Markdown heading block or text division |
 | `chunk` | `chunk:<file>:<index>` | Text fragment (≈512 chars, overlapping) |
 | `topic` | `topic:<slug>` | Inferred topic category (e.g., `topic:api`) |
@@ -309,7 +309,7 @@ query_docs("chunk text", rels="CONTAINS,NEXT")
 
 ## 8. Excluding Directories from Indexing
 
-By default, DocKG indexes all `.md` and `.txt` files and skips common directories (`.git`, `.venv`, `__pycache__`, etc.).
+By default, DocKG indexes all `.md`, `.txt`, `.rst`, and `.pdf` files and skips common directories (`.git`, `.venv`, `__pycache__`, etc.).
 
 **Why exclude?** Archive directories, drafts, and vendored docs pollute the graph with irrelevant nodes.
 
@@ -330,7 +330,90 @@ Both options are additive — CLI flags extend `pyproject.toml` excludes.
 
 ---
 
-## 9. Multipass Analysis Pipeline
+## 9. Verse Corpus Ingestion
+
+For sacred texts and other `chapter:verse`-structured documents (KJV Bible, Quran, Vedas, etc.),
+DocKG provides a specialized verse ingestion pipeline that achieves near-100% topic coverage
+via corpus-derived K-means clustering.
+
+### Why a Specialized Workflow?
+
+Standard keyword topic catalogs cover only ~7% of verse chunks — KJV vocabulary ("lord", "unto",
+"saith") overwhelms normal keyword matching. The verse pipeline solves this with embedding-based
+topic assignment: every chunk is embedded and assigned to its nearest K-means centroid.
+
+### Step 1 — Discover Topics
+
+```bash
+dockg pipeline discover-topics \
+  --repo /path/to/corpus \
+  --output discovered_topics.yaml \
+  --n-clusters 16 \
+  --chunk-strategy verse \
+  --sentences 5
+```
+
+Chunks the corpus → embeds all chunks → fits K-means → extracts per-cluster keywords.
+Writes two files: a human-readable YAML catalog and a `*.kmeans.joblib` model.
+
+**Choosing `--n-clusters`:** Start at 16 for a large corpus (e.g., the 66-book KJV Bible).
+Too few clusters blend distinct themes; too many fragment coherent books. Inspect the
+cluster keyword table in the output and merge/split as needed.
+
+### Step 2 — (Optional) Review and Rename the YAML
+
+Open `discovered_topics.yaml` and rename `cluster_NN` keys to descriptive labels
+(e.g., `cluster_11` → `psalms_devotional`). The numeric labels work fine for querying.
+
+### Step 3 — Build the Graph
+
+```bash
+dockg build-graph \
+  --repo /path/to/corpus \
+  --chunk-strategy verse \
+  --kmeans-model discovered_topics.kmeans.joblib
+```
+
+Or build graph + vector index together:
+
+```bash
+dockg build \
+  --repo /path/to/corpus \
+  --chunk-strategy verse \
+  --kmeans-model discovered_topics.kmeans.joblib
+```
+
+**Topic coverage comparison:**
+
+| Method | Coverage |
+|---|---|
+| Default keyword catalog | ~7% |
+| `--topics-file` (user YAML) | ~15–40% |
+| `--kmeans-model` | **~100%** |
+
+### Step 4 — Query
+
+```bash
+dockg query "covenant law commandment"
+dockg pack "psalms praise worship" --top 10
+```
+
+```python
+# MCP — find chunks in the wisdom/poetry cluster
+query_docs("fool vanity wisdom folly", rels="HAS_TOPIC")
+```
+
+### Verse Chunk Metadata
+
+Every verse chunk carries structured fields: `content_type`, `book`, `chapter`,
+`verse_start`, `verse_end` — stored in SQLite and queryable.
+
+See [`docs/verse_workflow.md`](verse_workflow.md) for the full workflow with
+infographic-ready diagrams, schema reference, and troubleshooting guide.
+
+---
+
+## 10. Multipass Analysis Pipeline
 
 DocKG also includes a diary_kg-style multipass pipeline for deep NLP analysis. This is complementary to the core build and MCP tools.
 
@@ -369,7 +452,7 @@ See `docs/ingestion.md` for the full ingestion architecture.
 
 ---
 
-## 10. This Corpus Live Stats
+## 11. This Corpus Live Stats
 
 ```
 Nodes: 1,500   (document: 12 · section: 48 · chunk: 850 · topic: 120 · entity: 200 · keyword: 270)
