@@ -124,15 +124,18 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + LanceDB know
 ### Usage
 
 ```bash
-# Full build (parse + index + SIMILAR_TO)
-dockg build docs --wipe
+# Full build (parse + index + SIMILAR_TO) — wipes by default
+dockg build docs
 
 # Granular steps
-dockg build-graph docs --wipe     # Step 1: parse → SQLite only
-dockg build-index --wipe          # Step 2: SQLite → LanceDB + SIMILAR_TO
+dockg build-graph docs            # Step 1: parse → SQLite only (wipes by default)
+dockg build-index                 # Step 2: SQLite → LanceDB + SIMILAR_TO (wipes by default)
+
+# Incremental update — keep existing data, upsert changes only
+dockg build docs --update
 
 # With custom options
-dockg build docs --wipe \
+dockg build docs \
     --chunk-size 512 \
     --model all-mpnet-base-v2 \
     --enable-topics --enable-entities --enable-keywords \
@@ -425,7 +428,7 @@ Output: Markdown report + JSON at `~/.claude/dockg_semantic_latest.json`
 
 | Need | Pipeline | Command |
 |------|----------|---------|
-| Build searchable graph for MCP/CLI queries | Core Build | `dockg build docs --wipe` |
+| Build searchable graph for MCP/CLI queries | Core Build | `dockg build docs` |
 | Deep NLP analysis with diversity sampling | Multipass | `dockg pipeline run --repo docs` |
 | Corpus embedding for manifold analysis | Multipass | `dockg pipeline embed --repo docs` |
 | Intrinsic dimensionality / MRL quality | Multipass | `dockg pipeline manifold` |

@@ -24,14 +24,20 @@ Author: Eric G. Suchanek, PhD
 from __future__ import annotations
 
 import contextlib
+import gc
+import gzip
+import json
 import logging
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 from kg_utils.embed import DEFAULT_MODEL
 from kg_utils.embedder import Embedder, SentenceTransformerEmbedder
+from rich.console import Console
 
 if TYPE_CHECKING:
     from doc_kg.store import GraphStore
@@ -80,6 +86,21 @@ def suppress_ingestion_logging() -> None:
 # above — re-exported here for backward compatibility.
 
 
+def make_embedder(model_name: str = DEFAULT_MODEL, *, device: str = "auto") -> Embedder:
+    """Construct a sentence-transformer embedder with optional device override.
+
+    :param model_name: Embedding model name or alias.
+    :param device: ``auto`` (default), ``cpu``, ``mps``, or ``cuda``.
+    :return: Configured embedder instance.
+    """
+    emb = SentenceTransformerEmbedder(model_name)
+    if device != "auto":
+        emb_any: Any = emb
+        emb_any.model = emb_any.model.to(device)
+        emb_any.device = device
+    return emb
+
+
 # ---------------------------------------------------------------------------
 # Seed hit
 # ---------------------------------------------------------------------------
@@ -113,6 +134,16 @@ class SeedHit:
 
 _DEFAULT_TABLE = "dockg_nodes"
 _DEFAULT_KINDS = ("document", "section", "chunk", "topic", "entity", "keyword")
+
+
+def _is_jsonl_cache(path: Path) -> bool:
+    return path.suffix == ".jsonl" or path.name.endswith(".jsonl.gz")
+
+
+def _open_text_auto(path: Path, mode: str) -> TextIO:
+    if path.suffix == ".gz":
+        return cast(TextIO, gzip.open(path, mode, encoding="utf-8"))
+    return cast(TextIO, open(path, mode, encoding="utf-8"))
 
 
 class SemanticIndex:
@@ -164,7 +195,7 @@ class SemanticIndex:
         store: GraphStore,
         *,
         wipe: bool = False,
-        batch_size: int = 256,
+        batch_size: int = 8192,
         encode_batch_size: int = 1024,
         quiet: bool = False,
         discover_similar: bool = True,
@@ -194,19 +225,34 @@ class SemanticIndex:
 
         import numpy as np  # pylint: disable=import-outside-toplevel
 
-        nodes = self._read_nodes(store)
-        if not quiet:
-            from rich.console import Console  # pylint: disable=import-outside-toplevel
+        # Count without loading any text — used for the progress bar and chunk pre-alloc.
+        n_total = store.count_nodes(kinds=list(self.index_kinds))
+        n_chunks = store.count_nodes(kinds=["chunk"]) if discover_similar else 0
 
-            Console().print(f"  nodes    : {len(nodes):,} to embed")
+        if not quiet:
+            Console().print(f"  nodes    : {n_total:,} to embed")
         tbl = self._open_table(wipe=wipe)
 
         indexed = 0
         all_ids: list[str] = []
-        # Accumulate (id, vec) only for chunk nodes — used by LanceDB ANN SIMILAR_TO
-        # discovery. Much smaller than a full (N × dim) matrix since it excludes
-        # document/section/topic/entity nodes.
-        chunk_pairs: list[tuple[str, Any]] = [] if discover_similar else []
+        telemetry_every = 25
+        write_batch_size = max(int(batch_size), int(encode_batch_size))
+        pending_rows: list[dict[str, Any]] = []
+        pending_ids: list[str] = []
+        processed_rows = 0
+        refresh_every_rows = 120_000
+        next_refresh_at = refresh_every_rows
+        current_encode_batch = max(64, int(encode_batch_size))
+        min_encode_batch = 64
+        # Pre-allocate a contiguous (n_chunks × dim) matrix for chunk vectors so
+        # the SIMILAR_TO ANN pass has a compact array rather than 300K+ loose ndarrays.
+        chunk_pair_ids: list[str] = []
+        chunk_pair_vecs: Any = (
+            np.empty((n_chunks, self.embedder.dim), dtype=np.float32)
+            if discover_similar and n_chunks > 0
+            else None
+        )
+        chunk_vec_idx = 0
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -231,17 +277,45 @@ class SemanticIndex:
             _progress_ctx = contextlib.nullcontext()
 
         with _progress_ctx as prog:
-            task_id = prog.add_task("  Embedding", total=len(nodes)) if prog is not None else None
-            for i in range(0, len(nodes), encode_batch_size):
-                enc_nodes = nodes[i : i + encode_batch_size]
+            task_id = prog.add_task("  Embedding", total=n_total) if prog is not None else None
+            batches = 0
+            window_embed_s = 0.0
+            window_add_s = 0.0
+            window_rows = 0
+            # Stream nodes in encode_batch_size pages — never hold all node dicts in RAM.
+            for enc_nodes in store.iter_nodes(
+                kinds=list(self.index_kinds), batch_size=encode_batch_size
+            ):
+                batches += 1
+                processed_rows += len(enc_nodes)
                 enc_texts = [_build_index_text(n) for n in enc_nodes]
-                enc_vecs = self.embedder.embed_texts(enc_texts)
-                enc_arr = np.asarray(enc_vecs, dtype=np.float32)
+                t_embed0 = time.perf_counter()
+                embedder_any: Any = self.embedder
+                # Deterministic late-run cliffs have appeared around ~274k rows.
+                # After that point, force smaller sub-batches to avoid long kernel stalls.
+                eff_batch = (
+                    min(current_encode_batch, 128)
+                    if processed_rows >= 240_000
+                    else current_encode_batch
+                )
+                enc_vecs: list[list[float]] = []
+                for i in range(0, len(enc_texts), eff_batch):
+                    sub = enc_texts[i : i + eff_batch]
+                    try:
+                        sub_vecs = embedder_any.embed_texts(sub, eff_batch)
+                    except TypeError:
+                        sub_vecs = self.embedder.embed_texts(sub)
+                    enc_vecs.extend(sub_vecs)
+                window_embed_s += time.perf_counter() - t_embed0
+                window_rows += len(enc_nodes)
 
-                if discover_similar:
+                if discover_similar and chunk_pair_vecs is not None:
+                    enc_arr = np.asarray(enc_vecs, dtype=np.float32)
                     for node, vec in zip(enc_nodes, enc_arr):
                         if node["id"].startswith("chunk:"):
-                            chunk_pairs.append((node["id"], vec))
+                            chunk_pair_ids.append(node["id"])
+                            chunk_pair_vecs[chunk_vec_idx] = vec
+                            chunk_vec_idx += 1
 
                 ids = [n["id"] for n in enc_nodes]
 
@@ -252,8 +326,7 @@ class SemanticIndex:
                     pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
                     tbl.delete(pred)
 
-                # Write the whole encode batch as one LanceDB fragment (not 256-row slices)
-                # — fewer fragments = faster subsequent scans.
+                # Buffer multiple encode batches so LanceDB gets fewer, larger fragments.
                 rows = [
                     {
                         "id": n["id"],
@@ -262,25 +335,115 @@ class SemanticIndex:
                         "title": n.get("title") or "",
                         "file_path": n.get("file_path") or "",
                         "text": text,
-                        "vector": vec.tolist(),
+                        "vector": vec,
                     }
-                    for n, text, vec in zip(enc_nodes, enc_texts, enc_arr)
+                    for n, text, vec in zip(enc_nodes, enc_texts, enc_vecs)
                 ]
-                tbl.add(rows)
-                indexed += len(rows)
-                all_ids.extend(ids)
+                pending_rows.extend(rows)
+                pending_ids.extend(ids)
+
+                if len(pending_rows) >= write_batch_size:
+                    t_add0 = time.perf_counter()
+                    tbl.add(pending_rows)
+                    indexed += len(pending_rows)
+                    all_ids.extend(pending_ids)
+                    pending_rows = []
+                    pending_ids = []
+                    window_add_s += time.perf_counter() - t_add0
+
+                if not quiet and batches % telemetry_every == 0:
+                    with contextlib.suppress(Exception):
+                        stats = tbl.stats()
+                        if isinstance(stats, dict):
+                            frag_stats = stats.get("fragment_stats", {})
+                            frags = frag_stats.get("num_fragments")
+                            small = frag_stats.get("num_small_fragments")
+                        else:
+                            frag_stats = getattr(stats, "fragment_stats", None)
+                            frags = getattr(frag_stats, "num_fragments", None)
+                            small = getattr(frag_stats, "num_small_fragments", None)
+                        embed_ms = (
+                            (window_embed_s / max(window_rows, 1)) * 1000.0 if window_rows else 0.0
+                        )
+                        add_ms = (
+                            (window_add_s / max(window_rows, 1)) * 1000.0 if window_rows else 0.0
+                        )
+
+                        Console().print(
+                            f"  ingest   : batch={batches} rows={indexed:,} "
+                            f"fragments={frags} small={small} "
+                            f"embed_ms_per_row={embed_ms:.3f} add_ms_per_row={add_ms:.3f} "
+                            f"encode_batch_eff={eff_batch}"
+                        )
+
+                        # Adjust encode batch dynamically based on recent latency.
+                        if embed_ms >= 1.2 and current_encode_batch > min_encode_batch:
+                            current_encode_batch = max(min_encode_batch, current_encode_batch // 2)
+                        elif embed_ms <= 0.35 and current_encode_batch < int(encode_batch_size):
+                            current_encode_batch = min(
+                                int(encode_batch_size), current_encode_batch * 2
+                            )
+
+                        # Adaptive refresh if embedding latency spikes (MPS/CUDA drift).
+                        if embed_ms >= 0.6:
+                            model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
+                            device = getattr(self.embedder, "device", "auto")
+                            Console().print(
+                                f"  ingest   : refreshing embedder at rows={processed_rows:,} "
+                                f"(embed_ms_per_row={embed_ms:.3f})"
+                            )
+                            self.embedder = make_embedder(model_name, device=device)
+                            next_refresh_at = processed_rows + refresh_every_rows
+
+                        # Long MPS/CUDA runs can degrade as allocator caches grow.
+                        # Proactively release backend caches at telemetry checkpoints.
+                        with contextlib.suppress(Exception):
+                            import torch  # pylint: disable=import-outside-toplevel
+
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                            elif torch.backends.mps.is_available():
+                                torch.mps.empty_cache()
+                        gc.collect()
+                        window_embed_s = 0.0
+                        window_add_s = 0.0
+                        window_rows = 0
+
+                if processed_rows >= next_refresh_at:
+                    # Refresh embedder periodically to avoid long-run backend state buildup.
+                    model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
+                    device = getattr(self.embedder, "device", "auto")
+                    self.embedder = make_embedder(model_name, device=device)
+                    next_refresh_at += refresh_every_rows
+
                 if prog is not None and task_id is not None:
                     prog.advance(task_id, len(enc_nodes))
+
+        if pending_rows:
+            tbl.add(pending_rows)
+            indexed += len(pending_rows)
+            all_ids.extend(pending_ids)
+
+        # Avoid synchronous compaction in the hot ingest loop; it can pause for
+        # minutes on large tables (observed around 300k rows). Keep this as an
+        # optional best-effort post-step.
+        with contextlib.suppress(Exception):
+            stats = tbl.stats()
+            frag_stats = stats.get("fragment_stats", {}) if isinstance(stats, dict) else {}
+            n_frags = int(frag_stats.get("num_fragments", 0) or 0)
+            if n_frags >= 256:
+                tbl.compact_files()
 
         self._tbl = tbl
 
         # SIMILAR_TO edge discovery — uses LanceDB ANN (no N×N matmul)
         similar_edges_added = 0
-        if discover_similar and chunk_pairs:
+        if discover_similar and chunk_pair_ids and chunk_pair_vecs is not None:
             similar_edges_added = self._discover_similar_edges(
                 store,
                 tbl,
-                chunk_pairs,
+                chunk_pair_ids,
+                chunk_pair_vecs[:chunk_vec_idx],
                 k=similar_k,
                 threshold=similarity_edge_threshold,
                 quiet=quiet,
@@ -321,6 +484,14 @@ class SemanticIndex:
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file (*out*).
         """
+        if _is_jsonl_cache(out):
+            return self._precompute_embeddings_jsonl_stream(
+                store,
+                out,
+                batch_size=batch_size,
+                quiet=quiet,
+            )
+
         from doc_kg.embedder_worker import (  # pylint: disable=import-outside-toplevel
             CorpusEmbedder,
         )
@@ -349,8 +520,6 @@ class SemanticIndex:
         )
 
         if not quiet:
-            from rich.console import Console  # pylint: disable=import-outside-toplevel
-
             Console().print(
                 f"  nodes    : {len(nodes):,} to embed  ({corp_embedder.n_workers} workers)"
             )
@@ -359,9 +528,102 @@ class SemanticIndex:
         CorpusEmbedder.save_cache(cache, out)
 
         if not quiet:
+            Console().print(f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})")
+
+        return out
+
+    def _precompute_embeddings_jsonl_stream(
+        self,
+        store: GraphStore,
+        out: Path,
+        *,
+        batch_size: int,
+        quiet: bool,
+    ) -> Path:
+        """Stream embeddings to JSONL/JSONL.GZ without holding a full cache in RAM."""
+        if quiet:
+            suppress_ingestion_logging()
+
+        out.parent.mkdir(parents=True, exist_ok=True)
+        total = store.count_nodes(kinds=list(self.index_kinds))
+        model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
+        dim = int(getattr(self.embedder, "dim", 0) or 0)
+        written = 0
+
+        if not quiet:
             from rich.console import Console  # pylint: disable=import-outside-toplevel
 
-            Console().print(f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})")
+            Console().print(f"  nodes    : {total:,} to embed  (streaming JSONL)")
+
+        if not quiet:
+            from rich.progress import (  # pylint: disable=import-outside-toplevel
+                BarColumn,
+                MofNCompleteColumn,
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                TimeElapsedColumn,
+                TimeRemainingColumn,
+            )
+
+            _progress_ctx: contextlib.AbstractContextManager = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+            )
+        else:
+            _progress_ctx = contextlib.nullcontext()
+
+        with _open_text_auto(out, "wt") as f:
+            header = {
+                "__meta__": {
+                    "version": 1,
+                    "model": model_name,
+                    "dim": dim,
+                    "created_at": datetime.now(tz=UTC).isoformat(),
+                }
+            }
+            f.write(json.dumps(header, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+            with _progress_ctx as prog:
+                task_id = prog.add_task("  Embedding", total=total) if prog is not None else None
+                for enc_nodes in store.iter_nodes(
+                    kinds=list(self.index_kinds), batch_size=max(1, int(batch_size))
+                ):
+                    texts = [_build_index_text(n) for n in enc_nodes]
+                    embedder_any: Any = self.embedder
+                    try:
+                        vecs = embedder_any.embed_texts(texts, batch_size)
+                    except TypeError:
+                        vecs = self.embedder.embed_texts(texts)
+
+                    for n, text, vec in zip(enc_nodes, texts, vecs):
+                        row = {
+                            "id": n["id"],
+                            "kind": n["kind"],
+                            "name": n["name"],
+                            "title": n.get("title") or "",
+                            "file_path": n.get("file_path") or "",
+                            "text": text,
+                            "vector": vec,
+                        }
+                        f.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+                        written += 1
+
+                    f.flush()
+                    if prog is not None and task_id is not None:
+                        prog.advance(task_id, len(enc_nodes))
+
+        if not quiet:
+            from rich.console import Console  # pylint: disable=import-outside-toplevel
+
+            size_mb = out.stat().st_size / 1_048_576
+            Console().print(
+                f"  cache    : {out}  ({written:,} vectors, dim={dim}, {size_mb:,.0f} MB)"
+            )
 
         return out
 
@@ -393,6 +655,18 @@ class SemanticIndex:
         :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :return: Stats dict (same schema as :meth:`build`).
         """
+        if _is_jsonl_cache(cache_path):
+            return self._build_from_jsonl_cache(
+                store,
+                cache_path,
+                wipe=wipe,
+                batch_size=batch_size,
+                quiet=quiet,
+                discover_similar=discover_similar,
+                similar_k=similar_k,
+                similarity_edge_threshold=similarity_edge_threshold,
+            )
+
         import numpy as np  # pylint: disable=import-outside-toplevel
 
         from doc_kg.embedder_worker import (  # pylint: disable=import-outside-toplevel
@@ -419,7 +693,14 @@ class SemanticIndex:
 
         indexed = 0
         all_ids: list[str] = []
-        chunk_pairs: list[tuple[str, Any]] = []
+        n_chunks_cache = sum(1 for m in cache.metadata if m["id"].startswith("chunk:"))
+        chunk_pair_ids: list[str] = []
+        chunk_pair_vecs: Any = (
+            np.empty((n_chunks_cache, cache.dim), dtype=np.float32)
+            if discover_similar and n_chunks_cache > 0
+            else None
+        )
+        chunk_vec_idx = 0
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -456,10 +737,12 @@ class SemanticIndex:
 
                 vec_arr = np.asarray(batch_vecs_raw, dtype=np.float32)
 
-                if discover_similar:
+                if discover_similar and chunk_pair_vecs is not None:
                     for meta, vec in zip(batch_meta, vec_arr):
                         if meta["id"].startswith("chunk:"):
-                            chunk_pairs.append((meta["id"], vec))
+                            chunk_pair_ids.append(meta["id"])
+                            chunk_pair_vecs[chunk_vec_idx] = vec
+                            chunk_vec_idx += 1
 
                 ids = [m["id"] for m in batch_meta]
                 if not wipe:
@@ -487,11 +770,12 @@ class SemanticIndex:
         self._tbl = tbl
 
         similar_edges_added = 0
-        if discover_similar and chunk_pairs:
+        if discover_similar and chunk_pair_ids and chunk_pair_vecs is not None:
             similar_edges_added = self._discover_similar_edges(
                 store,
                 tbl,
-                chunk_pairs,
+                chunk_pair_ids,
+                chunk_pair_vecs[:chunk_vec_idx],
                 k=similar_k,
                 threshold=similarity_edge_threshold,
                 quiet=quiet,
@@ -507,6 +791,114 @@ class SemanticIndex:
             "similar_edges_added": similar_edges_added,
         }
 
+    def _build_from_jsonl_cache(
+        self,
+        store: GraphStore,
+        cache_path: Path,
+        *,
+        wipe: bool,
+        batch_size: int,
+        quiet: bool,
+        discover_similar: bool,
+        similar_k: int,
+        similarity_edge_threshold: float,
+    ) -> dict:
+        """Build LanceDB index from streaming JSONL cache without loading all rows in RAM."""
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        if quiet:
+            suppress_ingestion_logging()
+
+        if not quiet:
+            from rich.console import Console  # pylint: disable=import-outside-toplevel
+
+            size_mb = cache_path.stat().st_size / 1_048_576
+            Console().print(f"  cache    : loading {cache_path.name} ({size_mb:,.0f} MB) …")
+
+        tbl = self._open_table(wipe=wipe)
+        indexed = 0
+        model_name = "unknown"
+        dim = 0
+        pending_rows: list[dict[str, Any]] = []
+        pending_ids: list[str] = []
+        chunk_pair_ids: list[str] = []
+        chunk_vecs_list: list[Any] = [] if discover_similar else []
+
+        with _open_text_auto(cache_path, "rt") as f:
+            first = f.readline()
+            if first:
+                first_obj = json.loads(first)
+                meta = first_obj.get("__meta__", {}) if isinstance(first_obj, dict) else {}
+                model_name = str(meta.get("model") or model_name)
+                dim = int(meta.get("dim") or dim)
+
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                rid = row["id"]
+                vec = row["vector"]
+                if not dim:
+                    dim = len(vec)
+
+                pending_rows.append(
+                    {
+                        "id": rid,
+                        "kind": row.get("kind", ""),
+                        "name": row.get("name", ""),
+                        "title": row.get("title") or "",
+                        "file_path": row.get("file_path") or "",
+                        "text": row.get("text") or "",
+                        "vector": vec,
+                    }
+                )
+                pending_ids.append(rid)
+
+                if discover_similar and rid.startswith("chunk:"):
+                    chunk_pair_ids.append(rid)
+                    chunk_vecs_list.append(vec)
+
+                if len(pending_rows) >= max(1, int(batch_size)):
+                    if not wipe:
+                        pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in pending_ids])
+                        tbl.delete(pred)
+                    tbl.add(pending_rows)
+                    indexed += len(pending_rows)
+                    pending_rows = []
+                    pending_ids = []
+
+        if pending_rows:
+            if not wipe:
+                pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in pending_ids])
+                tbl.delete(pred)
+            tbl.add(pending_rows)
+            indexed += len(pending_rows)
+
+        self._tbl = tbl
+
+        similar_edges_added = 0
+        if discover_similar and chunk_pair_ids and chunk_vecs_list:
+            chunk_pair_vecs = np.asarray(chunk_vecs_list, dtype=np.float32)
+            similar_edges_added = self._discover_similar_edges(
+                store,
+                tbl,
+                chunk_pair_ids,
+                chunk_pair_vecs,
+                k=similar_k,
+                threshold=similarity_edge_threshold,
+                quiet=quiet,
+            )
+
+        return {
+            "indexed_rows": indexed,
+            "dim": dim,
+            "model_name": model_name,
+            "table": self.table_name,
+            "lancedb_dir": str(self.lancedb_dir),
+            "kinds": list(self.index_kinds),
+            "similar_edges_added": similar_edges_added,
+        }
+
     # ------------------------------------------------------------------
     # SIMILAR_TO edge discovery
     # ------------------------------------------------------------------
@@ -515,7 +907,8 @@ class SemanticIndex:
         self,
         store: GraphStore,
         tbl: Any,
-        chunk_pairs: list[tuple[str, Any]],
+        chunk_ids: list[str],
+        chunk_vecs: Any,
         *,
         k: int,
         threshold: float,
@@ -525,7 +918,7 @@ class SemanticIndex:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 
         Uses LanceDB HNSW ANN queries instead of batched matmul — peak RAM is
-        O(n_chunks × dim) for the accumulated chunk vectors, with no N×N
+        O(n_chunks × dim) for the pre-allocated chunk vector matrix, with no N×N
         temporary similarity matrix. Scales to arbitrarily large corpora.
 
         For each chunk the top-``k`` nearest neighbours are retrieved from
@@ -536,7 +929,8 @@ class SemanticIndex:
 
         :param store: GraphStore to write edges into.
         :param tbl: Open LanceDB table (already populated with all node vectors).
-        :param chunk_pairs: List of ``(chunk_id, vec)`` accumulated during indexing.
+        :param chunk_ids: Chunk node IDs in the same order as *chunk_vecs*.
+        :param chunk_vecs: Float32 ndarray of shape ``(n_chunks, dim)``.
         :param k: Maximum SIMILAR_TO out-edges per source chunk (top-k by score).
         :param threshold: Minimum cosine similarity for a SIMILAR_TO edge (0–1).
         :param quiet: Suppress progress output.
@@ -545,10 +939,10 @@ class SemanticIndex:
         """
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
-        if not chunk_pairs:
+        if not chunk_ids:
             return 0
 
-        n_chunks = len(chunk_pairs)
+        n_chunks = len(chunk_ids)
         edges: list[DocEdge] = []
         total_edges = 0
 
@@ -584,7 +978,7 @@ class SemanticIndex:
                 else None
             )
 
-            for src_id, vec in chunk_pairs:
+            for src_id, vec in zip(chunk_ids, chunk_vecs):
                 # ANN search: cosine distance, chunk nodes only, top ann_k results.
                 # _distance is cosine distance ∈ [0, 2]; similarity = 1 - distance.
                 results = (

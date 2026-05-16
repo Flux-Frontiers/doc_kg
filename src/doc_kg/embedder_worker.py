@@ -24,6 +24,7 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import gzip
 import json
 import logging
 import multiprocessing
@@ -310,16 +311,24 @@ class CorpusEmbedder:
         }
 
         logger.info("Saving %d embeddings to %s …", cache.n_vectors, path)
-        print(f"  cache    : saving {cache.n_vectors:,} vectors to {path.name} …", flush=True)
+        print(
+            f"  cache    : saving {cache.n_vectors:,} vectors to {path.name} …",
+            flush=True,
+        )
         t0 = time.monotonic()
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=None)
+        open_fn = gzip.open if path.suffix == ".gz" else open
+        with open_fn(path, "wt", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
 
         elapsed = time.monotonic() - t0
         size_mb = path.stat().st_size / 1_048_576
         logger.info(
-            "Saved %d embeddings to %s (%.0f MB) in %.1fs", cache.n_vectors, path, size_mb, elapsed
+            "Saved %d embeddings to %s (%.0f MB) in %.1fs",
+            cache.n_vectors,
+            path,
+            size_mb,
+            elapsed,
         )
         print(f"  cache    : saved {size_mb:,.0f} MB in {elapsed:.1f}s", flush=True)
 
@@ -334,7 +343,8 @@ class CorpusEmbedder:
         logger.info("Loading embedding cache: %s (%.0f MB) …", path.name, size_mb)
         t0 = time.monotonic()
 
-        with open(path, encoding="utf-8") as f:
+        open_fn = gzip.open if path.suffix == ".gz" else open
+        with open_fn(path, "rt", encoding="utf-8") as f:
             data = json.load(f)
 
         elapsed = time.monotonic() - t0

@@ -3,5 +3,8 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "chat.tools.terminal.autoApprove": {
+        "sqlite3": true
+    }
 }
