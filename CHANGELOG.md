@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `src/doc_kg/discover_topics.py`: `import yaml` annotated with `# type: ignore[import-untyped]` (consistent with `topics.py`); `ck` variable given explicit union type annotation to satisfy mypy.
+- `src/doc_kg/index.py`: Removed leftover `DEBUG` `print` statement from `index_nodes()` that was leaking to stderr during every build.
+
+### Performance
+- `src/doc_kg/index.py`: `_discover_similar_edges()` rewritten to use LanceDB HNSW ANN queries instead of batched numpy matmul. The old approach allocated an `(n_chunks × dim)` matrix for all nodes plus a `(row_batch × n_chunks)` temporary similarity matrix per batch — for 400 K chunks the temp alone reached ~1.6 GB, causing OOM on large sacred-text corpora. The new approach queries LanceDB for each chunk's top-k nearest neighbours via the existing HNSW index; peak RAM is O(n_chunks × dim) with no N×N allocation. `build()` and `index_nodes()` no longer pre-allocate `all_vecs_np`; instead they accumulate `chunk_pairs: list[tuple[str, vec]]` for chunk nodes only (smaller than the full node set). SQLite PRIMARY KEY on `(src, rel, dst)` continues to deduplicate edges emitted by both A→B and B→A ANN results.
 
 ## [0.14.0] - 2026-05-04
 

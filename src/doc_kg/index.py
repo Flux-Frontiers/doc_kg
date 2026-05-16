@@ -203,14 +203,10 @@ class SemanticIndex:
 
         indexed = 0
         all_ids: list[str] = []
-        # Only pre-allocate the contiguous float32 matrix when SIMILAR_TO discovery
-        # is requested — for large corpora (1 M+ nodes × 768 dim × 4 B ≈ 3 GB)
-        # the allocation alone causes SIGBUS on macOS when skipping similarity.
-        all_vecs_np = (
-            np.zeros((len(nodes), self.embedder.dim), dtype=np.float32)
-            if discover_similar
-            else None
-        )
+        # Accumulate (id, vec) only for chunk nodes — used by LanceDB ANN SIMILAR_TO
+        # discovery. Much smaller than a full (N × dim) matrix since it excludes
+        # document/section/topic/entity nodes.
+        chunk_pairs: list[tuple[str, Any]] = [] if discover_similar else []
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -241,8 +237,11 @@ class SemanticIndex:
                 enc_texts = [_build_index_text(n) for n in enc_nodes]
                 enc_vecs = self.embedder.embed_texts(enc_texts)
                 enc_arr = np.asarray(enc_vecs, dtype=np.float32)
-                if all_vecs_np is not None:
-                    all_vecs_np[i : i + len(enc_nodes)] = enc_arr
+
+                if discover_similar:
+                    for node, vec in zip(enc_nodes, enc_arr):
+                        if node["id"].startswith("chunk:"):
+                            chunk_pairs.append((node["id"], vec))
 
                 ids = [n["id"] for n in enc_nodes]
 
@@ -275,13 +274,13 @@ class SemanticIndex:
 
         self._tbl = tbl
 
-        # SIMILAR_TO edge discovery
+        # SIMILAR_TO edge discovery — uses LanceDB ANN (no N×N matmul)
         similar_edges_added = 0
-        if discover_similar and all_vecs_np is not None and len(all_ids) > 0:
+        if discover_similar and chunk_pairs:
             similar_edges_added = self._discover_similar_edges(
                 store,
-                all_ids,
-                all_vecs_np,
+                tbl,
+                chunk_pairs,
                 k=similar_k,
                 threshold=similarity_edge_threshold,
                 quiet=quiet,
@@ -420,7 +419,7 @@ class SemanticIndex:
 
         indexed = 0
         all_ids: list[str] = []
-        all_vecs_np = np.zeros((cache.n_vectors, cache.dim), dtype=np.float32)
+        chunk_pairs: list[tuple[str, Any]] = []
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -456,7 +455,11 @@ class SemanticIndex:
                 batch_vecs_raw = cache.vectors[i : i + batch_size]
 
                 vec_arr = np.asarray(batch_vecs_raw, dtype=np.float32)
-                all_vecs_np[i : i + len(batch_meta)] = vec_arr
+
+                if discover_similar:
+                    for meta, vec in zip(batch_meta, vec_arr):
+                        if meta["id"].startswith("chunk:"):
+                            chunk_pairs.append((meta["id"], vec))
 
                 ids = [m["id"] for m in batch_meta]
                 if not wipe:
@@ -483,20 +486,12 @@ class SemanticIndex:
 
         self._tbl = tbl
 
-        import sys  # pylint: disable=import-outside-toplevel
-
-        print(
-            f"DEBUG: indexed={indexed}, all_ids={len(all_ids)}, discover={discover_similar}",
-            flush=True,
-            file=sys.stderr,
-        )
-
         similar_edges_added = 0
-        if discover_similar and all_ids:
+        if discover_similar and chunk_pairs:
             similar_edges_added = self._discover_similar_edges(
                 store,
-                all_ids,
-                all_vecs_np,
+                tbl,
+                chunk_pairs,
                 k=similar_k,
                 threshold=similarity_edge_threshold,
                 quiet=quiet,
@@ -519,61 +514,46 @@ class SemanticIndex:
     def _discover_similar_edges(
         self,
         store: GraphStore,
-        node_ids: list[str],
-        vecs: Any,
+        tbl: Any,
+        chunk_pairs: list[tuple[str, Any]],
         *,
         k: int,
         threshold: float,
         quiet: bool,
-        row_batch: int = 1024,
         flush_every: int = 1000,
     ) -> int:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 
-        Only chunk nodes participate in SIMILAR_TO (sections and documents
-        are already structurally connected via CONTAINS).
+        Uses LanceDB HNSW ANN queries instead of batched matmul — peak RAM is
+        O(n_chunks × dim) for the accumulated chunk vectors, with no N×N
+        temporary similarity matrix. Scales to arbitrarily large corpora.
 
-        Per-row top-``k`` cap: for each chunk, keep at most the top-``k``
-        most-similar peers above ``threshold``. After per-row pruning, an
-        upper-triangle filter (``src_global_idx < dst_global_idx``) deduplicates
-        the pair (a, b) so it is emitted exactly once. Bounded out-degree
-        prevents quadratic blow-up on stylistically homogeneous corpora where
-        most pairs sit just above the threshold.
-
-        Setting ``k <= 0`` disables the cap and falls back to pure threshold
-        filtering (legacy behavior).
-
-        Uses batched numpy matmul — no LanceDB queries, no ``seen`` set.
-        Edges are flushed to SQLite every *flush_every* entries to bound peak
-        memory regardless of how many qualifying pairs exist.
+        For each chunk the top-``k`` nearest neighbours are retrieved from
+        LanceDB using cosine distance. Pairs above ``threshold`` are emitted as
+        undirected SIMILAR_TO edges (canonicalized as (lo_id, hi_id) where
+        ``lo_id < hi_id`` lexicographically). The SQLite PRIMARY KEY on
+        (src, rel, dst) deduplicates when both A→B and B→A are found.
 
         :param store: GraphStore to write edges into.
-        :param node_ids: Node IDs in the same order as *vecs*.
-        :param vecs: Float32 numpy array of shape ``(N, dim)``.
+        :param tbl: Open LanceDB table (already populated with all node vectors).
+        :param chunk_pairs: List of ``(chunk_id, vec)`` accumulated during indexing.
         :param k: Maximum SIMILAR_TO out-edges per source chunk (top-k by score).
-                  ``k <= 0`` disables the cap.
-        :param threshold: Minimum cosine similarity for a SIMILAR_TO edge.
+        :param threshold: Minimum cosine similarity for a SIMILAR_TO edge (0–1).
         :param quiet: Suppress progress output.
-        :param row_batch: Matmul row-batch size to bound peak memory.
-                          1024 rows × 20 K cols × 4 B ≈ 80 MB per batch.
         :param flush_every: Flush accumulated edges to SQLite after this many.
         :return: Total number of edges added.
         """
-        import numpy as np  # pylint: disable=import-outside-toplevel
-
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
-        chunk_indices = [i for i, nid in enumerate(node_ids) if nid.startswith("chunk:")]
-        if not chunk_indices:
+        if not chunk_pairs:
             return 0
 
-        chunk_ids = [node_ids[i] for i in chunk_indices]
-        chunk_vecs = vecs[chunk_indices]  # direct numpy slice — no copy
-        n_chunks = len(chunk_ids)
-        n_batches = (n_chunks + row_batch - 1) // row_batch
-
+        n_chunks = len(chunk_pairs)
         edges: list[DocEdge] = []
         total_edges = 0
+
+        # Request k+1 so the source chunk itself (always rank-0) can be dropped.
+        ann_k = max(k + 1, 2) if k and k > 0 else 16
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -599,72 +579,49 @@ class SemanticIndex:
 
         with _sim_ctx as sim_prog:
             sim_task = (
-                sim_prog.add_task("  SIMILAR_TO scan", total=n_batches)
+                sim_prog.add_task("  SIMILAR_TO scan", total=n_chunks)
                 if sim_prog is not None
                 else None
             )
 
-            for batch_start in range(0, n_chunks, row_batch):
-                batch_end = min(batch_start + row_batch, n_chunks)
-                sims = chunk_vecs[batch_start:batch_end] @ chunk_vecs.T
+            for src_id, vec in chunk_pairs:
+                # ANN search: cosine distance, chunk nodes only, top ann_k results.
+                # _distance is cosine distance ∈ [0, 2]; similarity = 1 - distance.
+                results = (
+                    tbl.search(vec.tolist())
+                    .metric("cosine")
+                    .where("kind = 'chunk'", prefilter=True)
+                    .limit(ann_k)
+                    .to_list()
+                )
 
-                # Suppress self-similarity so it can't occupy a top-k slot
-                # (and never produces a self-loop in the threshold path).
-                rows_in_batch = batch_end - batch_start
-                local = np.arange(rows_in_batch)
-                sims[local, batch_start + local] = -np.inf
+                for row in results:
+                    dst_id: str = row["id"]
+                    if dst_id == src_id:
+                        continue
+                    sim = 1.0 - float(row.get("_distance", 1.0))
+                    if sim < threshold:
+                        continue
 
-                if k and k > 0:
-                    # Per-row top-k above threshold. argpartition gets the indices
-                    # of the k highest-scoring columns per row in O(N) per row,
-                    # then we filter by threshold so weak matches are still excluded.
-                    n_cols = sims.shape[1]
-                    k_eff = min(k, max(n_cols - 1, 1))  # -1 because self is masked
-                    top_idx = np.argpartition(-sims, k_eff - 1, axis=1)[:, :k_eff]
-                    row_idxs = np.repeat(np.arange(rows_in_batch), k_eff)
-                    col_idxs = top_idx.reshape(-1)
-                    above = sims[row_idxs, col_idxs] >= threshold
-                    row_idxs = row_idxs[above]
-                    col_idxs = col_idxs[above]
-                else:
-                    # Legacy: every pair above threshold (no cap).
-                    row_idxs, col_idxs = np.where(sims >= threshold)
-
-                # Canonicalize undirected edges: always emit src=min(a,b), dst=max(a,b).
-                # The (src, rel, dst) PRIMARY KEY in SQLite dedups cross-batch
-                # AND across the asymmetry of per-row top-k (where A picks B but B
-                # may not pick A). Self-loops are already excluded by the -inf mask
-                # above and would be filtered here anyway by the equality check.
-                src_global = batch_start + row_idxs
-                lo = np.minimum(src_global, col_idxs)
-                hi = np.maximum(src_global, col_idxs)
-                non_self = lo != hi
-                if non_self.any():
-                    filt_ri = row_idxs[non_self]  # local row indices for sim lookup
-                    filt_ci = col_idxs[non_self]  # local col indices for sim lookup
-                    lo = lo[non_self]
-                    hi = hi[non_self]
-                    sim_vals = sims[filt_ri, filt_ci]
-
-                    for i in range(len(lo)):
-                        edges.append(
-                            DocEdge(
-                                src=chunk_ids[lo[i]],
-                                rel="SIMILAR_TO",
-                                dst=chunk_ids[hi[i]],
-                                evidence={"similarity": round(float(sim_vals[i]), 4)},
-                            )
+                    # Canonical undirected edge: lexicographic (lo, hi)
+                    lo_id, hi_id = (src_id, dst_id) if src_id < dst_id else (dst_id, src_id)
+                    edges.append(
+                        DocEdge(
+                            src=lo_id,
+                            rel="SIMILAR_TO",
+                            dst=hi_id,
+                            evidence={"similarity": round(sim, 4)},
                         )
+                    )
 
-                    # Flush to SQLite periodically — bounds peak memory
-                    if len(edges) >= flush_every:
-                        store._upsert_edges(edges)
-                        total_edges += len(edges)
-                        edges = []
+                if len(edges) >= flush_every:
+                    store._upsert_edges(edges)
+                    total_edges += len(edges)
+                    edges = []
+
                 if sim_prog is not None and sim_task is not None:
                     sim_prog.advance(sim_task, 1)
 
-        # Final flush
         if edges:
             store._upsert_edges(edges)
             total_edges += len(edges)
