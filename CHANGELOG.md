@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.15.0] - 2026-05-16
+
+### Added
 - `src/doc_kg/cli/cmd_build.py`: Three new commands: `build-embeddings` (SQLite → embedding cache JSON/JSONL, gzip-capable), `build-index-from-cache` (cache → LanceDB without model inference), and `build-two-phase` (stable end-to-end pipeline using cache as intermediary). `build-index` gains `--device` (auto/cpu/mps/cuda) and `--index-kind` (repeatable, restricts embedded node kinds) options.
 - `src/doc_kg/index.py`: `make_embedder()` factory function with `device` override; `build()` now streams nodes via `store.iter_nodes()` (avoids loading all node dicts into RAM) and pre-allocates a contiguous `(n_chunks × dim)` float32 ndarray for the SIMILAR_TO ANN pass; `_discover_similar_edges()` signature updated to accept separate `chunk_ids` + `chunk_vecs` arrays; `_is_jsonl_cache()` and `_open_text_auto()` helpers for cache I/O.
 - `src/doc_kg/store.py`: `count_nodes()` — fast kind-filtered row count used for progress bars and pre-allocation; `iter_nodes()` — batch generator that streams node dicts without holding the full result set in RAM; `query_nodes()` gains `limit` and `offset` parameters for pagination.
