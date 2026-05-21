@@ -676,7 +676,22 @@ class DocKG:
         :param max_nodes: Maximum nodes to return.
         :return: :class:`QueryResult`.
         """
-        hits = self.index.search(q, k=k)
+        # Oversample to account for front-matter / reference filtering.
+        raw_hits = self.index.search(q, k=k * 3)
+
+        # Immediately drop reference.md hits (file_path check, works on all indices).
+        candidates = [h for h in raw_hits if not (h.file_path or "").endswith("reference.md")]
+
+        # Drop front_matter chunks (content_type set after rebuild; no-op on old indices).
+        if candidates:
+            cand_nodes = self.store.nodes_batch({h.id for h in candidates})
+            candidates = [
+                h
+                for h in candidates
+                if cand_nodes.get(h.id, {}).get("content_type") != "front_matter"
+            ]
+
+        hits = candidates[:k]
         seed_ids: set[str] = {h.id for h in hits}
         seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
 
@@ -715,11 +730,16 @@ class DocKG:
 
         ranked_nodes.sort(key=lambda x: x["_rank_key"])
 
+        _excluded_types = {"front_matter", "reference"}
         nodes: list[dict] = []
         kept_ids: set[str] = set()
         for n in ranked_nodes:
             if len(nodes) >= max_nodes:
                 break
+            # Keep front_matter/reference in the graph for traversal but exclude
+            # them from returned results — they are preamble/metadata, not content.
+            if n.get("content_type") in _excluded_types:
+                continue
             kept_ids.add(n["id"])
             nodes.append(n)
 

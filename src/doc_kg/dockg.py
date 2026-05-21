@@ -151,6 +151,90 @@ SKIP_DIRS = {
 
 TEXT_EXTENSIONS = {".md", ".txt", ".rst", ".pdf"}
 
+# ============================================================================
+# Front-matter / reference classification
+# ============================================================================
+
+# Headings that signal editorial preamble — introductions, prefaces, translator
+# notes, tables of contents, etc.  These sections contaminate semantic seeding
+# because they are topically dense summaries that score high on every query.
+_FM_HEADING = re.compile(
+    r"""
+    \b(
+        introduc\w*                                          # introduction, introductory
+      | preface
+      | foreword | fore\s*word
+      | prefator\w*
+      | editor['']?s?\s*(note|introduction|preface|remarks)
+      | translator['']?s?\s*(note|introduction|preface|remarks)
+      | transcriber['']?s?\s*note
+      | biographical\s+sketch
+      | about\s+the\s+author
+      | about\s+this\s+(book|edition|text|translation)
+      | table\s+of\s+contents
+      | proleg\w*
+      | note[s]?\s*to\s+the
+      | a\s+note\s+on
+      | note\s+on\s+the\s+(text|translation|edition)
+      | publisher['']?s?\s*(note|preface)
+      | copyright
+      | by\s+way\s+of\s+introduction
+      | introductory\s+essay
+      | select\s+bibliography
+    )\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Headings that unambiguously start main content — beats FM heuristics.
+_FM_MAIN_CONTENT = re.compile(
+    r"^(chapter|book|part|volume|canto|act|scene|letter|section|song|ode|tale|night|day)\b",
+    re.IGNORECASE,
+)
+
+# FM classification only applies to sections starting in the first 40% of a file.
+_FM_POSITION_CUTOFF = 0.40
+
+
+def _classify_section_content_type(
+    section_title: str | None,
+    section_level: int | None,
+    char_start: int,
+    total_chars: int,
+    file_path: str,
+) -> str | None:
+    """Return ``'front_matter'``, ``'reference'``, or ``None`` for a section.
+
+    Rules (applied in order):
+    1. Files named ``reference.md`` → ``'reference'`` (bibliographic metadata).
+    2. ``section_title`` is ``None`` (preamble before any heading) → ``None``.
+    3. H1 headings (level 1) → ``None``; that's the book title, never FM.
+    4. Headings starting with a main-content keyword → ``None``; main content wins.
+    5. Sections starting after ``_FM_POSITION_CUTOFF`` of the file → ``None``;
+       too late to be preamble, more likely an embedded contextual intro.
+    6. Heading matches ``_FM_HEADING`` → ``'front_matter'``.
+
+    :param section_title: Heading text of the section, or ``None`` for the preamble.
+    :param section_level: Markdown heading level (1–6), or ``None``.
+    :param char_start: Character offset of the section in the source file.
+    :param total_chars: Total character length of the source file.
+    :param file_path: Corpus-relative file path.
+    :return: Content type string, or ``None`` for ordinary prose.
+    """
+    if file_path.endswith("reference.md"):
+        return "reference"
+    if section_title is None:
+        return None
+    if section_level == 1:
+        return None
+    if _FM_MAIN_CONTENT.match(section_title):
+        return None
+    if total_chars > 0 and char_start / total_chars > _FM_POSITION_CUTOFF:
+        return None
+    if _FM_HEADING.search(section_title):
+        return "front_matter"
+    return None
+
 
 # ============================================================================
 # Node ID helpers
@@ -456,6 +540,7 @@ def parse_corpus(
 
             # Chunk the document (returns structured chunks with section info)
             chunks = active_chunker.chunk(raw_text, file_path=file_path)
+            total_chars = len(raw_text)
 
             # Batch K-means topic assignment for this file (embedding-based, near-100% coverage)
             _chunk_kmeans_topics: list[str | None] = []
@@ -481,6 +566,15 @@ def parse_corpus(
                 references = chunk_info.get("references", [])
                 # Verse metadata (None for non-verse documents)
                 content_type = chunk_info.get("content_type")
+                # Classify front-matter / reference sections when not already typed
+                if content_type is None:
+                    content_type = _classify_section_content_type(
+                        section_title,
+                        section_level,
+                        char_start,
+                        total_chars,
+                        file_path,
+                    )
                 verse_book = chunk_info.get("book")
                 verse_chapter = chunk_info.get("chapter")
                 verse_start = chunk_info.get("verse_start")
