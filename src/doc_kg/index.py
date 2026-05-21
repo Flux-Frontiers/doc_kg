@@ -201,6 +201,7 @@ class SemanticIndex:
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
+        similar_max_degree: int = 0,
     ) -> dict:
         """Build (or rebuild) the vector index from *store*.
 
@@ -446,6 +447,7 @@ class SemanticIndex:
                 chunk_pair_vecs[:chunk_vec_idx],
                 k=similar_k,
                 threshold=similarity_edge_threshold,
+                max_degree=similar_max_degree,
                 quiet=quiet,
             )
 
@@ -638,6 +640,7 @@ class SemanticIndex:
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
+        similar_max_degree: int = 0,
     ) -> dict:
         """Build (or rebuild) the LanceDB index from a pre-computed embedding cache.
 
@@ -665,6 +668,7 @@ class SemanticIndex:
                 discover_similar=discover_similar,
                 similar_k=similar_k,
                 similarity_edge_threshold=similarity_edge_threshold,
+                similar_max_degree=similar_max_degree,
             )
 
         import numpy as np  # pylint: disable=import-outside-toplevel
@@ -778,6 +782,7 @@ class SemanticIndex:
                 chunk_pair_vecs[:chunk_vec_idx],
                 k=similar_k,
                 threshold=similarity_edge_threshold,
+                max_degree=similar_max_degree,
                 quiet=quiet,
             )
 
@@ -802,6 +807,7 @@ class SemanticIndex:
         discover_similar: bool,
         similar_k: int,
         similarity_edge_threshold: float,
+        similar_max_degree: int,
     ) -> dict:
         """Build LanceDB index from streaming JSONL cache without loading all rows in RAM."""
         import numpy as np  # pylint: disable=import-outside-toplevel
@@ -886,6 +892,7 @@ class SemanticIndex:
                 chunk_pair_vecs,
                 k=similar_k,
                 threshold=similarity_edge_threshold,
+                max_degree=similar_max_degree,
                 quiet=quiet,
             )
 
@@ -912,6 +919,7 @@ class SemanticIndex:
         *,
         k: int,
         threshold: float,
+        max_degree: int = 0,
         quiet: bool,
         flush_every: int = 1000,
     ) -> int:
@@ -927,16 +935,25 @@ class SemanticIndex:
         ``lo_id < hi_id`` lexicographically). The SQLite PRIMARY KEY on
         (src, rel, dst) deduplicates when both A→B and B→A are found.
 
+        When *max_degree* > 0 the scan collects candidates first, then enforces
+        a hard per-node cap with a greedy high-similarity selection pass. This
+        keeps each node's SIMILAR_TO degree <= *max_degree* while preferring
+        stronger edges globally.
+
         :param store: GraphStore to write edges into.
         :param tbl: Open LanceDB table (already populated with all node vectors).
         :param chunk_ids: Chunk node IDs in the same order as *chunk_vecs*.
         :param chunk_vecs: Float32 ndarray of shape ``(n_chunks, dim)``.
         :param k: Maximum SIMILAR_TO out-edges per source chunk (top-k by score).
         :param threshold: Minimum cosine similarity for a SIMILAR_TO edge (0–1).
+        :param max_degree: Cap total SIMILAR_TO edges per node (0 = unlimited).
         :param quiet: Suppress progress output.
-        :param flush_every: Flush accumulated edges to SQLite after this many.
+        :param flush_every: Flush accumulated edges to SQLite after this many
+            (ignored when *max_degree* > 0 — writes are deferred until pruning).
         :return: Total number of edges added.
         """
+        import heapq  # pylint: disable=import-outside-toplevel
+
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
         if not chunk_ids:
@@ -948,6 +965,10 @@ class SemanticIndex:
 
         # Request k+1 so the source chunk itself (always rank-0) can be dropped.
         ann_k = max(k + 1, 2) if k and k > 0 else 16
+
+        # Per-node degree cap: {node_id: min-heap of (sim, lo_id, hi_id)}
+        # Each heap keeps the top-max_degree edges by similarity for that node.
+        node_heap: dict[str, list] = {} if max_degree > 0 else {}
 
         if not quiet:
             from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -999,22 +1020,61 @@ class SemanticIndex:
 
                     # Canonical undirected edge: lexicographic (lo, hi)
                     lo_id, hi_id = (src_id, dst_id) if src_id < dst_id else (dst_id, src_id)
-                    edges.append(
-                        DocEdge(
-                            src=lo_id,
-                            rel="SIMILAR_TO",
-                            dst=hi_id,
-                            evidence={"similarity": round(sim, 4)},
-                        )
-                    )
 
-                if len(edges) >= flush_every:
-                    store._upsert_edges(edges)
-                    total_edges += len(edges)
-                    edges = []
+                    if max_degree > 0:
+                        # Track per-node top-max_degree edges via min-heap.
+                        entry = (sim, lo_id, hi_id)
+                        for nid in (lo_id, hi_id):
+                            h = node_heap.setdefault(nid, [])
+                            heapq.heappush(h, entry)
+                            if len(h) > max_degree:
+                                heapq.heappop(h)  # drop weakest
+                    else:
+                        edges.append(
+                            DocEdge(
+                                src=lo_id,
+                                rel="SIMILAR_TO",
+                                dst=hi_id,
+                                evidence={"similarity": round(sim, 4)},
+                            )
+                        )
+                        if len(edges) >= flush_every:
+                            store._upsert_edges(edges)
+                            total_edges += len(edges)
+                            edges = []
 
                 if sim_prog is not None and sim_task is not None:
                     sim_prog.advance(sim_task, 1)
+
+        if max_degree > 0:
+            # Candidate set: union of per-node top-max_degree heaps.
+            candidates: dict[tuple[str, str], float] = {}
+            for heap in node_heap.values():
+                for sim, lo, hi in heap:
+                    key = (lo, hi)
+                    if key not in candidates or sim > candidates[key]:
+                        candidates[key] = sim
+
+            # Hard cap selection: highest-similarity edges first while both
+            # endpoints still have degree budget available.
+            degree: dict[str, int] = {}
+            selected: list[DocEdge] = []
+            ordered = sorted(candidates.items(), key=lambda item: item[1], reverse=True)
+            for (lo, hi), sim in ordered:
+                if degree.get(lo, 0) >= max_degree or degree.get(hi, 0) >= max_degree:
+                    continue
+                selected.append(
+                    DocEdge(
+                        src=lo,
+                        rel="SIMILAR_TO",
+                        dst=hi,
+                        evidence={"similarity": round(sim, 4)},
+                    )
+                )
+                degree[lo] = degree.get(lo, 0) + 1
+                degree[hi] = degree.get(hi, 0) + 1
+
+            edges = selected
 
         if edges:
             store._upsert_edges(edges)

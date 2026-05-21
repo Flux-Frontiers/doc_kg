@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.15.3] - 2026-05-20
+
+### Added
+- `src/doc_kg/index.py`: `_discover_similar_edges()` gains `max_degree` parameter — when > 0, uses a per-node min-heap to collect top-k candidate edges during the ANN scan, then enforces a hard per-node cap with a greedy high-similarity selection pass before writing to SQLite. Prevents hub nodes from accumulating unbounded SIMILAR_TO degree in dense corpora. `build()`, `build_from_cache()`, and `_build_index_from_cache_chunks()` all gain a `similar_max_degree: int = 0` parameter (default 0 = unlimited, preserving existing behaviour).
+- `src/doc_kg/kg.py`: `DocKG.build()`, `build_from_cache()`, and `build_index_from_cache()` gain `similar_max_degree: int = 0` parameter, threaded through to `SemanticIndex`.
+- `tests/test_similar_edges.py`: 12 new tests for `_discover_similar_edges()` covering empty input, self-hit skipping, threshold filtering, canonical edge direction, similarity evidence, and all `max_degree` pruning cases (unlimited, cap=1, cap=2, dense graph, prefers highest similarity, threshold+cap interaction).
+
+### Changed
+- `analysis/architecture.md`: Moved from project root into `analysis/` directory (renamed from `architecture.md`).
+- `.vscode/settings.json`: Added `python.defaultInterpreterPath` and `python.testing.pytestPath` pointing to `.venv/bin/` so the VS Code Test Explorer uses the project virtual environment. Installed `pytest` and `pytest-cov` into `.venv` (were missing despite being declared in `[project.optional-dependencies] dev`).
+- `.dockg/snapshots/manifest.json`: Snapshot updated for v0.15.3.
+
+### Fixed
+- `src/doc_kg/index.py`: `build_from_cache()` was not forwarding `similar_max_degree` to `_build_from_jsonl_cache()` — the JSONL cache path silently ignored the degree cap. Argument now threaded through correctly (mypy `call-arg` error).
+
+### Removed
+- `generate_wiki.py`: Deleted — superseded by dedicated documentation tooling.
+- `CHANGES_exclude_dir.md`: Deleted — temporary scratch file.
+- `release-notes.md`: Deleted — content lives in `CHANGELOG.md`.
+
 ## [0.15.0] - 2026-05-16
 
 ### Added
