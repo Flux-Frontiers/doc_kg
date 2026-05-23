@@ -75,7 +75,7 @@ class DocKGAnalyzer:
 
     def _analyze_baseline(self) -> None:
         self.console.print("[dim]Analyzing baseline graph stats...[/dim]")
-        self.stats = self.kg.stats()
+        self.stats = self.store.stats()
 
     def _analyze_document_metrics(self) -> None:
         self.console.print("[dim]Computing per-document structure metrics...[/dim]")
