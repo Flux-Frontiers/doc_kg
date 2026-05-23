@@ -7,7 +7,7 @@ GraphStore — SQLite persistence layer for DocKG.
 Mirrors CodeKG's GraphStore almost exactly.  SQLite is the authoritative,
 canonical store.  No embeddings, no LanceDB, no text parsing.
 
-Schema differences from CodeKG:
+Schema differences from PyCodeKG:
   - ``nodes.text``   replaces  ``nodes.docstring``
   - ``nodes.title``  replaces  ``nodes.qualname``
   - ``nodes.char_start`` / ``nodes.char_end``  replace  ``nodes.lineno`` / ``nodes.end_lineno``
@@ -15,6 +15,8 @@ Schema differences from CodeKG:
   - DEFAULT_RELS includes SIMILAR_TO and NEXT in addition to CONTAINS/REFERENCES
 
 Author: Eric G. Suchanek, PhD
+Last Revision: 2026-05-21 18:26:00
+License: Elastic 2.0
 """
 
 from __future__ import annotations

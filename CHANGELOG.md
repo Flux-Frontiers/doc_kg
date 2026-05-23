@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/doc_kg/dockg.py`: `parse_corpus()` now calls `_classify_section_content_type()` for every chunk whose `content_type` is `None` after chunking. Captures `total_chars = len(raw_text)` per file for position-cutoff calculation. Front-matter and reference sections are tagged during corpus ingestion so the content type is persisted in SQLite.
 - `src/doc_kg/kg.py`: `DocKG.query()` now filters front-matter and reference content from both seed selection and returned results. Seeds are oversampled 3× to compensate for filtering; `reference.md` hits are dropped by file path immediately; remaining candidates are checked against the SQLite store for `content_type == 'front_matter'` and dropped. In the ranked result walk, nodes with `content_type` in `{'front_matter', 'reference'}` are skipped in the returned list but remain in the graph for traversal (they can still contribute neighbour edges).
 
+### Changed
+- `src/doc_kg/index.py`: `_discover_similar_edges()` rewritten from per-chunk LanceDB ANN queries to a **blocked NumPy matmul** (BLAS SGEMM). Because sentence-transformers emits L2-normalised vectors (`normalize_embeddings=True`), cosine similarity equals the dot product, so `X[block] @ X.T` gives exact pairwise similarities with a single BLAS call per block — no per-chunk Python↔LanceDB round-trip. Block size is adaptively clamped so the `(B × N)` similarity matrix stays under ~256 MB regardless of corpus size. Top-k filtering now uses `np.argpartition` (O(N)) instead of a full sort. The `tbl` parameter is retained for call-site compatibility but is no longer used. Added `block_size: int = 512` parameter.
+- `tests/test_similar_edges.py`: All tests rewritten to use real L2-normalised NumPy vectors instead of mocked LanceDB ANN results. `_make_tbl()` helper removed; `_run_discovery()` now takes `chunk_vecs` directly. Star scenario uses geometrically correct vectors (hub-spoke sim=0.6, spoke-spoke sim=0.36 < threshold). `test_max_degree_prefers_higher_similarity` uses exact dot-product construction for 0.99 and 0.85 similarities.
+
 ### Removed
 
 ### Fixed

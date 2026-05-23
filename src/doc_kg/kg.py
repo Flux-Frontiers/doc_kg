@@ -515,14 +515,15 @@ class DocKG:
         graph_stats.similar_edges_added = index_stats.similar_edges_added
         return graph_stats
 
-    def build_graph(self, *, wipe: bool = False) -> BuildStats:
+    def build_graph(self, *, wipe: bool = False, quiet: bool = False) -> BuildStats:
         """Corpus parsing → SQLite only.
 
         :param wipe: Clear existing graph before writing.
+        :param quiet: Suppress progress output.
         :return: :class:`BuildStats` (``indexed_rows`` will be ``None``).
         """
-        nodes, edges = self.graph.extract(force=wipe).result()
-        self.store.write(nodes, edges, wipe=wipe, quiet=False)
+        nodes, edges = self.graph.extract(force=wipe, quiet=quiet).result()
+        self.store.write(nodes, edges, wipe=wipe, quiet=quiet)
         self.store.stamp_meta("doc_kg", _pkg_version("doc_kg"))
         s = self.store.stats()
         return BuildStats(
@@ -572,6 +573,7 @@ class DocKG:
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
         similar_max_degree: int = 0,
+        quiet: bool = False,
     ) -> BuildStats:
         """Build the LanceDB index from a pre-computed embedding cache.
 
@@ -585,6 +587,7 @@ class DocKG:
                           Set to 0 to disable the cap.
         :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
         :param similar_max_degree: Cap total SIMILAR_TO edges per node (0 = unlimited).
+        :param quiet: Suppress progress output.
         :return: :class:`BuildStats`.
         """
         idx_stats = self.index.build_from_cache(
@@ -595,6 +598,7 @@ class DocKG:
             similar_k=similar_k,
             similarity_edge_threshold=similarity_edge_threshold,
             similar_max_degree=similar_max_degree,
+            quiet=quiet,
         )
         s = self.store.stats()
         return BuildStats(

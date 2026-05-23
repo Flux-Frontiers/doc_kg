@@ -922,37 +922,48 @@ class SemanticIndex:
         max_degree: int = 0,
         quiet: bool,
         flush_every: int = 1000,
+        block_size: int = 512,
     ) -> int:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 
-        Uses LanceDB HNSW ANN queries instead of batched matmul — peak RAM is
-        O(n_chunks × dim) for the pre-allocated chunk vector matrix, with no N×N
-        temporary similarity matrix. Scales to arbitrarily large corpora.
+        Replaces the per-chunk LanceDB ANN loop with a blocked NumPy matmul.
+        Since all chunk vectors are L2-normalised by the embedder
+        (``normalize_embeddings=True``), cosine similarity equals the dot
+        product, so one BLAS SGEMM call per block gives exact similarities
+        with no per-query Python↔LanceDB round-trip overhead.
 
-        For each chunk the top-``k`` nearest neighbours are retrieved from
-        LanceDB using cosine distance. Pairs above ``threshold`` are emitted as
-        undirected SIMILAR_TO edges (canonicalized as (lo_id, hi_id) where
-        ``lo_id < hi_id`` lexicographically). The SQLite PRIMARY KEY on
-        (src, rel, dst) deduplicates when both A→B and B→A are found.
+        The ``(block_size × n_chunks)`` sims matrix is clamped adaptively to
+        stay under ~256 MB regardless of corpus size (e.g. block_size auto-
+        clamps to 128 for a 500 k-chunk corpus at 384-d).
 
-        When *max_degree* > 0 the scan collects candidates first, then enforces
-        a hard per-node cap with a greedy high-similarity selection pass. This
-        keeps each node's SIMILAR_TO degree <= *max_degree* while preferring
-        stronger edges globally.
+        Pairs above *threshold* are emitted as undirected SIMILAR_TO edges
+        (canonicalized as (lo_id, hi_id) where ``lo_id < hi_id``
+        lexicographically).  The SQLite PRIMARY KEY on (src, rel, dst)
+        deduplicates the symmetric pairs that arise from processing both
+        directions of each edge.
+
+        When *max_degree* > 0 the scan collects candidates first, then
+        enforces a hard per-node cap with a greedy high-similarity selection
+        pass.
 
         :param store: GraphStore to write edges into.
-        :param tbl: Open LanceDB table (already populated with all node vectors).
+        :param tbl: Accepted for call-site compatibility; not used.
         :param chunk_ids: Chunk node IDs in the same order as *chunk_vecs*.
         :param chunk_vecs: Float32 ndarray of shape ``(n_chunks, dim)``.
-        :param k: Maximum SIMILAR_TO out-edges per source chunk (top-k by score).
+                           Must be L2-normalised (sentence-transformers with
+                           ``normalize_embeddings=True`` guarantees this).
+        :param k: Maximum SIMILAR_TO out-edges per source chunk (0 = unlimited).
         :param threshold: Minimum cosine similarity for a SIMILAR_TO edge (0–1).
         :param max_degree: Cap total SIMILAR_TO edges per node (0 = unlimited).
         :param quiet: Suppress progress output.
         :param flush_every: Flush accumulated edges to SQLite after this many
             (ignored when *max_degree* > 0 — writes are deferred until pruning).
+        :param block_size: Source rows per matmul block before adaptive clamping.
         :return: Total number of edges added.
         """
         import heapq  # pylint: disable=import-outside-toplevel
+
+        import numpy as np  # pylint: disable=import-outside-toplevel
 
         from doc_kg.dockg import DocEdge  # pylint: disable=import-outside-toplevel
 
@@ -960,11 +971,19 @@ class SemanticIndex:
             return 0
 
         n_chunks = len(chunk_ids)
+
+        # Contiguous float32 is required for BLAS SGEMM.
+        X = np.ascontiguousarray(chunk_vecs, dtype=np.float32)
+
+        # Clamp block_size so the (B × N) sims matrix stays under ~256 MB.
+        _bytes_per_row = n_chunks * 4
+        eff_block = max(64, min(block_size, (256 * 1024 * 1024) // max(_bytes_per_row, 1)))
+
+        # k=0 means no cap — include all neighbours above threshold.
+        eff_k = min(k, n_chunks - 1) if k > 0 else n_chunks - 1
+
         edges: list[DocEdge] = []
         total_edges = 0
-
-        # Request k+1 so the source chunk itself (always rank-0) can be dropped.
-        ann_k = max(k + 1, 2) if k and k > 0 else 16
 
         # Per-node degree cap: {node_id: min-heap of (sim, lo_id, hi_id)}
         # Each heap keeps the top-max_degree edges by similarity for that node.
@@ -999,52 +1018,59 @@ class SemanticIndex:
                 else None
             )
 
-            for src_id, vec in zip(chunk_ids, chunk_vecs):
-                # ANN search: cosine distance, chunk nodes only, top ann_k results.
-                # _distance is cosine distance ∈ [0, 2]; similarity = 1 - distance.
-                results = (
-                    tbl.search(vec.tolist())
-                    .metric("cosine")
-                    .where("kind = 'chunk'", prefilter=True)
-                    .limit(ann_k)
-                    .to_list()
-                )
+            for block_start in range(0, n_chunks, eff_block):
+                block_end = min(block_start + eff_block, n_chunks)
 
-                for row in results:
-                    dst_id: str = row["id"]
-                    if dst_id == src_id:
+                # (B, dim) @ (dim, N) → (B, N) exact cosine similarities via BLAS.
+                sims = X[block_start:block_end] @ X.T
+
+                for i in range(block_end - block_start):
+                    src_idx = block_start + i
+                    src_id = chunk_ids[src_idx]
+                    row = sims[i]
+
+                    row[src_idx] = -1.0  # exclude self-match
+
+                    # All neighbours at or above the threshold.
+                    (above,) = np.where(row >= threshold)
+                    if not above.size:
                         continue
-                    sim = 1.0 - float(row.get("_distance", 1.0))
-                    if sim < threshold:
-                        continue
 
-                    # Canonical undirected edge: lexicographic (lo, hi)
-                    lo_id, hi_id = (src_id, dst_id) if src_id < dst_id else (dst_id, src_id)
+                    # Keep top-eff_k by similarity (argpartition: O(N), not O(N log N)).
+                    if above.size > eff_k:
+                        top_idx = np.argpartition(row[above], -eff_k)[-eff_k:]
+                        above = above[top_idx]
 
-                    if max_degree > 0:
-                        # Track per-node top-max_degree edges via min-heap.
-                        entry = (sim, lo_id, hi_id)
-                        for nid in (lo_id, hi_id):
-                            h = node_heap.setdefault(nid, [])
-                            heapq.heappush(h, entry)
-                            if len(h) > max_degree:
-                                heapq.heappop(h)  # drop weakest
-                    else:
-                        edges.append(
-                            DocEdge(
-                                src=lo_id,
-                                rel="SIMILAR_TO",
-                                dst=hi_id,
-                                evidence={"similarity": round(sim, 4)},
+                    for j in above.tolist():
+                        sim = float(row[j])
+                        dst_id = chunk_ids[j]
+                        lo_id, hi_id = (src_id, dst_id) if src_id < dst_id else (dst_id, src_id)
+
+                        if max_degree > 0:
+                            entry = (sim, lo_id, hi_id)
+                            for nid in (lo_id, hi_id):
+                                h = node_heap.setdefault(nid, [])
+                                heapq.heappush(h, entry)
+                                if len(h) > max_degree:
+                                    heapq.heappop(h)  # drop weakest
+                        else:
+                            edges.append(
+                                DocEdge(
+                                    src=lo_id,
+                                    rel="SIMILAR_TO",
+                                    dst=hi_id,
+                                    evidence={"similarity": round(sim, 4)},
+                                )
                             )
-                        )
-                        if len(edges) >= flush_every:
-                            store._upsert_edges(edges)
-                            total_edges += len(edges)
-                            edges = []
+                            if len(edges) >= flush_every:
+                                store._upsert_edges(edges)
+                                total_edges += len(edges)
+                                edges = []
+
+                del sims  # release block memory before next allocation
 
                 if sim_prog is not None and sim_task is not None:
-                    sim_prog.advance(sim_task, 1)
+                    sim_prog.advance(sim_task, block_end - block_start)
 
         if max_degree > 0:
             # Candidate set: union of per-node top-max_degree heaps.
