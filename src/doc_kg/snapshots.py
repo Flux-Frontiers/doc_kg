@@ -389,6 +389,19 @@ class SnapshotManager(_BaseSnapshotManager):
         }
 
     # ------------------------------------------------------------------
+    # Prune — ignore db_path when comparing metrics for duplicate detection
+    # ------------------------------------------------------------------
+
+    _METRICS_IGNORE = frozenset({"db_path"})
+
+    def _metrics_changed(self, new_metrics: dict[str, Any], old_metrics: dict[str, Any]) -> bool:
+        """Return True if meaningful metrics changed, ignoring volatile fields like db_path."""
+        strip = self._METRICS_IGNORE
+        a = {k: v for k, v in new_metrics.items() if k not in strip}
+        b = {k: v for k, v in old_metrics.items() if k not in strip}
+        return a != b
+
+    # ------------------------------------------------------------------
     # Delta computation — adds coverage_delta and issues_delta
     # ------------------------------------------------------------------
 
