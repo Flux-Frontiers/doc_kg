@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/dockg_logo_256.png" alt="DocKG logo" width="200"/>
+  <img src="assets/dockg_logo.png" alt="DocKG logo"/>
 </p>
 
 [![CI](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml/badge.svg)](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/publish.yml)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.15.3-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
+[![Version](https://img.shields.io/badge/version-0.15.4-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
 

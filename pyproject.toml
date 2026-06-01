@@ -54,7 +54,7 @@ description = "A tool to build a semantically searchable knowledge graph from ma
 readme = "README.md"
 license = "Elastic-2.0"
 authors = [
-    { name = "Eric G. Suchanek, PhD", email = "suchanek@mac.com" }
+    { name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }
 ]
 keywords = ["knowledge-graph", "document-analysis", "markdown", "lancedb", "sqlite", "semantic-search"]
 classifiers = [
