@@ -7,7 +7,7 @@
 #
 # Quick install (pip)
 # -------------------
-#   pip install -e ".[dev]"             core + dev tools (pytest, ruff, mypy, etc.)
+#   pip install -e ".[dev]"             core + dev tools (pytest, ruff, ty, etc.)
 #   pip install -e ".[viz]"             core + Streamlit/Plotly/PyVis visualizer
 #   pip install -e ".[kgdeps]"          core + KG integrations (pycode-kg, kg-rag)
 #   pip install -e ".[all]"             everything above
@@ -49,7 +49,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.15.3"
+version = "0.15.4"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -86,7 +86,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "detect-secrets>=1.5.0",
-    "mypy>=1.10.0",
+    "ty>=0.0.41",
     "pdoc>=14.0.0",
     "pre-commit>=4.5.1",
     "pylint>=4.0.5",
@@ -109,7 +109,7 @@ kgdeps = [
 ]
 all = [
     "detect-secrets>=1.5.0",
-    "mypy>=1.10.0",
+    "ty>=0.0.41",
     "pdoc>=14.0.0",
     "plotly>=5.14.0",
     "pre-commit>=4.5.1",
@@ -151,12 +151,13 @@ exclude = [".claude"]
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
-[tool.mypy]
-python_version        = "3.12"
-strict                = false
-ignore_missing_imports = true
-mypy_path             = "src"
-explicit_package_bases = true
+[tool.ty.environment]
+python-version = "3.12"
+root = ["src"]
+
+[tool.ty.rules]
+# Be lenient about third-party stubs (mirrors mypy's ignore_missing_imports).
+unresolved-import = "ignore"
 
 [tool.pytest.ini_options]
 testpaths  = ["tests"]
@@ -194,4 +195,9 @@ exclude = [
 help     = "Generate project documentation and user guide PDFs"
 sequence = [
     { shell = "cd src && pdoc --o ../docs --logo ./logo.png doc_kg" },
+]
+
+[dependency-groups]
+dev = [
+    "ty (>=0.0.41)"
 ]

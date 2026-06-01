@@ -69,13 +69,13 @@ def suppress_ingestion_logging() -> None:
             kwargs["disable"] = True
             _orig_init(self, *args, **kwargs)
 
-        _tqdm.tqdm.__init__ = _silent_init
+        _tqdm.tqdm.__init__ = _silent_init  # ty: ignore[invalid-assignment]
 
         try:
             import tqdm.auto as _tqdm_auto  # pylint: disable=import-outside-toplevel
 
             if _tqdm_auto.tqdm is not _tqdm.tqdm:
-                _tqdm_auto.tqdm.__init__ = _silent_init
+                _tqdm_auto.tqdm.__init__ = _silent_init  # ty: ignore[invalid-assignment]
         except ImportError:
             pass
     except (ImportError, AttributeError):

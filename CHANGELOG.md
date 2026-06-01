@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.15.4] - 2026-06-01
+
+### Changed
+- `pyproject.toml`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml`: Migrated type checker from `mypy` to Astral `ty`. Replaced `mypy>=1.10.0` with `ty>=0.0.41` in `dev` and `all` optional-dependency groups; replaced `[tool.mypy]` configuration with `[tool.ty.environment]` / `[tool.ty.rules]`; CI step changed from `poetry run mypy src/` to `poetry run ty check src/`; pre-commit `mypy` hook replaced by `ty`; `ruff-pre-commit` pinned to `v0.15.13` and hook renamed `ruff` → `ruff-check`.
+- `src/doc_kg/app.py`, `src/doc_kg/dockg.py`, `src/doc_kg/index.py`, `src/doc_kg/kg.py`, `src/doc_kg/store.py`, `src/doc_kg/topics.py`: All `# type: ignore[...]` suppression comments that target ty-specific diagnostics converted to `# ty: ignore[...]` format.
+- `src/doc_kg/graph.py`: `nodes` and `edges` properties now narrow `None` via `assert self._nodes/edges is not None` instead of `# type: ignore[return-value]`, making the invariant explicit.
+- `analysis/doc_kg_analysis_20260523.md`: Refreshed analysis snapshot (2 975 nodes, 22 140 edges, 93.4% entity coverage).
+
+### Removed
+- `src/doc_kg/kg.py`: Removed unused `similar_max_degree` parameter from `DocKG.build()`, `build_from_cache()`, and `build_index_from_cache()`. The parameter was accepted but never forwarded to `SemanticIndex`; use `similar_k` for per-node edge caps.
+- `.claude/agents/`: Removed 13 stale agent definition files (`cco`, `cw`, `do`, `doc`, `kc`, `me`, `qa`, `sd`, `sec`, `ta`, `uid`, `uids`, `uxd`).
+
 ## [0.15.3] - 2026-05-20
 
 ### Added

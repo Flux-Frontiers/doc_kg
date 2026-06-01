@@ -22,7 +22,7 @@ from typing import Any
 try:
     import yaml  # type: ignore[import-untyped]
 except Exception:  # pylint: disable=broad-exception-caught  # pragma: no cover - optional dependency at runtime
-    yaml = None  # type: ignore[assignment]  # pylint: disable=invalid-name
+    yaml = None  # ty: ignore[invalid-assignment]  # pylint: disable=invalid-name
 
 
 _DEFAULT_TOPICS: dict[str, list[str]] = {

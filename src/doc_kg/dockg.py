@@ -414,7 +414,7 @@ def parse_corpus(
     edges: dict[tuple[str, str, str], DocEdge] = {}
 
     chunker = chunker_for(
-        chunk_strategy,  # type: ignore[arg-type]
+        chunk_strategy,  # ty: ignore[invalid-argument-type]
         sentences_per_chunk=sentences_per_chunk,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -546,7 +546,7 @@ def parse_corpus(
             _chunk_kmeans_topics: list[str | None] = []
             if _kmeans_data is not None and chunks:
                 batch_texts = [c["text"] for c in chunks]
-                raw_embs = _kmeans_embedder.embed_texts(batch_texts)  # type: ignore[union-attr]
+                raw_embs = _kmeans_embedder.embed_texts(batch_texts)  # ty: ignore[unresolved-attribute]
                 arr = _sk_normalize(_np.asarray(raw_embs, dtype="float32"))  # type: ignore[name-defined]
                 cluster_idxs = _kmeans_data["kmeans"].predict(arr)
                 _chunk_kmeans_topics = [_kmeans_data["labels"][int(i)] for i in cluster_idxs]

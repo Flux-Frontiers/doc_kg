@@ -570,7 +570,7 @@ class GraphStore:
             params: list[object] = [node_id, rel]
         else:
             query = "SELECT src, rel, dst, evidence FROM edges WHERE src = ?"
-            params = [node_id]
+            params: list[object] = [node_id]
         if limit is not None:
             query += " LIMIT ?"
             params.append(limit)
