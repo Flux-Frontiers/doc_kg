@@ -10,7 +10,7 @@ Coverage:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from doc_kg.dockg import (
     DocEdge,
@@ -311,21 +311,23 @@ class TestQuerySeedFiltering:
         hit.rank = 0
         return hit
 
+    def _make_kg(self, tmp_path, store, hits):
+        """Build a DocKG with a real store and a mock index (no model loading)."""
+        kg = DocKG(tmp_path)
+        kg._store = store
+        mock_index = MagicMock()
+        mock_index.search.return_value = hits
+        kg._index = mock_index
+        return kg
+
     def test_reference_md_excluded_from_results(self, tmp_path):
         store, _ = self._build_store(tmp_path)
-
-        # Simulate index returning hits that include a reference.md node.
         hits = [
             self._fake_seed_hit("chunk:book.md:0000", "book.md", 0.05),
             self._fake_seed_hit("chunk:reference.md:0000", "reference.md", 0.10),
         ]
-
-        kg = DocKG(tmp_path)
-        kg._store = store  # inject real store
-
-        with patch.object(kg.index, "search", return_value=hits):
-            result = kg.query("stoic philosophy")
-
+        kg = self._make_kg(tmp_path, store, hits)
+        result = kg.query("stoic philosophy")
         returned_ids = {n["id"] for n in result.nodes}
         assert "chunk:reference.md:0000" not in returned_ids, (
             "reference.md chunk should be excluded from query results"
@@ -333,18 +335,12 @@ class TestQuerySeedFiltering:
 
     def test_front_matter_excluded_from_results(self, tmp_path):
         store, _ = self._build_store(tmp_path)
-
         hits = [
             self._fake_seed_hit("chunk:book.md:0000", "book.md", 0.05),
             self._fake_seed_hit("chunk:book.md:0001", "book.md", 0.08),
         ]
-
-        kg = DocKG(tmp_path)
-        kg._store = store
-
-        with patch.object(kg.index, "search", return_value=hits):
-            result = kg.query("stoic philosophy")
-
+        kg = self._make_kg(tmp_path, store, hits)
+        result = kg.query("stoic philosophy")
         returned_ids = {n["id"] for n in result.nodes}
         assert "chunk:book.md:0001" not in returned_ids, (
             "front_matter chunk should be excluded from query results"
@@ -352,37 +348,23 @@ class TestQuerySeedFiltering:
 
     def test_prose_chunk_included_in_results(self, tmp_path):
         store, _ = self._build_store(tmp_path)
-
         hits = [
             self._fake_seed_hit("chunk:book.md:0000", "book.md", 0.05),
             self._fake_seed_hit("chunk:book.md:0001", "book.md", 0.08),
             self._fake_seed_hit("chunk:reference.md:0000", "reference.md", 0.12),
         ]
-
-        kg = DocKG(tmp_path)
-        kg._store = store
-
-        with patch.object(kg.index, "search", return_value=hits):
-            result = kg.query("stoic philosophy")
-
+        kg = self._make_kg(tmp_path, store, hits)
+        result = kg.query("stoic philosophy")
         returned_ids = {n["id"] for n in result.nodes}
         assert "chunk:book.md:0000" in returned_ids, "Prose chunk should be present in results"
 
     def test_all_filtered_seeds_still_returns_empty(self, tmp_path):
         store, _ = self._build_store(tmp_path)
-
-        # Only FM and reference hits — no prose.
         hits = [
             self._fake_seed_hit("chunk:book.md:0001", "book.md", 0.05),
             self._fake_seed_hit("chunk:reference.md:0000", "reference.md", 0.08),
         ]
-
-        kg = DocKG(tmp_path)
-        kg._store = store
-
-        with patch.object(kg.index, "search", return_value=hits):
-            result = kg.query("stoic philosophy")
-
-        # No front_matter or reference in results regardless.
+        kg = self._make_kg(tmp_path, store, hits)
+        result = kg.query("stoic philosophy")
         for n in result.nodes:
             assert n.get("content_type") not in ("front_matter", "reference")
