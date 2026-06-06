@@ -1,0 +1,125 @@
+{
+  "key": "f3666ceab2290bcdfd743c7d4bf53ba9c920e073",
+  "branch": "main",
+  "timestamp": "2026-05-04T03:47:24.364185+00:00",
+  "version": "0.13.0",
+  "metrics": {
+    "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+    "total_nodes": 2442,
+    "total_edges": 19307,
+    "node_counts": {
+      "chunk": 481,
+      "document": 29,
+      "entity": 691,
+      "keyword": 575,
+      "section": 345,
+      "topic": 321
+    },
+    "edge_counts": {
+      "CONTAINS": 826,
+      "CO_OCCURS_WITH": 11422,
+      "HAS_KEYWORD": 1914,
+      "HAS_TOPIC": 497,
+      "MENTIONS_ENTITY": 2183,
+      "NEXT": 96,
+      "REFERENCES": 23,
+      "SIMILAR_TO": 2346
+    },
+    "meaningful_nodes": 2413,
+    "coverage_score": 0.9771309771309772,
+    "issues_count": 1,
+    "complexity_median": 56.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260308.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260308.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 70,
+      "total_links": 70
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 66,
+      "total_links": 66
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260308.md:0003",
+      "file_path": "analysis/doc_kg_analysis_20260308.md",
+      "label": "Hot Chunks",
+      "references": 0,
+      "semantic_links": 63,
+      "total_links": 63
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260308.md:0001",
+      "file_path": "analysis/doc_kg_analysis_20260308.md",
+      "label": "Semantic Coverage",
+      "references": 0,
+      "semantic_links": 57,
+      "total_links": 57
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260320.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260320.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 56,
+      "total_links": 56
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0003",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Hot Chunks",
+      "references": 0,
+      "semantic_links": 54,
+      "total_links": 54
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0001",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Semantic Coverage",
+      "references": 0,
+      "semantic_links": 51,
+      "total_links": 51
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260320.md:0001",
+      "file_path": "analysis/doc_kg_analysis_20260320.md",
+      "label": "Semantic Coverage",
+      "references": 0,
+      "semantic_links": 50,
+      "total_links": 50
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0009",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Module Architecture",
+      "references": 0,
+      "semantic_links": 50,
+      "total_links": 50
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260320.md:0003",
+      "file_path": "analysis/doc_kg_analysis_20260320.md",
+      "label": "Hot Chunks",
+      "references": 0,
+      "semantic_links": 49,
+      "total_links": 49
+    }
+  ],
+  "issues": [
+    "Chunk density appears low; consider reducing --chunk-size or reviewing corpus content."
+  ],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 475,
+    "edges": 7618,
+    "coverage_delta": 0.09225125204506657,
+    "issues_delta": 1
+  }
+}

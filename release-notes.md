@@ -1,22 +1,15 @@
-# Release Notes — v0.15.4
+# Release Notes — v0.15.5
 
-> Released: 2026-06-01
+> Released: 2026-06-05
 
-## What's New
+## [0.15.5] - 2026-06-05
 
-### Type checker migrated from mypy to ty
+### Changed
+- `.pre-commit-config.yaml`, `pyproject.toml`: Removed `pylint` entirely; linting is now handled exclusively by `ruff`, consistent with the `kgrag` project. Dropped `pylint>=4.0.5` from `dev` and `all` optional-dependency groups and deleted `[tool.pylint.messages_control]` configuration.
 
-The project has switched from `mypy` to Astral's `ty` for static type checking. `ty` is a Rust-based type checker that is significantly faster than `mypy` for large codebases. The migration covers CI (`.github/workflows/ci.yml`), pre-commit (`.pre-commit-config.yaml`), dev dependencies, and `pyproject.toml` configuration. The `[tool.mypy]` section has been replaced with `[tool.ty.environment]` and `[tool.ty.rules]`. All type-suppression comments have been updated to the `# ty: ignore[...]` format, and two `# type: ignore[return-value]` workarounds in `graph.py` have been replaced with explicit `assert` narrowing.
-
-The `ruff-pre-commit` hook has also been updated to `v0.15.13` and the hook id renamed from `ruff` to `ruff-check`.
-
-### Removed dead API surface
-
-The `similar_max_degree` parameter has been removed from `DocKG.build()`, `build_from_cache()`, and `build_index_from_cache()`. The parameter was accepted but never forwarded to the underlying `SemanticIndex`, so callers were silently getting unlimited degree regardless of what they passed. Use `similar_k` for per-node edge caps.
-
-### Housekeeping
-
-13 stale `.claude/agents/` definition files have been removed (`cco`, `cw`, `do`, `doc`, `kc`, `me`, `qa`, `sd`, `sec`, `ta`, `uid`, `uids`, `uxd`).
+### Fixed
+- `src/doc_kg/kg.py`: Restored `similar_max_degree: int = 0` parameter to `DocKG.build()`, `build_from_cache()`, and `build_index_from_cache()`. The parameter was introduced in v0.15.3 but removed in v0.15.4 because it was accepted without being forwarded to `SemanticIndex`. It is now threaded through correctly to `_discover_similar_edges()` via all three public build paths.
+- `tests/test_front_matter.py`: `TestQuerySeedFiltering` tests were failing in CI with a HuggingFace connectivity error. The root cause was that `patch.object(kg.index, "search", ...)` triggered the lazy `index` property before the patch applied, initialising `SemanticIndex` and loading the sentence-transformer model. Fixed by injecting `kg._index = MagicMock()` directly so the lazy property is bypassed entirely. Tests now run in ~0.05 s with no network access.
 
 ---
 

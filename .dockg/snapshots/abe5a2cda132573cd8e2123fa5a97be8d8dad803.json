@@ -1,0 +1,125 @@
+{
+  "key": "abe5a2cda132573cd8e2123fa5a97be8d8dad803",
+  "branch": "main",
+  "timestamp": "2026-05-04T14:17:54.031179+00:00",
+  "version": "0.13.0",
+  "metrics": {
+    "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+    "total_nodes": 2480,
+    "total_edges": 18303,
+    "node_counts": {
+      "chunk": 493,
+      "document": 30,
+      "entity": 697,
+      "keyword": 581,
+      "section": 352,
+      "topic": 327
+    },
+    "edge_counts": {
+      "CONTAINS": 845,
+      "CO_OCCURS_WITH": 11618,
+      "HAS_KEYWORD": 1961,
+      "HAS_TOPIC": 509,
+      "MENTIONS_ENTITY": 2232,
+      "NEXT": 100,
+      "REFERENCES": 24,
+      "SIMILAR_TO": 1014
+    },
+    "meaningful_nodes": 2450,
+    "coverage_score": 0.9783637592968222,
+    "issues_count": 1,
+    "complexity_median": 23.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:docs/ingestion.md:0001",
+      "file_path": "docs/ingestion.md",
+      "label": "Pipeline Overview",
+      "references": 0,
+      "semantic_links": 26,
+      "total_links": 26
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 25,
+      "total_links": 25
+    },
+    {
+      "id": "chunk:docs/CLI.md:0015",
+      "file_path": "docs/CLI.md",
+      "label": "`dockg mcp` \u2014 MCP server",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 25
+    },
+    {
+      "id": "chunk:docs/CLI.md:0004",
+      "file_path": "docs/CLI.md",
+      "label": "`dockg build` \u2014 Full pipeline",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 24
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0014",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Docstring Coverage",
+      "references": 0,
+      "semantic_links": 23,
+      "total_links": 24
+    },
+    {
+      "id": "chunk:docs/CLI.md:0002",
+      "file_path": "docs/CLI.md",
+      "label": "Unified CLI",
+      "references": 0,
+      "semantic_links": 23,
+      "total_links": 23
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0032",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Graph Traversal Node Edge",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 23
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0030",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Data Persistence Storage Database",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0005",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Fan-In Ranking",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260320.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260320.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 21
+    }
+  ],
+  "issues": [
+    "Chunk density appears low; consider reducing --chunk-size or reviewing corpus content."
+  ],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 513,
+    "edges": 6614,
+    "coverage_delta": 0.09348403421091156,
+    "issues_delta": 1
+  }
+}
