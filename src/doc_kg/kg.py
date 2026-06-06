@@ -490,6 +490,7 @@ class DocKG:
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
+        similar_max_degree: int = 0,
     ) -> BuildStats:
         """Full pipeline: corpus parsing → SQLite → LanceDB + SIMILAR_TO edges.
 
@@ -498,6 +499,7 @@ class DocKG:
         :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
                           Set to 0 to disable the cap.
         :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
+        :param similar_max_degree: Hard per-node degree cap for SIMILAR_TO edges (0 = no cap).
         :return: :class:`BuildStats`.
         """
         graph_stats = self.build_graph(wipe=wipe)
@@ -506,6 +508,7 @@ class DocKG:
             discover_similar=discover_similar,
             similar_k=similar_k,
             similarity_edge_threshold=similarity_edge_threshold,
+            similar_max_degree=similar_max_degree,
         )
         graph_stats.indexed_rows = index_stats.indexed_rows
         graph_stats.index_dim = index_stats.index_dim
@@ -569,6 +572,7 @@ class DocKG:
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
+        similar_max_degree: int = 0,
         quiet: bool = False,
     ) -> BuildStats:
         """Build the LanceDB index from a pre-computed embedding cache.
@@ -582,6 +586,7 @@ class DocKG:
         :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
                           Set to 0 to disable the cap.
         :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
+        :param similar_max_degree: Hard per-node degree cap for SIMILAR_TO edges (0 = no cap).
         :param quiet: Suppress progress output.
         :return: :class:`BuildStats`.
         """
@@ -592,6 +597,7 @@ class DocKG:
             discover_similar=discover_similar,
             similar_k=similar_k,
             similarity_edge_threshold=similarity_edge_threshold,
+            similar_max_degree=similar_max_degree,
             quiet=quiet,
         )
         s = self.store.stats()
@@ -614,6 +620,7 @@ class DocKG:
         discover_similar: bool = True,
         similar_k: int = 5,
         similarity_edge_threshold: float = 0.85,
+        similar_max_degree: int = 0,
     ) -> BuildStats:
         """SQLite → LanceDB only (graph must already exist).
 
@@ -622,6 +629,7 @@ class DocKG:
         :param similar_k: Max SIMILAR_TO out-edges per chunk (top-k by score).
                           Set to 0 to disable the cap.
         :param similarity_edge_threshold: Minimum cosine similarity for a SIMILAR_TO edge.
+        :param similar_max_degree: Hard per-node degree cap for SIMILAR_TO edges (0 = no cap).
         :return: :class:`BuildStats` with ``indexed_rows``, ``index_dim``, and
                  ``similar_edges_added`` set.
         """
@@ -635,6 +643,7 @@ class DocKG:
             discover_similar=discover_similar,
             similar_k=similar_k,
             similarity_edge_threshold=similarity_edge_threshold,
+            similar_max_degree=similar_max_degree,
         )
         s = self.store.stats()
         return BuildStats(

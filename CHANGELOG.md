@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.15.5] - 2026-06-05
+
+### Fixed
+- `src/doc_kg/kg.py`: Restored `similar_max_degree: int = 0` parameter to `DocKG.build()`, `build_from_cache()`, and `build_index_from_cache()`. The parameter was introduced in v0.15.3 but removed in v0.15.4 because it was accepted without being forwarded to `SemanticIndex`. It is now threaded through correctly to `_discover_similar_edges()` via all three public build paths.
+
 ## [0.15.4] - 2026-06-01
 
 ### Changed
