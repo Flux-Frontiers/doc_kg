@@ -162,3 +162,42 @@ def test_stamp_meta_idempotent(tmp_path):
 
     assert len(rows) == 1
     assert rows[0][0] == "1.0.1"
+
+
+def test_fts_lexical_search(tmp_path):
+    """rebuild_fts() enables exact-phrase BM25 retrieval over chunk text."""
+    db = tmp_path / "test.sqlite"
+    store = GraphStore(db)
+    store.write(_make_nodes(), _make_edges(), wipe=True)
+
+    # No index yet -> graceful empty result, not an error.
+    assert store.has_fts() is False
+    assert store.search_lexical("first chunk") == []
+
+    n = store.rebuild_fts(quiet=True)
+    assert n == 2  # two chunk nodes; the document node is excluded
+    assert store.has_fts() is True
+
+    # Exact-phrase match isolates the right chunk.
+    assert store.search_lexical("first chunk") == ["chunk:notes.md:0000"]
+    assert store.search_lexical("second chunk") == ["chunk:notes.md:0001"]
+
+    # Apostrophes / punctuation must not break FTS5 query syntax. No exact
+    # phrase here ("first chunk of text"), so it falls back to OR-of-terms and
+    # still ranks the best lexical match first.
+    assert store.search_lexical("first chunk's text!")[0] == "chunk:notes.md:0000"
+
+    # Empty / term-less queries degrade cleanly.
+    assert store.search_lexical("   ") == []
+    store.close()
+
+
+def test_fts_rebuild_is_idempotent(tmp_path):
+    """rebuild_fts() can be called repeatedly without error or duplication."""
+    db = tmp_path / "test.sqlite"
+    store = GraphStore(db)
+    store.write(_make_nodes(), _make_edges(), wipe=True)
+    assert store.rebuild_fts(quiet=True) == 2
+    assert store.rebuild_fts(quiet=True) == 2  # drop + rebuild, no duplicates
+    assert store.search_lexical("first chunk") == ["chunk:notes.md:0000"]
+    store.close()

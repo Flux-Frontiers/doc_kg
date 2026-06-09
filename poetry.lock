@@ -1294,15 +1294,28 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.2.4"
-description = "Shared types and snapshot infrastructure for the KGModule SDK"
+version = "0.4.2"
+description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 files = [
-    {file = "kgmodule_utils-0.2.4-py3-none-any.whl", hash = "sha256:cf1b36c930709f8437403336a09173e810ec2627e59449a403f3b192f36a53dc"},
-    {file = "kgmodule_utils-0.2.4.tar.gz", hash = "sha256:ec9fc77fec00335e7e271bd86da98f753e0598fdd8927c104e4be9be703b3a1b"},
+    {file = "kgmodule_utils-0.4.2-py3-none-any.whl", hash = "sha256:7fab7fb489df6ca513b1ebfef991b135cb414689074af0c5cd5308afb0eb5480"},
+    {file = "kgmodule_utils-0.4.2.tar.gz", hash = "sha256:6cbd7ffb16c9c6f6d4d18c31a8304a46aed6044659e4891a90c25e1587fac854"},
 ]
+
+[package.dependencies]
+lancedb = {version = ">=0.19.0", optional = true, markers = "extra == \"semantic\""}
+numpy = {version = ">=1.24.0", optional = true, markers = "extra == \"semantic\""}
+sentence-transformers = {version = ">=5.4.1", optional = true, markers = "extra == \"semantic\""}
+torch = {version = ">=2.5.1", optional = true, markers = "extra == \"semantic\""}
+transformers = {version = ">=4.40.0,<4.57", optional = true, markers = "extra == \"semantic\""}
+ty = ">=0.0.44,<0.0.45"
+
+[package.extras]
+semantic = ["lancedb (>=0.19.0)", "numpy (>=1.24.0)", "sentence-transformers (>=5.4.1)", "torch (>=2.5.1)", "transformers (>=4.40.0,<4.57)"]
+synthesis = ["httpx (>=0.27.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
+synthesis-mflux = ["httpx (>=0.27.0)", "mflux (>=0.9.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
 
 [[package]]
 name = "lance-namespace"
@@ -2508,21 +2521,20 @@ files = [
 
 [[package]]
 name = "pycode-kg"
-version = "0.19.1"
+version = "0.19.3"
 description = "A tool to build a searchable knowledge graph from Python repositories"
 optional = true
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 markers = "extra == \"dev\" or extra == \"kgdeps\" or extra == \"all\""
 files = [
-    {file = "pycode_kg-0.19.1-py3-none-any.whl", hash = "sha256:8c68844280c1c302cedb64e9fbe40bfc92d881c32bcc31cff9a3ab3c0ab1cb45"},
-    {file = "pycode_kg-0.19.1.tar.gz", hash = "sha256:58863f69eeb33976c295f1a417d247ec65958d21d100c67fc18bbc1b6a52c2dd"},
+    {file = "pycode_kg-0.19.3-py3-none-any.whl", hash = "sha256:835f77b2fed1a6bbb97064d671174621848b4f42b18c964242963ba2676e665e"},
+    {file = "pycode_kg-0.19.3.tar.gz", hash = "sha256:bb27f051a39039feaa843aba10123da1ac40e2a8dd0d04d44eb8c95cd2eecda8"},
 ]
 
 [package.dependencies]
 click = ">=8.1.0,<9"
-kgmodule-utils = ">=0.2.1"
-lancedb = ">=0.29.0"
+kgmodule-utils = {version = ">=0.3.1", extras = ["semantic"]}
 mcp = ">=1.0.0"
 numpy = ">=1.24.0"
 pandas = ">=2.0.0"
@@ -2533,9 +2545,9 @@ torch = ">=2.5.1"
 transformers = ">=4.40.0,<4.57"
 
 [package.extras]
-all = ["PyQt5 (>=5.15.0)", "detect-secrets (>=1.5.0)", "markdown (>=3.6)", "mypy (>=1.10.0)", "param (>=2.0.0)", "pdoc (>=14.0.0)", "plotly (>=5.14.0)", "pre-commit (>=4.5.1)", "pylint (>=4.0.5)", "pytest (>=8.0.0)", "pytest-cov (>=5.0.0)", "pyvis (>=0.3.2)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "ruff (>=0.4.0)", "streamlit (>=1.35.0)", "trame-vtk (>=2.0.0)"]
-dev = ["detect-secrets (>=1.5.0)", "doc-kg (>=0.11.0)", "mypy (>=1.10.0)", "pdoc (>=14.0.0)", "pre-commit (>=4.5.1)", "pylint (>=4.0.5)", "pytest (>=8.0.0)", "pytest-cov (>=5.0.0)", "ruff (>=0.4.0)"]
-kgdeps = ["doc-kg (>=0.11.0)"]
+all = ["PyQt5 (>=5.15.0)", "detect-secrets (>=1.5.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pdoc (>=14.0.0)", "plotly (>=5.14.0)", "pre-commit (>=4.5.1)", "pylint (>=4.0.5)", "pytest (>=8.0.0)", "pytest-cov (>=5.0.0)", "pyvis (>=0.3.2)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "ruff (>=0.4.0)", "streamlit (>=1.35.0)", "trame-vtk (>=2.0.0)", "ty (>=0.0.41)"]
+dev = ["detect-secrets (>=1.5.0)", "doc-kg (>=0.15.2)", "pdoc (>=14.0.0)", "pre-commit (>=4.5.1)", "pylint (>=4.0.5)", "pytest (>=8.0.0)", "pytest-cov (>=5.0.0)", "ruff (>=0.4.0)", "ty (>=0.0.41)"]
+kgdeps = ["doc-kg (>=0.15.2)"]
 viz = ["plotly (>=5.14.0)", "pyvis (>=0.3.2)", "streamlit (>=1.35.0)"]
 viz3d = ["PyQt5 (>=5.15.0)", "markdown (>=3.6)", "param (>=2.0.0)", "pyvista[jupyter] (>=0.44.0)", "pyvistaqt (>=0.11.0)", "trame-vtk (>=2.0.0)"]
 
@@ -4121,32 +4133,31 @@ tutorials = ["matplotlib", "pandas", "tabulate"]
 
 [[package]]
 name = "ty"
-version = "0.0.41"
+version = "0.0.44"
 description = "An extremely fast Python type checker, written in Rust."
 optional = false
 python-versions = ">=3.8"
 groups = ["main", "dev"]
 files = [
-    {file = "ty-0.0.41-py3-none-linux_armv6l.whl", hash = "sha256:5f61c5c06616129ce31dd74141e18be69f5e4204a9a0f4505688213353475b30"},
-    {file = "ty-0.0.41-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:25d6b4fbf198ae7523b8e4845ec3c7e1b1cd5efa1712febcad3856e70e66632b"},
-    {file = "ty-0.0.41-py3-none-macosx_11_0_arm64.whl", hash = "sha256:3509788ed3753669cdd28d289f281b834ceee91b4de648fcf0ef60677a75b030"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b8c04f1424c872f1d8d28efbd69fb52728fcc6c37aa2d11675bf16f76d33ae14"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:53e52bfce12f3723c376d690625f5c462fe318c46dbe53b16d36c266388ee04c"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c4f1d606602dc0eb895a0943af737d638311c7afd48b414897fd42a05e876a76"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:e8f3c41f0b6b0525bcc8d76a9a5921cccda11886ae11f73e2d51e20e185bafb3"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bff8c4468933961e656664c3ef190800e3d50582c248aed41bb8a1578d64864a"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c83077a5c56770b1dab5b086a908a4e77740fb8f29d862ed05bd4c854549603d"},
-    {file = "ty-0.0.41-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:8067fae5532ad3c48295c7ddbd1657ea3ee7392810c57810c9c98fe83d43d57f"},
-    {file = "ty-0.0.41-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:73a245242380bac3fbf3005d085c153923a45de8918001fad475af54c6fd50e4"},
-    {file = "ty-0.0.41-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:4eb25f5dc398aa0a5fbd90de62d6a0fd3713354e566ba93cc53670fe84067ee1"},
-    {file = "ty-0.0.41-py3-none-musllinux_1_2_i686.whl", hash = "sha256:092c3a1ef9e3a189f71428092e736080ef42bf5c14412aa61bee8d644261797d"},
-    {file = "ty-0.0.41-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:53edeb6e2ac430fe789454471f0e22a2a71581100818271150bd8f89fa468cc7"},
-    {file = "ty-0.0.41-py3-none-win32.whl", hash = "sha256:f66bdf3afb71f11d412a4c704fa9691e0209cbc8268a19489c8960c7b74eac8b"},
-    {file = "ty-0.0.41-py3-none-win_amd64.whl", hash = "sha256:c18386e5c3a0c3d118ce58ee0d8a35f8d18d6b1020ca8ec690f6064e6230a79b"},
-    {file = "ty-0.0.41-py3-none-win_arm64.whl", hash = "sha256:289eb66ee5c3554d59b0ea69885ddc5fc8051f3228dd9fee2501799db4a07117"},
-    {file = "ty-0.0.41.tar.gz", hash = "sha256:1e8b55bf4729634b2db64a7d9541cd880087cd681e87efc36e6a056cf05fb648"},
+    {file = "ty-0.0.44-py3-none-linux_armv6l.whl", hash = "sha256:272d31e7ad49b1dc5e8465a9fe700354e14c755b40d9c75f08f031d786903df3"},
+    {file = "ty-0.0.44-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b92c4ddd7a3daf2049715edec9dc70cf6fd31a5a318ee647258f90dd75495eed"},
+    {file = "ty-0.0.44-py3-none-macosx_11_0_arm64.whl", hash = "sha256:4d42cfd84a690f6654b2a4f0515027c21b692cf2512d32e6433f754893a95609"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5dc47ae87e4cb7db2a9166bb23b78a905c3626e523296ec5bccf36b5e89bda6b"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:46d867e80f16f421ac72c9a85240dbf050d62d9b3fbd10a8b5b082fb21679e0b"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:411f5de0f96a4e4e5cccc3e0d55954c41f6a99ee6ca1fe5a7226cbc68406e053"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:4b15f01ecb4e2b46c05a1769293f9d32c3d4a1e4e7dfccf37c604d705dc3e3f4"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:edd32b7467af509c99c0244c2226a4e4c03400699003ec33373282ab931654d9"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:503a585f4007387c3afc58bae23a7ca1b9f236cbdb1a881dc36110655ceb1937"},
+    {file = "ty-0.0.44-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:2d28bcfa83243d77c2316944e8cf197f73597bf17d1ddc047d0b10a762531252"},
+    {file = "ty-0.0.44-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:56fd2dd0192def189715b25f5338f6222fb827884dc34111e50aa1c4e061cee5"},
+    {file = "ty-0.0.44-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:7f8d990489032de1984e73c159f3e760d754cf83a602b874827d943821f63595"},
+    {file = "ty-0.0.44-py3-none-musllinux_1_2_i686.whl", hash = "sha256:f61ffe72996a755432922fe90b28db593f572eb5cbf48e3ef4e67b282533d1b0"},
+    {file = "ty-0.0.44-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:2b237a143bac4f30cec9257d45f01e72da97030a80a09a2b69cfef065f09c37f"},
+    {file = "ty-0.0.44-py3-none-win32.whl", hash = "sha256:6a24586c65419223ac5bab4822d49ab493a5d19ea2a897514284c232b9d6166a"},
+    {file = "ty-0.0.44-py3-none-win_amd64.whl", hash = "sha256:8cccb27e348c89a9733fbad1b2efadfbad79b107c7e52adb52dfd8a70156a38d"},
+    {file = "ty-0.0.44-py3-none-win_arm64.whl", hash = "sha256:58049504e7a12bf1957f24a5384a332c94d5590127083a80db5e5a1bed34190b"},
+    {file = "ty-0.0.44.tar.gz", hash = "sha256:5886229830ab77022842a1c55d2ef57405621a91fc465969fa6d538661898173"},
 ]
-markers = {main = "extra == \"dev\" or extra == \"all\""}
 
 [[package]]
 name = "typing-extensions"
@@ -4383,4 +4394,4 @@ viz = ["plotly", "pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "9ab437cdaaea450bef5c41e1cdccf2e92352d076dc0f1f85c42c840c5c393101"
+content-hash = "f7781ff8e8b5b15611495b339e69c36bd16450702da937a6eeac056e202e796c"

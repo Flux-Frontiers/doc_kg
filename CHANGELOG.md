@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `src/doc_kg/store.py`: Hybrid lexical retrieval via SQLite FTS5. `GraphStore.rebuild_fts()` builds a *contentless* FTS5 table `nodes_fts` (inverted index only, ≈1× chunk-text size) over all `kind='chunk'` rows; safe to call repeatedly (drops + rebuilds) and no-ops cleanly when SQLite lacks FTS5. `has_fts()` reports index presence. `search_lexical()` runs BM25 ranking, trying an exact-phrase query first and falling back to OR-of-terms for recall; returns chunk IDs best-first, or `[]` on older corpora so callers degrade to dense-only. Added `_fts_terms()` helper to tokenise queries into bare alphanumerics, stripping apostrophes/punctuation that FTS5 would otherwise treat as query syntax (e.g. `Lot's` → `lot`, `s`).
+- `src/doc_kg/kg.py`: `DocKG._fused_seeds()` blends the dense (vector) and lexical (BM25) seed channels with reciprocal rank fusion (RRF, `_RRF_K=60`) so exact-phrase matches that dense embeddings bury can seed graph expansion without sacrificing dense recall. Lexical-only seeds receive a synthetic cosine distance (`_LEXICAL_SEED_BASE_DIST` + per-rank step) so distance-based ranking can place them. `query()` and `pack()` now seed via `_fused_seeds()`. `DocKG.build()` calls `store.rebuild_fts()` so new builds get the lexical index automatically.
+- `src/doc_kg/cli/cmd_build.py`: `dockg reindex-fts` command backfills the FTS5 lexical index on an existing graph from chunk text already in SQLite — no re-embedding, no LanceDB changes. Lets corpora built before the lexical index existed gain hybrid retrieval.
+- `tests/test_store.py`: `test_fts_lexical_search` and `test_fts_rebuild_is_idempotent` cover graceful empty results before indexing, chunk-count after `rebuild_fts()`, exact-phrase isolation, apostrophe/punctuation handling via OR-fallback, term-less query degradation, and idempotent rebuilds.
 
 ### Changed
+- `pyproject.toml`, `src/doc_kg/__init__.py`: Version bumped to 0.15.6.
 
 ### Removed
 

@@ -907,3 +907,31 @@ def build_two_phase(
 
     _console.print("\n[green]Build complete.[/green]")
     kg.close()
+
+
+@cli.command("reindex-fts")
+@repo_option
+@sqlite_option
+def reindex_fts(repo: str, sqlite: str) -> None:
+    """Backfill the FTS5 lexical (BM25) index on an existing graph.
+
+    Rebuilds ``nodes_fts`` from chunk text already in SQLite — no re-embedding,
+    no LanceDB changes.  Use this to add hybrid lexical retrieval to corpora
+    built before the lexical index existed.
+    """
+    from doc_kg.store import GraphStore  # pylint: disable=import-outside-toplevel
+
+    repo_root = Path(repo).resolve()
+    db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
+    if not db_path.exists():
+        raise click.ClickException(f"No graph store at {db_path}")
+
+    _console.print(Rule(f"DocKG reindex-fts — {repo_root.name}", style="bold blue"))
+    _console.print(f"  graph store : {db_path}")
+    store = GraphStore(db_path)
+    n = store.rebuild_fts()
+    store.close()
+    if n:
+        _console.print("\n[green]Lexical index ready.[/green]")
+    else:
+        _console.print("\n[yellow]No lexical index built (FTS5 unavailable or no chunks).[/yellow]")

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import sqlite3
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
@@ -663,6 +664,82 @@ class GraphStore:
         return meta
 
     # ------------------------------------------------------------------
+    # Lexical (full-text) index — SQLite FTS5
+    # ------------------------------------------------------------------
+
+    def rebuild_fts(self, *, quiet: bool = False) -> int:
+        """(Re)build the FTS5 lexical index over chunk text.
+
+        Creates a *contentless* FTS5 table ``nodes_fts`` keyed by ``nodes.rowid``
+        so it stores only the inverted index (≈1× the chunk text size), not a
+        second copy of the text.  Safe to call repeatedly — it drops and
+        rebuilds.  No-ops cleanly if SQLite was compiled without FTS5.
+
+        :param quiet: Suppress the summary line.
+        :return: Number of chunk rows indexed (``0`` if FTS5 is unavailable).
+        """
+        con = self.con
+        try:
+            con.execute("DROP TABLE IF EXISTS nodes_fts")
+            con.execute("CREATE VIRTUAL TABLE nodes_fts USING fts5(text, content='')")
+        except sqlite3.OperationalError as exc:  # FTS5 not compiled in
+            if not quiet:
+                Console().print(f"  [yellow]FTS5 unavailable, skipping lexical index ({exc})[/]")
+            return 0
+        con.execute(
+            "INSERT INTO nodes_fts(rowid, text) "
+            "SELECT rowid, text FROM nodes "
+            "WHERE kind='chunk' AND text IS NOT NULL AND text != ''"
+        )
+        con.commit()
+        n = con.execute("SELECT count(*) FROM nodes_fts").fetchone()[0]
+        if not quiet:
+            Console().print(f"  Built lexical index (nodes_fts): {n} chunks")
+        return n
+
+    def has_fts(self) -> bool:
+        """Return ``True`` if the ``nodes_fts`` lexical index exists."""
+        row = self.con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes_fts'"
+        ).fetchone()
+        return row is not None
+
+    def search_lexical(self, query: str, *, limit: int = 24) -> list[str]:
+        """BM25 lexical search over chunk text via FTS5.
+
+        Tries an exact-phrase query first (adjacent terms, in order), then falls
+        back to an OR-of-terms query for recall.  Returns chunk node IDs ordered
+        best-first.  Returns ``[]`` when the index is absent (older corpora) or
+        the query has no usable terms, so callers degrade to dense-only.
+
+        :param query: Natural-language query string.
+        :param limit: Maximum number of chunk IDs to return.
+        :return: Ordered list of chunk node IDs.
+        """
+        if not self.has_fts():
+            return []
+        terms = _fts_terms(query)
+        if not terms:
+            return []
+        con = self.con
+
+        def _run(match: str) -> list[str]:
+            try:
+                rows = con.execute(
+                    "SELECT n.id FROM nodes_fts f JOIN nodes n ON n.rowid = f.rowid "
+                    "WHERE nodes_fts MATCH ? ORDER BY bm25(nodes_fts) LIMIT ?",
+                    (match, limit),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                return []
+            return [r[0] for r in rows]
+
+        ids = _run('"' + " ".join(terms) + '"')  # phrase
+        if not ids:
+            ids = _run(" OR ".join(terms))  # any-term fallback
+        return ids
+
+    # ------------------------------------------------------------------
     # Stats
     # ------------------------------------------------------------------
 
@@ -691,6 +768,17 @@ class GraphStore:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+_FTS_TOKEN = re.compile(r"[a-z0-9]+")
+
+
+def _fts_terms(query: str) -> list[str]:
+    """Tokenise a query into bare alphanumeric terms for FTS5.
+
+    Strips apostrophes, quotes and punctuation that would otherwise be
+    interpreted as FTS5 query syntax (e.g. ``Lot's`` → ``lot``, ``s``).
+    """
+    return _FTS_TOKEN.findall(query.lower())
 
 
 def _row_to_node(row: tuple) -> dict:

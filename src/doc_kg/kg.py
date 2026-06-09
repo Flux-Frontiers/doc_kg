@@ -268,6 +268,16 @@ _REL_RANK_WEIGHTS: dict[str, float] = {
 
 _MIN_CHUNK_CHARS = 50  # micro-fragments below this are noise, not factual asides
 
+# Reciprocal-rank-fusion constant for blending the dense (vector) and lexical
+# (BM25) seed channels.  Larger -> flatter weighting across ranks.
+_RRF_K = 60
+# Synthetic cosine-distance assigned to seeds that surface only via the lexical
+# channel (no dense vector rank), so downstream distance-based ranking can place
+# them.  An exact-phrase BM25 hit is high-confidence, hence a small base
+# distance; the per-rank step keeps lexical-only seeds ordered among themselves.
+_LEXICAL_SEED_BASE_DIST = 0.12
+_LEXICAL_SEED_STEP = 0.01
+
 
 def _short_chunk_boost(node: dict, *, threshold: int = 200) -> float:
     """Return a boost for short chunk nodes to surface factual asides.
@@ -524,6 +534,7 @@ class DocKG:
         """
         nodes, edges = self.graph.extract(force=wipe, quiet=quiet).result()
         self.store.write(nodes, edges, wipe=wipe, quiet=quiet)
+        self.store.rebuild_fts(quiet=quiet)
         self.store.stamp_meta("doc_kg", _pkg_version("doc_kg"))
         s = self.store.stats()
         return BuildStats(
@@ -662,6 +673,59 @@ class DocKG:
     # Query
     # ------------------------------------------------------------------
 
+    def _fused_seeds(self, q: str, k: int) -> dict[str, dict]:
+        """Produce ranked query seeds by fusing dense + lexical retrieval.
+
+        Runs the dense vector search and the FTS5/BM25 lexical search, drops
+        front-matter / reference chunks from both, then blends the two rank
+        lists with reciprocal rank fusion (RRF).  This lets exact-phrase matches
+        (which dense embeddings frequently bury) seed the graph expansion while
+        preserving dense recall.  Degrades to pure dense ranking when the corpus
+        has no lexical index (``nodes_fts`` absent on older builds).
+
+        :param q: Natural-language query.
+        :param k: Number of fused seeds to keep.
+        :return: ``{node_id: {"rank": int, "dist": float}}`` ordered best-first.
+        """
+        # Oversample the dense channel to survive front-matter / reference filtering.
+        raw_hits = self.index.search(q, k=k * 3)
+        dense = [h for h in raw_hits if not (h.file_path or "").endswith("reference.md")]
+        lex_ids = self.store.search_lexical(q, limit=k * 3)
+
+        # Single batch fetch to filter both channels by content_type.
+        need = {h.id for h in dense} | set(lex_ids)
+        nmap = self.store.nodes_batch(need) if need else {}
+
+        def _ok(nid: str) -> bool:
+            n = nmap.get(nid)
+            if n is None:
+                return False
+            if (n.get("file_path") or "").endswith("reference.md"):
+                return False
+            return n.get("content_type") not in ("front_matter", "reference")
+
+        dense = [h for h in dense if _ok(h.id)]
+        lex_ids = [i for i in lex_ids if _ok(i)]
+
+        dense_dist = {h.id: h.distance for h in dense}
+        lex_rank = {i: r for r, i in enumerate(lex_ids)}
+
+        scores: dict[str, float] = {}
+        for r, h in enumerate(dense):
+            scores[h.id] = scores.get(h.id, 0.0) + 1.0 / (_RRF_K + r)
+        for i, r in lex_rank.items():
+            scores[i] = scores.get(i, 0.0) + 1.0 / (_RRF_K + r)
+
+        order = sorted(scores, key=lambda i: -scores[i])[:k]
+        seed_rank: dict[str, dict] = {}
+        for rank, nid in enumerate(order):
+            if nid in dense_dist:
+                dist = dense_dist[nid]
+            else:
+                dist = _LEXICAL_SEED_BASE_DIST + _LEXICAL_SEED_STEP * lex_rank.get(nid, 0)
+            seed_rank[nid] = {"rank": rank, "dist": dist}
+        return seed_rank
+
     def query(
         self,
         q: str,
@@ -680,24 +744,9 @@ class DocKG:
         :param max_nodes: Maximum nodes to return.
         :return: :class:`QueryResult`.
         """
-        # Oversample to account for front-matter / reference filtering.
-        raw_hits = self.index.search(q, k=k * 3)
-
-        # Immediately drop reference.md hits (file_path check, works on all indices).
-        candidates = [h for h in raw_hits if not (h.file_path or "").endswith("reference.md")]
-
-        # Drop front_matter chunks (content_type set after rebuild; no-op on old indices).
-        if candidates:
-            cand_nodes = self.store.nodes_batch({h.id for h in candidates})
-            candidates = [
-                h
-                for h in candidates
-                if cand_nodes.get(h.id, {}).get("content_type") != "front_matter"
-            ]
-
-        hits = candidates[:k]
-        seed_ids: set[str] = {h.id for h in hits}
-        seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
+        # Fuse dense (vector) and lexical (BM25) seed channels via RRF.
+        seed_rank = self._fused_seeds(q, k)
+        seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
         all_ids = set(meta.keys())
@@ -788,8 +837,7 @@ class DocKG:
         :param max_nodes: Maximum nodes to return (``None`` for no limit).
         :return: :class:`TextPack`.
         """
-        hits = self.index.search(q, k=k)
-        seed_rank: dict[str, dict] = {h.id: {"rank": h.rank, "dist": h.distance} for h in hits}
+        seed_rank = self._fused_seeds(q, k)
         seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
