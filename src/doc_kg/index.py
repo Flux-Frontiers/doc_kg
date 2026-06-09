@@ -1112,16 +1112,23 @@ class SemanticIndex:
     # Search
     # ------------------------------------------------------------------
 
-    def search(self, query: str, k: int = 8) -> list[SeedHit]:
+    def search(self, query: str, k: int = 8, *, where: str | None = None) -> list[SeedHit]:
         """Semantic vector search.
 
         :param query: Natural-language query string.
         :param k: Number of results to return.
+        :param where: Optional SQL filter applied as a LanceDB *prefilter*
+            (evaluated before the vector search, so the ``k`` nearest are drawn
+            from the matching subset rather than filtered afterwards).  Built
+            against the indexed columns ``file_path`` and ``kind``.
         :return: List of :class:`SeedHit` ordered by ascending distance.
         """
         tbl = self._get_table()
         qvec = self.embedder.embed_query(query)
-        raw = tbl.search(qvec).metric("cosine").limit(k).to_list()
+        builder = tbl.search(qvec).metric("cosine")
+        if where:
+            builder = builder.where(where, prefilter=True)
+        raw = builder.limit(k).to_list()
 
         hits: list[SeedHit] = []
         for rank, row in enumerate(raw):

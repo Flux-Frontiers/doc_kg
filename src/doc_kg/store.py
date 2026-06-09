@@ -704,7 +704,14 @@ class GraphStore:
         ).fetchone()
         return row is not None
 
-    def search_lexical(self, query: str, *, limit: int = 24) -> list[str]:
+    def search_lexical(
+        self,
+        query: str,
+        *,
+        limit: int = 24,
+        file_prefixes: Sequence[str] | None = None,
+        node_kinds: Sequence[str] | None = None,
+    ) -> list[str]:
         """BM25 lexical search over chunk text via FTS5.
 
         Tries an exact-phrase query first (adjacent terms, in order), then falls
@@ -712,9 +719,17 @@ class GraphStore:
         best-first.  Returns ``[]`` when the index is absent (older corpora) or
         the query has no usable terms, so callers degrade to dense-only.
 
+        When ``file_prefixes`` or ``node_kinds`` are given, the underlying SQL is
+        constrained so the filter is applied *in the database* (true pushdown)
+        rather than discarding rows after retrieval — this keeps the BM25 budget
+        focused on in-scope nodes (e.g. a single genre subtree).
+
         :param query: Natural-language query string.
         :param limit: Maximum number of chunk IDs to return.
-        :return: Ordered list of chunk node IDs.
+        :param file_prefixes: Restrict to nodes whose ``file_path`` starts with
+            any of these prefixes (matched with SQL ``LIKE '<prefix>%'``).
+        :param node_kinds: Restrict to nodes whose ``kind`` is in this set.
+        :return: Ordered list of node IDs.
         """
         if not self.has_fts():
             return []
@@ -723,12 +738,14 @@ class GraphStore:
             return []
         con = self.con
 
+        filter_sql, filter_params = _node_filter_sql(file_prefixes, node_kinds, alias="n")
+
         def _run(match: str) -> list[str]:
             try:
                 rows = con.execute(
                     "SELECT n.id FROM nodes_fts f JOIN nodes n ON n.rowid = f.rowid "
-                    "WHERE nodes_fts MATCH ? ORDER BY bm25(nodes_fts) LIMIT ?",
-                    (match, limit),
+                    f"WHERE nodes_fts MATCH ?{filter_sql} ORDER BY bm25(nodes_fts) LIMIT ?",
+                    (match, *filter_params, limit),
                 ).fetchall()
             except sqlite3.OperationalError:
                 return []
@@ -770,6 +787,44 @@ class GraphStore:
 # ---------------------------------------------------------------------------
 
 _FTS_TOKEN = re.compile(r"[a-z0-9]+")
+
+
+def _node_filter_sql(
+    file_prefixes: Sequence[str] | None,
+    node_kinds: Sequence[str] | None,
+    *,
+    alias: str = "n",
+) -> tuple[str, list[str]]:
+    """Build a parameterised SQL fragment scoping a ``nodes`` query.
+
+    Produces a leading-``AND`` clause (or empty string) plus the ordered bind
+    parameters, restricting rows by ``file_path`` prefix and/or ``kind``.  All
+    values are bound, never interpolated, so prefixes/kinds are injection-safe.
+
+    :param file_prefixes: Prefixes matched as ``file_path LIKE '<prefix>%'``
+        (OR-combined).  ``%`` and ``_`` in a prefix are escaped so they match
+        literally.
+    :param node_kinds: Allowed ``kind`` values (IN-combined).
+    :param alias: Table alias for the ``nodes`` table in the surrounding query.
+    :return: ``(sql_fragment, params)`` where ``sql_fragment`` begins with
+        ``" AND "`` when non-empty.
+    """
+    clauses: list[str] = []
+    params: list[str] = []
+    if file_prefixes:
+        ors: list[str] = []
+        for prefix in file_prefixes:
+            escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            ors.append(f"{alias}.file_path LIKE ? ESCAPE '\\'")
+            params.append(f"{escaped}%")
+        clauses.append("(" + " OR ".join(ors) + ")")
+    if node_kinds:
+        placeholders = ", ".join("?" for _ in node_kinds)
+        clauses.append(f"{alias}.kind IN ({placeholders})")
+        params.extend(node_kinds)
+    if not clauses:
+        return "", []
+    return " AND " + " AND ".join(clauses), params
 
 
 def _fts_terms(query: str) -> list[str]:

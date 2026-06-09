@@ -321,6 +321,57 @@ def _semantic_rank_boost(node_id: str, edges: list[dict]) -> float:
     return round(score, 4)
 
 
+def _lance_where(
+    file_prefixes: tuple[str, ...] | None,
+    node_kinds: tuple[str, ...] | None,
+) -> str | None:
+    """Build a LanceDB SQL prefilter from scope constraints.
+
+    Returns ``None`` when no constraints are given so callers can skip the
+    ``where`` clause entirely.  String literals are single-quote-escaped; the
+    only interpolated values are corpus-derived ``file_path`` prefixes and
+    ``kind`` names, never user free-text.
+
+    :param file_prefixes: ``file_path`` prefixes, OR-combined as ``LIKE``.
+    :param node_kinds: Allowed ``kind`` values, IN-combined.
+    :return: SQL filter string, or ``None`` if unconstrained.
+    """
+    clauses: list[str] = []
+    if file_prefixes:
+        ors = " OR ".join(
+            f"file_path LIKE '{p.replace(chr(39), chr(39) * 2)}%'" for p in file_prefixes
+        )
+        clauses.append(f"({ors})")
+    if node_kinds:
+        joined = ", ".join(f"'{k.replace(chr(39), chr(39) * 2)}'" for k in node_kinds)
+        clauses.append(f"kind IN ({joined})")
+    return " AND ".join(clauses) if clauses else None
+
+
+def _node_in_scope(
+    node: dict,
+    file_prefixes: tuple[str, ...] | None,
+    node_kinds: tuple[str, ...] | None,
+) -> bool:
+    """Return True if ``node`` satisfies the scope constraints.
+
+    Applied as a final guard after graph expansion, which can traverse edges
+    (e.g. ``SIMILAR_TO``) into nodes outside the requested scope.
+
+    :param node: Node dict with ``file_path`` and ``kind`` keys.
+    :param file_prefixes: Required ``file_path`` prefixes (any match), or None.
+    :param node_kinds: Allowed ``kind`` values, or None.
+    :return: True if the node is in scope.
+    """
+    if node_kinds and node.get("kind") not in node_kinds:
+        return False
+    if file_prefixes:
+        fp = node.get("file_path") or ""
+        if not any(fp.startswith(p) for p in file_prefixes):
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # DocKG — orchestrator
 # ---------------------------------------------------------------------------
@@ -673,7 +724,14 @@ class DocKG:
     # Query
     # ------------------------------------------------------------------
 
-    def _fused_seeds(self, q: str, k: int) -> dict[str, dict]:
+    def _fused_seeds(
+        self,
+        q: str,
+        k: int,
+        *,
+        file_prefixes: tuple[str, ...] | None = None,
+        node_kinds: tuple[str, ...] | None = None,
+    ) -> dict[str, dict]:
         """Produce ranked query seeds by fusing dense + lexical retrieval.
 
         Runs the dense vector search and the FTS5/BM25 lexical search, drops
@@ -683,14 +741,23 @@ class DocKG:
         preserving dense recall.  Degrades to pure dense ranking when the corpus
         has no lexical index (``nodes_fts`` absent on older builds).
 
+        When ``file_prefixes``/``node_kinds`` are supplied, both retrieval
+        channels are constrained at source (LanceDB prefilter + FTS5 SQL), so
+        the seed budget is spent entirely on in-scope nodes.
+
         :param q: Natural-language query.
         :param k: Number of fused seeds to keep.
+        :param file_prefixes: Restrict seeds to these ``file_path`` prefixes.
+        :param node_kinds: Restrict seeds to these node kinds.
         :return: ``{node_id: {"rank": int, "dist": float}}`` ordered best-first.
         """
+        where = _lance_where(file_prefixes, node_kinds)
         # Oversample the dense channel to survive front-matter / reference filtering.
-        raw_hits = self.index.search(q, k=k * 3)
+        raw_hits = self.index.search(q, k=k * 3, where=where)
         dense = [h for h in raw_hits if not (h.file_path or "").endswith("reference.md")]
-        lex_ids = self.store.search_lexical(q, limit=k * 3)
+        lex_ids = self.store.search_lexical(
+            q, limit=k * 3, file_prefixes=file_prefixes, node_kinds=node_kinds
+        )
 
         # Single batch fetch to filter both channels by content_type.
         need = {h.id for h in dense} | set(lex_ids)
@@ -734,6 +801,8 @@ class DocKG:
         hop: int = 1,
         rels: tuple[str, ...] = DEFAULT_RELS,
         max_nodes: int = 25,
+        source_path_prefixes: tuple[str, ...] | None = None,
+        node_kinds: tuple[str, ...] | None = None,
     ) -> QueryResult:
         """Hybrid query: semantic seeding + structural expansion.
 
@@ -742,10 +811,19 @@ class DocKG:
         :param hop: Graph expansion hops.
         :param rels: Edge types to expand.
         :param max_nodes: Maximum nodes to return.
+        :param source_path_prefixes: When given, restrict retrieval to nodes
+            whose ``file_path`` starts with one of these prefixes.  Pushed down
+            to both the vector (LanceDB prefilter) and lexical (FTS5) seed
+            channels, and enforced as a final guard so graph expansion cannot
+            leak out-of-scope nodes.
+        :param node_kinds: When given, restrict results to these node kinds
+            (e.g. ``("chunk", "section")`` to drop structural/topic nodes).
         :return: :class:`QueryResult`.
         """
         # Fuse dense (vector) and lexical (BM25) seed channels via RRF.
-        seed_rank = self._fused_seeds(q, k)
+        seed_rank = self._fused_seeds(
+            q, k, file_prefixes=source_path_prefixes, node_kinds=node_kinds
+        )
         seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
@@ -793,6 +871,10 @@ class DocKG:
             # them from returned results — they are preamble/metadata, not content.
             if n.get("content_type") in _excluded_types:
                 continue
+            # Final scope guard: graph expansion can cross out of the requested
+            # subtree/kinds via edges; drop any node that escaped the seed filter.
+            if not _node_in_scope(n, source_path_prefixes, node_kinds):
+                continue
             kept_ids.add(n["id"])
             nodes.append(n)
 
@@ -826,6 +908,8 @@ class DocKG:
         rels: tuple[str, ...] = DEFAULT_RELS,
         max_chars: int = 2000,
         max_nodes: int | None = 15,
+        source_path_prefixes: tuple[str, ...] | None = None,
+        node_kinds: tuple[str, ...] | None = None,
     ) -> TextPack:
         """Hybrid query + text excerpt extraction.
 
@@ -835,9 +919,15 @@ class DocKG:
         :param rels: Edge types to expand.
         :param max_chars: Maximum characters per text excerpt.
         :param max_nodes: Maximum nodes to return (``None`` for no limit).
+        :param source_path_prefixes: When given, restrict retrieval to nodes
+            whose ``file_path`` starts with one of these prefixes (pushed down
+            to both seed channels and enforced after expansion).
+        :param node_kinds: When given, restrict results to these node kinds.
         :return: :class:`TextPack`.
         """
-        seed_rank = self._fused_seeds(q, k)
+        seed_rank = self._fused_seeds(
+            q, k, file_prefixes=source_path_prefixes, node_kinds=node_kinds
+        )
         seed_ids: set[str] = set(seed_rank.keys())
 
         meta = self.store.expand(seed_ids, hop=hop, rels=rels)
@@ -883,6 +973,9 @@ class DocKG:
         for n in raw_nodes:
             if max_nodes is not None and len(kept) >= max_nodes:
                 break
+            # Final scope guard: drop nodes that expansion pulled out of scope.
+            if not _node_in_scope(n, source_path_prefixes, node_kinds):
+                continue
             if (
                 n["kind"] in ("document", "section")
                 and n.get("file_path") in seen_files_with_chunks
