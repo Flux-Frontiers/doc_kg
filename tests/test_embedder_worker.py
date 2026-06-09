@@ -291,6 +291,9 @@ def _make_fake_st(dim: int = 4):
     """Return a mock SentenceTransformer that produces deterministic vectors."""
     fake = MagicMock()
     fake.encode.return_value = np.zeros((1, dim), dtype="float32")
+    # load_sentence_transformer() ends with `model = model.to(device)`; the
+    # mock must return itself so the configured `.encode` survives the move.
+    fake.to.return_value = fake
     return fake
 
 
@@ -336,6 +339,7 @@ def test_embed_shard_returns_correct_shape(tmp_path):
     model_name = "BAAI/bge-small-en-v1.5"
     fake_st = MagicMock()
     fake_st.encode.side_effect = lambda batch, **kw: np.zeros((len(batch), 4), dtype="float32")
+    fake_st.to.return_value = fake_st  # survive load_sentence_transformer's model.to(device)
     missing = tmp_path / "nonexistent"
 
     with (
