@@ -53,7 +53,7 @@ class TestLanceWhere:
 
     def test_prefixes(self):
         where = _lance_where(("sci-fi/",), None)
-        assert where == "(file_path LIKE 'sci-fi/%')"
+        assert where == "(starts_with(file_path, 'sci-fi/'))"
 
     def test_kinds(self):
         where = _lance_where(None, ("chunk", "section"))
@@ -61,11 +61,19 @@ class TestLanceWhere:
 
     def test_combined(self):
         where = _lance_where(("a/",), ("chunk",))
-        assert where == "(file_path LIKE 'a/%') AND kind IN ('chunk')"
+        assert where == "(starts_with(file_path, 'a/')) AND kind IN ('chunk')"
 
     def test_single_quotes_escaped(self):
         where = _lance_where(("o'brien/",), None)
         assert "o''brien/" in where
+
+    def test_underscore_matches_literally(self):
+        # starts_with takes a plain string, so SQL LIKE wildcards (%/_) in a
+        # prefix need no escaping and cannot over-match (e.g. 'doc_kg' must
+        # not match 'docXkg').
+        where = _lance_where(("doc_kg/",), None)
+        assert where == "(starts_with(file_path, 'doc_kg/'))"
+        assert "LIKE" not in where
 
 
 # ---------------------------------------------------------------------------

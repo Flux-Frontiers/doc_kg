@@ -273,9 +273,12 @@ _MIN_CHUNK_CHARS = 50  # micro-fragments below this are noise, not factual aside
 _RRF_K = 60
 # Synthetic cosine-distance assigned to seeds that surface only via the lexical
 # channel (no dense vector rank), so downstream distance-based ranking can place
-# them.  An exact-phrase BM25 hit is high-confidence, hence a small base
-# distance; the per-rank step keeps lexical-only seeds ordered among themselves.
-_LEXICAL_SEED_BASE_DIST = 0.12
+# them.  Must sit at or below the distance of a typical *good* dense hit
+# (~0.4-0.5 for bge-small) but not far below it: smaller values let a single
+# lexical seed's expansion neighbourhood evict every dense hit from the top-k
+# (0.12 cost -14 pp recall@15 on the gutenberg_kg gold set; >=0.40 is plateau-
+# optimal).  The per-rank step keeps lexical-only seeds ordered among themselves.
+_LEXICAL_SEED_BASE_DIST = 0.45
 _LEXICAL_SEED_STEP = 0.01
 
 
@@ -332,20 +335,44 @@ def _lance_where(
     only interpolated values are corpus-derived ``file_path`` prefixes and
     ``kind`` names, never user free-text.
 
-    :param file_prefixes: ``file_path`` prefixes, OR-combined as ``LIKE``.
+    Prefixes are matched with ``starts_with()`` rather than ``LIKE`` so that
+    ``%`` and ``_`` in a prefix match literally — the same semantics as the
+    SQLite-side :func:`doc_kg.store._node_filter_sql` and the post-expansion
+    :func:`_node_in_scope` guard.
+
+    :param file_prefixes: ``file_path`` prefixes, OR-combined as ``starts_with``.
     :param node_kinds: Allowed ``kind`` values, IN-combined.
     :return: SQL filter string, or ``None`` if unconstrained.
     """
     clauses: list[str] = []
     if file_prefixes:
         ors = " OR ".join(
-            f"file_path LIKE '{p.replace(chr(39), chr(39) * 2)}%'" for p in file_prefixes
+            f"starts_with(file_path, '{p.replace(chr(39), chr(39) * 2)}')" for p in file_prefixes
         )
         clauses.append(f"({ors})")
     if node_kinds:
         joined = ", ".join(f"'{k.replace(chr(39), chr(39) * 2)}'" for k in node_kinds)
         clauses.append(f"kind IN ({joined})")
     return " AND ".join(clauses) if clauses else None
+
+
+def _seed_base_dist(nid: str, via_seed: str, seed_rank: dict[str, dict]) -> float:
+    """Return the ranking distance for an expanded node.
+
+    Seed nodes rank by their own ``self_dist`` (for lexical-only seeds this
+    sits just behind the best dense hit); non-seed nodes inherit the
+    conservative ``dist`` of the seed that reached them, so a lexical seed's
+    neighbourhood cannot crowd out dense results.
+
+    :param nid: Node id being ranked.
+    :param via_seed: Seed id recorded by graph-expansion provenance.
+    :param seed_rank: Seed metadata from :meth:`DocKG._fused_seeds`.
+    :return: Cosine-distance-scale ranking value (lower = better).
+    """
+    own = seed_rank.get(nid)
+    if own is not None:
+        return own.get("self_dist", own["dist"])
+    return seed_rank.get(via_seed, {"dist": 1e9})["dist"]
 
 
 def _node_in_scope(
@@ -784,13 +811,23 @@ class DocKG:
             scores[i] = scores.get(i, 0.0) + 1.0 / (_RRF_K + r)
 
         order = sorted(scores, key=lambda i: -scores[i])[:k]
+        # A lexical match is strong evidence for the matching chunk *itself*
+        # but weak evidence for its structural neighbourhood, so lexical-only
+        # seeds carry two distances: ``self_dist`` slots the seed just behind
+        # the best dense hit, while ``dist`` (used by expanded neighbours via
+        # provenance) stays conservative so one BM25 hit cannot flood the
+        # top-k with its neighbours.  Dense seeds use their real distance for
+        # both.
+        best_dense = min(dense_dist.values(), default=_LEXICAL_SEED_BASE_DIST)
         seed_rank: dict[str, dict] = {}
         for rank, nid in enumerate(order):
             if nid in dense_dist:
-                dist = dense_dist[nid]
+                dist = self_dist = dense_dist[nid]
             else:
-                dist = _LEXICAL_SEED_BASE_DIST + _LEXICAL_SEED_STEP * lex_rank.get(nid, 0)
-            seed_rank[nid] = {"rank": rank, "dist": dist}
+                lex_pos = lex_rank.get(nid, 0)
+                dist = _LEXICAL_SEED_BASE_DIST + _LEXICAL_SEED_STEP * lex_pos
+                self_dist = min(best_dense + _LEXICAL_SEED_STEP * (lex_pos + 1), dist)
+            seed_rank[nid] = {"rank": rank, "dist": dist, "self_dist": self_dist}
         return seed_rank
 
     def query(
@@ -839,7 +876,7 @@ class DocKG:
         ranked_nodes: list[dict] = []
         for nid, n in node_map.items():
             prov: ProvMeta = meta[nid]
-            base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
+            base_dist = _seed_base_dist(nid, prov.via_seed, seed_rank)
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
             short_boost = _short_chunk_boost(n)
@@ -941,7 +978,7 @@ class DocKG:
         raw_nodes: list[dict] = []
         for nid, n in node_map.items():
             prov: ProvMeta = meta[nid]
-            base_dist = seed_rank.get(prov.via_seed, {"dist": 1e9})["dist"]
+            base_dist = _seed_base_dist(nid, prov.via_seed, seed_rank)
             kind_pri = _KIND_PRIORITY.get(n["kind"], 99)
             semantic_boost = _semantic_rank_boost(nid, all_edges)
             seed_sim = max(0.0, round(1.0 - base_dist, 4))

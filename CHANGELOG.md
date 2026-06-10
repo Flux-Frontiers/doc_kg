@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.15.8] - 2026-06-10
+
+### Added
+- `docs/query_path_visual.md`: Visual description of the hybrid query path for image generation — illustration brief covering the dense (LanceDB) and lexical (FTS5/BM25) seed channels, scope pushdown gates, RRF fusion with dual-distance lexical seeds, graph expansion, ranking, guards, and outputs, plus a structured per-stage reference, benchmark validation table, and ASCII overview. Follows the `docs/pipeline_visual.md` format.
+- `benchmarks/recall_bench.py`: Standard retrieval-recall benchmark for seeding changes, adapted from `gutenberg_kg/scripts/evaluate_similar_to_value.py`. A/Bs query-time seeding conditions (`dense`, `hybrid`, or explicit base-dist floats) over the same prebuilt per-book indices, with two complementary query sets: **gold mode** (human-labeled gutenberg_kg gold CSV — dense-biased, measures the lexical channel's cost) and **phrase mode** (auto-generated exact-phrase queries sampled from chunk text, unique-in-book, FTS5-tokenizer-aligned — measures the lexical channel's benefit with no human labeling). Corpus artifacts are never modified: each `graph.sqlite` is copied to a temp dir for the FTS rebuild and LanceDB is opened read-only, keeping node IDs stable against gold labels. Emits per-query JSON under `benchmarks/data/`.
+
+### Changed
+- `pyproject.toml`, `src/doc_kg/__init__.py`, `README.md`, `CITATION.cff`: Version bumped to 0.15.8.
+
+### Removed
+
+### Fixed
+- `src/doc_kg/kg.py`: `_lance_where()` now matches `file_path` prefixes with `starts_with()` instead of `LIKE` — `%`/`_` in a prefix were treated as SQL wildcards by the LanceDB (DataFusion) prefilter, so e.g. prefix `doc_kg/` also matched `docXkg/`. The SQLite-side `_node_filter_sql()` already escaped these via `LIKE ... ESCAPE`; the two pushdown channels and the `_node_in_scope()` guard now share identical literal-prefix semantics. Verified against LanceDB 0.30.2.
+- `src/doc_kg/kg.py`: Lexical-only seed ranking rebuilt after `benchmarks/recall_bench.py` measured both failure modes of the single synthetic distance shipped in v0.15.7. (1) `_LEXICAL_SEED_BASE_DIST` raised 0.12 → 0.45: at 0.12 a lexical seed's expansion neighbourhood outranked virtually every dense hit, costing −14.2 pp recall@15 / −21.3 pp MRR@15 on the gutenberg_kg gold set (7/34 queries wiped to zero); a sweep (0.25–0.60) plateaus at ≥0.40. (2) But at 0.45 the exact-phrase hit *itself* was evicted by dense-seeded expansion noise (hybrid lost to dense-only on verbatim-phrase retrieval, 0.317 vs 0.367 recall@15). Fix: `_fused_seeds()` now assigns lexical-only seeds two distances — `self_dist` (just behind the best dense hit; ranks the matching chunk itself) and `dist` (conservative 0.45; inherited by expanded neighbours via provenance) — applied through the new `_seed_base_dist()` helper in both `query()` and `pack()`. A lexical match is strong evidence for the matching chunk, weak evidence for its neighbourhood. Result: phrase-mode recall@15 0.367 → **0.667** (+30 pp vs dense-only) with gold-set cost unchanged (−1 pp, a single RRF seed-membership displacement).
+- `tests/test_query_scope.py`: `_lance_where` assertions updated to `starts_with()`; added literal-underscore regression test.
+
 ## [0.15.7] - 2026-06-09
 
 ### Added

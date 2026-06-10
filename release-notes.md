@@ -1,22 +1,45 @@
-# Release Notes — v0.15.7
+# Release Notes — v0.15.8
 
-> Released: 2026-06-09
+> Released: 2026-06-10
 
-### Added
-- **Query-time scope pushdown** (`src/doc_kg/kg.py`, `src/doc_kg/store.py`, `src/doc_kg/index.py`): `DocKG.query()` and `DocKG.pack()` accept optional `source_path_prefixes` and `node_kinds` constraints that restrict retrieval to a subtree (e.g. a single genre of a consolidated corpus) and/or node kinds. The filter is pushed *into* both seed channels — LanceDB vector search via a prefilter `where` clause (`SemanticIndex.search(..., where=)`) and FTS5 lexical search via parameterised SQL (`GraphStore.search_lexical(..., file_prefixes=, node_kinds=)`) — so the seed budget is spent entirely on in-scope nodes rather than post-filtered, eliminating cross-subtree starvation. A final `_node_in_scope()` guard drops any node that graph expansion pulled out of scope via edges. New helpers: `_lance_where()`/`_node_in_scope()` (`kg.py`) and `_node_filter_sql()` (`store.py`, injection-safe with `LIKE ... ESCAPE`).
-- `tests/test_query_scope.py`: covers the SQL/Lance filter builders, the scope guard, and FTS5 lexical pushdown (prefix-only, kind-only, and combined) restricting results to a genre subtree.
-- `src/doc_kg/store.py`: Hybrid lexical retrieval via SQLite FTS5. `GraphStore.rebuild_fts()` builds a *contentless* FTS5 table `nodes_fts` (inverted index only, ≈1× chunk-text size) over all `kind='chunk'` rows; safe to call repeatedly (drops + rebuilds) and no-ops cleanly when SQLite lacks FTS5. `has_fts()` reports index presence. `search_lexical()` runs BM25 ranking, trying an exact-phrase query first and falling back to OR-of-terms for recall; returns chunk IDs best-first, or `[]` on older corpora so callers degrade to dense-only. Added `_fts_terms()` helper to tokenise queries into bare alphanumerics, stripping apostrophes/punctuation that FTS5 would otherwise treat as query syntax (e.g. `Lot's` → `lot`, `s`).
-- `src/doc_kg/kg.py`: `DocKG._fused_seeds()` blends the dense (vector) and lexical (BM25) seed channels with reciprocal rank fusion (RRF, `_RRF_K=60`) so exact-phrase matches that dense embeddings bury can seed graph expansion without sacrificing dense recall. Lexical-only seeds receive a synthetic cosine distance (`_LEXICAL_SEED_BASE_DIST` + per-rank step) so distance-based ranking can place them. `query()` and `pack()` now seed via `_fused_seeds()`. `DocKG.build()` calls `store.rebuild_fts()` so new builds get the lexical index automatically.
-- `src/doc_kg/cli/cmd_build.py`: `dockg reindex-fts` command backfills the FTS5 lexical index on an existing graph from chunk text already in SQLite — no re-embedding, no LanceDB changes. Lets corpora built before the lexical index existed gain hybrid retrieval.
-- `tests/test_store.py`: `test_fts_lexical_search` and `test_fts_rebuild_is_idempotent` cover graceful empty results before indexing, chunk-count after `rebuild_fts()`, exact-phrase isolation, apostrophe/punctuation handling via OR-fallback, term-less query degradation, and idempotent rebuilds.
+DocKG 0.15.8 is a calibration release for the hybrid retrieval pipeline introduced in
+v0.15.7. The headline result: **exact-phrase recall@15 nearly doubles (0.37 → 0.67)**
+while labeled gold-set retrieval stays within 1 pp of the dense-only baseline — the
+hybrid lexical channel now delivers the benefit it was designed for without taxing
+ordinary semantic queries.
 
-### Changed
-- `pyproject.toml`, `src/doc_kg/__init__.py`: Version bumped to 0.15.7.
+## What changed
 
-### Removed
+**Dual-distance lexical seeds.** Benchmarking exposed that the single synthetic
+distance assigned to BM25-only seeds could not be made safe: set low, one lexical hit's
+expansion neighbourhood evicted every dense result from the top-k (−14 pp recall on the
+gold set, 7 of 34 queries wiped to zero); set high, the exact-phrase match itself was
+buried under dense-seeded expansion noise. The fix splits the two roles — a lexical
+seed now ranks *itself* just behind the best dense hit while its *neighbourhood*
+inherits a conservative distance. An exact lexical match is strong evidence for the
+matching chunk, weak evidence for its structural neighbours.
 
-### Fixed
+**Scope-prefilter correctness.** The LanceDB side of query-time scope pushdown treated
+`%` and `_` in path prefixes as SQL wildcards (so `doc_kg/` could also match
+`docXkg/`); it now uses literal `starts_with()` matching, identical to the SQLite FTS5
+channel and the post-expansion scope guard.
+
+**A standard recall benchmark.** `benchmarks/recall_bench.py` makes these measurements
+repeatable: it A/Bs seeding conditions over prebuilt corpora using the gutenberg_kg
+labeled gold set (cost side) plus auto-generated, unique-in-book exact-phrase queries
+(benefit side), without modifying any corpus artifacts. Run it before shipping any
+future seeding change.
+
+**Query-path documentation.** `docs/query_path_visual.md` documents the full hybrid
+query path — both seed channels, scope gates, RRF fusion, expansion, ranking, and
+guards — as an image-generation brief plus a per-stage technical reference.
+
+## Upgrading
+
+Corpora built before v0.15.7 need a one-time `dockg reindex-fts` to gain the hybrid
+lexical channel this release calibrates — no re-embedding required. Corpora built on
+v0.15.7+ pick up the improvements automatically; no rebuild needed.
 
 ---
 
-_Full changelog: [CHANGELOG.md](CHANGELOG.md)_
+_Full details: [CHANGELOG.md](CHANGELOG.md)_
