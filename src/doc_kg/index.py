@@ -29,7 +29,7 @@ import gzip
 import json
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -579,6 +579,20 @@ class SemanticIndex:
         else:
             _progress_ctx = contextlib.nullcontext()
 
+        # The MPS allocator caches freed blocks and never returns them, so a long
+        # streaming embed grows unbounded ("other allocations") and OOMs. Evict
+        # the cache each batch to keep GPU memory flat — mirrors the eviction the
+        # adaptive index-build path already does. Store the eviction callable
+        # (or None) so we never reassign the imported module.
+        mps_empty_cache: Callable[[], None] | None = None
+        try:
+            import torch
+
+            if hasattr(torch, "mps") and torch.backends.mps.is_available():
+                mps_empty_cache = torch.mps.empty_cache
+        except Exception:  # noqa: BLE001
+            mps_empty_cache = None
+
         with _open_text_auto(out, "wt") as f:
             header = {
                 "__meta__": {
@@ -616,6 +630,8 @@ class SemanticIndex:
                         written += 1
 
                     f.flush()
+                    if mps_empty_cache is not None:
+                        mps_empty_cache()
                     if prog is not None and task_id is not None:
                         prog.advance(task_id, len(enc_nodes))
 

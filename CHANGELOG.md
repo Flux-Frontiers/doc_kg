@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+- `index.py` (`_precompute_embeddings_jsonl_stream`): evict the MPS allocator cache each batch (`torch.mps.empty_cache()`). The Metal allocator caches freed blocks and never returns them, so a long consolidated streaming embed (700k+ nodes) grew unbounded ("other allocations") and OOM'd on Apple Silicon. Per-batch eviction keeps GPU memory flat, mirroring the eviction the adaptive index-build path already performs.
 
 ## [0.15.8] - 2026-06-10
 
