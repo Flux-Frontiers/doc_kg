@@ -7,13 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.9] - 2026-06-17
+
 ### Added
 
+- **Device control for embedding.** `CorpusEmbedder(device=...)` plus a `_resolve_device()`
+  helper (precedence: explicit arg > `KG_EMBED_DEVICE` env > auto-detect). Threaded through
+  `DocKG.build_embeddings(device=...)` and `index.precompute_embeddings(device=...)`.
+
 ### Changed
+
+- **Parallel embedding now recycles workers.** `_embed_parallel` splits work into many small
+  shards (`_RECYCLE_SHARD`, default 25k texts) and runs `Pool(maxtasksperchild=1)`, so a fresh
+  process handles each shard. Long-lived embedding workers accumulate allocator/heap/GC state
+  that decays throughput on large corpora; recycling resets each worker and keeps throughput
+  flat at any scale. (Previously one giant shard per worker, which degraded past ~300k items.)
 
 ### Removed
 
 ### Fixed
+
+- **GPU embedding no longer fans out into an OOM.** When the device is `mps`/`cuda`,
+  `CorpusEmbedder.embed` forces single-process embedding — a GPU can't be shared across spawn
+  workers, so N workers stacked N allocations and OOM'd. Only CPU parallelises now.
 
 ## [0.15.8] - 2026-06-10
 

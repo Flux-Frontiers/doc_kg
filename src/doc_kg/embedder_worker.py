@@ -44,6 +44,12 @@ logger = logging.getLogger(__name__)
 #: Matches diary_kg: nomic-embed-text-v1 (768-d, asymmetric retrieval).
 PIPELINE_MODEL: str = "BAAI/bge-small-en-v1.5"
 
+#: Texts per recycled shard in parallel embedding. With maxtasksperchild=1 the
+#: pool spawns a fresh worker per shard, so this is the cadence at which each
+#: worker's accumulated allocator/heap state is reset. Sized so the per-shard
+#: model reload (~seconds) is a small fraction of the shard's embedding work.
+_RECYCLE_SHARD: int = 25_000
+
 
 # ============================================================================
 # Spawn-safe top-level worker function
@@ -56,19 +62,30 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
     Must be a top-level function (not a method) for pickle-safe multiprocessing
     with the ``spawn`` start method.
 
-    :param args: Tuple of ``(texts, model_name, batch_size, worker_id, progress_queue)``.
-        *progress_queue* receives ``int`` counts after each batch and ``None`` as a
-        sentinel when the shard is finished.  Pass ``None`` for the queue to skip
-        progress reporting (e.g. sequential mode).
+    :param args: Tuple of ``(texts, model_name, batch_size, worker_id,
+        progress_queue, device)``.  *progress_queue* receives ``int`` counts
+        after each batch and ``None`` as a sentinel when the shard is finished
+        (pass ``None`` to skip progress reporting, e.g. sequential mode).
+        *device* pins this worker's model to a concrete device (e.g. ``"cpu"``);
+        ``None`` falls back to ``KG_EMBED_DEVICE`` / auto-detect.  Pinning is what
+        keeps N parallel CPU workers from each auto-selecting MPS and stacking N
+        GPU allocations into an OOM.
     :return: ``(worker_id, vectors)`` tuple so callers can reassemble in order.
     """
-    texts, model_name, batch_size, worker_id, progress_queue = args
+    texts, model_name, batch_size, worker_id, progress_queue, device = args
 
     # Suppress noisy logging in workers
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
 
+    # kg_utils' load_sentence_transformer auto-detects the device and returns a
+    # model already moved onto it. When a worker is pinned (e.g. ``"cpu"`` for
+    # parallel CPU shards), move it explicitly so inference runs on the pinned
+    # device rather than each worker's auto-selected accelerator — what keeps N
+    # parallel CPU workers from each running encode() on MPS and OOMing.
     model = load_sentence_transformer(model_name)
+    if device:
+        model = model.to(device)
 
     # Nomic v1 requires a task prefix for asymmetric retrieval mode
     if "nomic-ai/" in model_name:
@@ -132,12 +149,40 @@ class EmbeddingCache:
 # ============================================================================
 
 
+def _resolve_device(device: str | None) -> str | None:
+    """Resolve the embedding device: explicit arg > ``KG_EMBED_DEVICE`` > auto.
+
+    Returns a concrete device string (``"cpu"`` / ``"mps"`` / ``"cuda"``) so the
+    value can both pin workers *and* gate parallelism.  Returns ``None`` only when
+    torch is unavailable, in which case callers treat it as "let the loader
+    decide".
+
+    :param device: Explicit device override, or ``None``.
+    :return: Resolved device string, or ``None`` if undeterminable.
+    """
+    sel = (device or os.environ.get("KG_EMBED_DEVICE", "")).strip().lower()
+    if sel:
+        return sel
+    try:
+        import torch  # pylint: disable=import-outside-toplevel
+
+        if torch.cuda.is_available():
+            return "cuda"
+        return "mps" if torch.backends.mps.is_available() else "cpu"
+    except Exception:  # noqa: BLE001
+        return None
+
+
 class CorpusEmbedder:
     """Multi-process corpus embedding engine.
 
     :param model_name: HuggingFace model name.
     :param n_workers: Number of parallel workers (default: CPU count / 2).
     :param batch_size: Per-worker batch size.
+    :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``).  ``None``
+        resolves via ``KG_EMBED_DEVICE`` then auto-detect.  A GPU device forces
+        single-process embedding — the GPU can't be shared across spawn workers,
+        so N workers would stack N allocations and OOM.  Only CPU fans out.
     """
 
     def __init__(
@@ -146,10 +191,12 @@ class CorpusEmbedder:
         *,
         n_workers: int | None = None,
         batch_size: int = 64,
+        device: str | None = None,
     ) -> None:
         self.model_name = model_name
         self.n_workers = n_workers or max(1, (os.cpu_count() or 2) // 2)
         self.batch_size = batch_size
+        self.device = _resolve_device(device)
 
     def embed(
         self,
@@ -180,8 +227,13 @@ class CorpusEmbedder:
 
         t0 = time.monotonic()
 
-        # For small inputs or single worker, run in main process
-        if len(texts) < 50 or self.n_workers <= 1:
+        # Parallel embedding only pays off on CPU. A GPU device (mps/cuda) can't
+        # be shared across spawn workers without stacking allocations into an
+        # OOM, so it always runs single-process here — the guard that keeps any
+        # caller (per-book ingest, diaries, consolidated build) from re-tripping
+        # the multi-worker MPS OOM.
+        on_gpu = (self.device or "") in {"mps", "cuda"}
+        if len(texts) < 50 or self.n_workers <= 1 or on_gpu:
             vectors = self._embed_sequential(texts)
         else:
             vectors = self._embed_parallel(texts)
@@ -207,7 +259,7 @@ class CorpusEmbedder:
 
     def _embed_sequential(self, texts: list[str]) -> list[list[float]]:
         """Embed in the main process (small inputs or single worker)."""
-        _, vectors = _embed_shard((texts, self.model_name, self.batch_size, 0, None))
+        _, vectors = _embed_shard((texts, self.model_name, self.batch_size, 0, None, self.device))
         return vectors
 
     def _embed_parallel(self, texts: list[str]) -> list[list[float]]:
@@ -222,15 +274,21 @@ class CorpusEmbedder:
             TimeRemainingColumn,
         )
 
-        # Split texts into shards
-        n = self.n_workers
-        shard_size = (len(texts) + n - 1) // n
-        shards_base = []
-        for i in range(n):
-            start = i * shard_size
-            end = min(start + shard_size, len(texts))
-            if start < len(texts):
-                shards_base.append((texts[start:end], self.model_name, self.batch_size, i))
+        # Split into MANY small shards (>> n_workers) rather than one giant shard
+        # per worker. Combined with ``maxtasksperchild=1`` below, the pool spawns a
+        # FRESH process for each shard: long-lived embedding workers accumulate
+        # allocator/heap/GC state that decays throughput over a large run, and
+        # recycling resets every worker to a clean process — keeping throughput
+        # flat regardless of corpus size. ``_RECYCLE_SHARD`` is large enough that
+        # the per-shard model reload stays a small fraction of the shard's work,
+        # but small enough to recycle well before degradation sets in. For small
+        # inputs it collapses back to ~one shard per worker.
+        per_worker = (len(texts) + self.n_workers - 1) // self.n_workers
+        shard_size = max(self.batch_size, min(_RECYCLE_SHARD, per_worker))
+        shards_base = [
+            (texts[start : start + shard_size], self.model_name, self.batch_size, i)
+            for i, start in enumerate(range(0, len(texts), shard_size))
+        ]
 
         # Use spawn to avoid fork-unsafe tokenizer/CUDA issues
         ctx = multiprocessing.get_context("spawn")
@@ -242,9 +300,10 @@ class CorpusEmbedder:
             # Manager.Queue() is a proxy — picklable across spawn boundary
             with multiprocessing.Manager() as manager:
                 progress_queue = manager.Queue()
-                shards = [(*s, progress_queue) for s in shards_base]
+                shards = [(*s, progress_queue, self.device) for s in shards_base]
 
-                with ctx.Pool(processes=n_shards) as pool:
+                # maxtasksperchild=1 → a fresh worker per shard (see above).
+                with ctx.Pool(processes=self.n_workers, maxtasksperchild=1) as pool:
                     with Progress(
                         SpinnerColumn(),
                         TextColumn("[progress.description]{task.description}"),
@@ -254,7 +313,8 @@ class CorpusEmbedder:
                         TimeRemainingColumn(),
                     ) as progress:
                         task = progress.add_task(
-                            f"  Embedding ({n_shards} workers)", total=len(texts)
+                            f"  Embedding ({self.n_workers} workers, {n_shards} recycled shards)",
+                            total=len(texts),
                         )
 
                         def _drain() -> None:

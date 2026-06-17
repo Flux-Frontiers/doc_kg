@@ -308,7 +308,7 @@ def test_embed_shard_uses_local_path_when_exists(tmp_path):
         patch("kg_utils.embedder.resolve_model_path", return_value=fake_local),
         patch("sentence_transformers.SentenceTransformer", return_value=fake_st) as mock_cls,
     ):
-        _embed_shard((["hello"], model_name, 8, 0, None))
+        _embed_shard((["hello"], model_name, 8, 0, None, None))
 
     assert mock_cls.call_args.kwargs.get("local_files_only") is True
 
@@ -328,7 +328,7 @@ def test_embed_shard_falls_back_to_network_when_local_files_only_fails(tmp_path)
         patch("kg_utils.embedder.resolve_model_path", return_value=missing),
         patch("sentence_transformers.SentenceTransformer", side_effect=side_effect) as mock_cls,
     ):
-        _embed_shard((["hello"], model_name, 8, 0, None))
+        _embed_shard((["hello"], model_name, 8, 0, None, None))
 
     assert mock_cls.call_count == 2
 
@@ -346,7 +346,7 @@ def test_embed_shard_returns_correct_shape(tmp_path):
         patch("kg_utils.embedder.resolve_model_path", return_value=missing),
         patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
     ):
-        worker_id, vectors = _embed_shard((texts, model_name, 8, 7, None))
+        worker_id, vectors = _embed_shard((texts, model_name, 8, 7, None, None))
 
     assert worker_id == 7
     assert len(vectors) == 3

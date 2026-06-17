@@ -630,6 +630,7 @@ class DocKG:
         *,
         n_workers: int | None = None,
         batch_size: int = 64,
+        device: str | None = None,
         quiet: bool = False,
     ) -> Path:
         """Embed all nodes and save to a JSON cache file (no LanceDB writes).
@@ -640,6 +641,9 @@ class DocKG:
                     Defaults to ``<db_path parent>/embeddings.json``.
         :param n_workers: Worker processes (default: CPU count / 2).
         :param batch_size: Per-worker embedding batch size.
+        :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``); ``None``
+            resolves via ``KG_EMBED_DEVICE`` then auto-detect.  GPU devices force
+            single-process embedding (the GPU can't be shared across workers).
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file.
         """
@@ -650,6 +654,7 @@ class DocKG:
             Path(out),
             n_workers=n_workers,
             batch_size=batch_size,
+            device=device,
             quiet=quiet,
         )
 

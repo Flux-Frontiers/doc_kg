@@ -472,6 +472,7 @@ class SemanticIndex:
         *,
         n_workers: int | None = None,
         batch_size: int = 64,
+        device: str | None = None,
         quiet: bool = False,
     ) -> Path:
         """Embed all index nodes and save to an :class:`~doc_kg.embedder_worker.EmbeddingCache` JSON.
@@ -483,6 +484,9 @@ class SemanticIndex:
         :param out: Output path for the cache JSON.
         :param n_workers: Worker processes for embedding (default: CPU count / 2).
         :param batch_size: Per-worker embedding batch size.
+        :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``); ``None``
+            resolves via ``KG_EMBED_DEVICE`` then auto-detect.  GPU devices force
+            single-process embedding (see :class:`~doc_kg.embedder_worker.CorpusEmbedder`).
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file (*out*).
         """
@@ -519,6 +523,7 @@ class SemanticIndex:
             model_name=model_name,
             n_workers=n_workers,
             batch_size=batch_size,
+            device=device,
         )
 
         if not quiet:

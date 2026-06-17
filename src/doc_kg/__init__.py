@@ -2,6 +2,6 @@
 
 from doc_kg.kg import DocKG
 
-__version__ = "0.15.8"
+__version__ = "0.15.9"
 
 __all__ = ["DocKG", "__version__"]
