@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Incremental embedding.** `precompute_embeddings(only_missing=True)` (and
+  `DocKG.build_embeddings(only_missing=...)`) skips nodes whose id is already in the
+  LanceDB table, so only new/changed nodes are embedded. Pair with
+  `build_index_from_cache(wipe=False)` to upsert. Backed by `_existing_index_ids()`,
+  which projects just the `id` column (cheap on large tables).
+- **`DocKG.prune_index()` / `SemanticIndex.prune(keep_ids)`** — delete index vectors whose
+  node id is no longer in the graph (orphans from removed/renamed nodes), so incremental
+  updates don't leave stale hits behind.
+
 ## [0.15.9] - 2026-06-17
 
 ### Added

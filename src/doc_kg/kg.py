@@ -631,6 +631,7 @@ class DocKG:
         n_workers: int | None = None,
         batch_size: int = 64,
         device: str | None = None,
+        only_missing: bool = False,
         quiet: bool = False,
     ) -> Path:
         """Embed all nodes and save to a JSON cache file (no LanceDB writes).
@@ -644,6 +645,9 @@ class DocKG:
         :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``); ``None``
             resolves via ``KG_EMBED_DEVICE`` then auto-detect.  GPU devices force
             single-process embedding (the GPU can't be shared across workers).
+        :param only_missing: Incremental — embed only nodes not already in the index
+            (pair with ``build_index_from_cache(wipe=False)`` to upsert). ``.json``
+            cache path only.
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file.
         """
@@ -655,8 +659,22 @@ class DocKG:
             n_workers=n_workers,
             batch_size=batch_size,
             device=device,
+            only_missing=only_missing,
             quiet=quiet,
         )
+
+    def prune_index(self, *, quiet: bool = False) -> int:
+        """Delete index vectors whose node id is no longer in the graph.
+
+        Run after an incremental (``only_missing``) embed + upsert so vectors for
+        removed/renamed nodes (e.g. a deleted book) don't linger and return stale
+        hits. The graph must reflect the current corpus (rebuild it first).
+
+        :param quiet: Suppress the summary line.
+        :return: Number of orphan vectors deleted.
+        """
+        keep = {n["id"] for n in self.store.query_nodes(kinds=list(self.index.index_kinds))}
+        return self.index.prune(keep, quiet=quiet)
 
     def build_index_from_cache(
         self,

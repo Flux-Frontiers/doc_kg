@@ -465,6 +465,66 @@ class SemanticIndex:
     # Two-phase build: precompute → cache file → LanceDB
     # ------------------------------------------------------------------
 
+    def _existing_index_ids(self) -> set[str]:
+        """Return node ids already vectorized in the LanceDB table (empty if none).
+
+        Reads only the ``id`` column via a Lance projection, so it stays cheap even
+        for large tables. Used by incremental embedding (``only_missing``) to skip
+        nodes that already have a vector.
+
+        :return: Set of existing node ids, or an empty set if the table is absent.
+        """
+        import lancedb  # pylint: disable=import-outside-toplevel
+
+        if not self.lancedb_dir.exists():
+            return set()
+        try:
+            db = lancedb.connect(str(self.lancedb_dir))
+            if self.table_name not in db.list_tables().tables:
+                return set()
+            tbl = db.open_table(self.table_name)
+            n = tbl.count_rows()
+            if not n:
+                return set()
+            # Project ONLY the id column (no vectors loaded). A vector-less search()
+            # is a full scan; limit must cover the table. Fall back to a whole-table
+            # read if this LanceDB build doesn't support the projected scan.
+            try:
+                arrow = tbl.search().select(["id"]).limit(n).to_arrow()
+            except Exception:  # noqa: BLE001
+                arrow = tbl.to_arrow()
+            ids = arrow.column("id").to_pylist()
+            return {i for i in ids if i and i != "__dummy__"}
+        except Exception:  # noqa: BLE001 — any read failure ⇒ treat as no existing ids
+            return set()
+
+    def prune(self, keep_ids: set[str], *, quiet: bool = False) -> int:
+        """Delete index rows whose id is not in *keep_ids* (orphans of removed nodes).
+
+        After an incremental (``only_missing``) embed + upsert, vectors for nodes that
+        no longer exist in the graph (e.g. a removed/renamed book) would linger and
+        return stale hits. This removes them so the index matches the current graph.
+
+        :param keep_ids: Node ids that should remain in the index.
+        :param quiet: Suppress the summary line.
+        :return: Number of orphan rows deleted.
+        """
+        existing = self._existing_index_ids()
+        orphans = [i for i in existing if i not in keep_ids]
+        if not orphans:
+            return 0
+        import lancedb  # pylint: disable=import-outside-toplevel
+
+        db = lancedb.connect(str(self.lancedb_dir))
+        tbl = db.open_table(self.table_name)
+        for start in range(0, len(orphans), 1000):  # bound the IN-list per DELETE
+            chunk = orphans[start : start + 1000]
+            id_list = ", ".join("'" + x.replace("'", "''") + "'" for x in chunk)
+            tbl.delete(f"id IN ({id_list})")
+        if not quiet:
+            Console().print(f"  pruned {len(orphans):,} orphan vectors from the index")
+        return len(orphans)
+
     def precompute_embeddings(
         self,
         store: GraphStore,
@@ -473,6 +533,7 @@ class SemanticIndex:
         n_workers: int | None = None,
         batch_size: int = 64,
         device: str | None = None,
+        only_missing: bool = False,
         quiet: bool = False,
     ) -> Path:
         """Embed all index nodes and save to an :class:`~doc_kg.embedder_worker.EmbeddingCache` JSON.
@@ -487,6 +548,10 @@ class SemanticIndex:
         :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``); ``None``
             resolves via ``KG_EMBED_DEVICE`` then auto-detect.  GPU devices force
             single-process embedding (see :class:`~doc_kg.embedder_worker.CorpusEmbedder`).
+        :param only_missing: Incremental embedding — skip nodes whose ``id`` is already
+            present in the LanceDB table, so only new/changed nodes are embedded.
+            Pair with ``build_from_cache(wipe=False)`` to upsert. No-op (embeds all)
+            when the table doesn't exist yet. Honored on the ``.json`` path only.
         :param quiet: Suppress progress output.
         :return: Path to the saved cache file (*out*).
         """
@@ -506,6 +571,16 @@ class SemanticIndex:
             suppress_ingestion_logging()
 
         nodes = self._read_nodes(store)
+        if only_missing:
+            existing = self._existing_index_ids()
+            if existing:
+                before = len(nodes)
+                nodes = [n for n in nodes if n["id"] not in existing]
+                if not quiet:
+                    Console().print(
+                        f"  incremental: {before - len(nodes):,} already vectorized, "
+                        f"{len(nodes):,} new to embed"
+                    )
         texts = [_build_index_text(n) for n in nodes]
         metadata = [
             {
