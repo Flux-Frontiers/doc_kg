@@ -1,45 +1,45 @@
-# Release Notes — v0.15.8
+# Release Notes — v0.16.0
 
-> Released: 2026-06-10
+> Released: 2026-06-24
 
-DocKG 0.15.8 is a calibration release for the hybrid retrieval pipeline introduced in
-v0.15.7. The headline result: **exact-phrase recall@15 nearly doubles (0.37 → 0.67)**
-while labeled gold-set retrieval stays within 1 pp of the dense-only baseline — the
-hybrid lexical channel now delivers the benefit it was designed for without taxing
-ordinary semantic queries.
+DocKG 0.16.0 adds a **row-count-gated approximate-nearest-neighbour (ANN) index** to the
+LanceDB vector store. Below a configurable threshold the exact flat cosine scan is
+unchanged (sub-millisecond, exact); above it, `SemanticIndex` builds an IVF index
+automatically and `search()` uses it transparently. On the 683k-vector gutenberg-all
+corpus this cuts query latency **~64 ms → ~12 ms end-to-end** with no change to the
+embedding model or ranking. The change is additive and backward-compatible — small
+corpora are untouched, and consumer repos inherit it through `DocKG.build_index_from_cache`
+with no code changes.
 
 ## What changed
 
-**Dual-distance lexical seeds.** Benchmarking exposed that the single synthetic
-distance assigned to BM25-only seeds could not be made safe: set low, one lexical hit's
-expansion neighbourhood evicted every dense result from the top-k (−14 pp recall on the
-gold set, 7 of 34 queries wiped to zero); set high, the exact-phrase match itself was
-buried under dense-seeded expansion noise. The fix splits the two roles — a lexical
-seed now ranks *itself* just behind the best dense hit while its *neighbourhood*
-inherits a conservative distance. An exact lexical match is strong evidence for the
-matching chunk, weak evidence for its structural neighbours.
+**Gated IVF index.** Once a table crosses `ann_threshold` (default 50k rows), the index is
+built at the end of every build path and consumed by `search()`; below it, nothing changes.
+Defaults are `IVF_FLAT` (full vectors — exact within probed cells, best recall; `IVF_PQ`
+available for disk-constrained or multi-million-scale corpora), `nprobes=50`, and
+`refine_factor=0`, all overridable via `DOCKG_ANN_*` environment variables. Index-build
+failures fall back to the flat scan, so the index is never load-bearing.
 
-**Scope-prefilter correctness.** The LanceDB side of query-time scope pushdown treated
-`%` and `_` in path prefixes as SQL wildcards (so `doc_kg/` could also match
-`docXkg/`); it now uses literal `starts_with()` matching, identical to the SQLite FTS5
-channel and the post-expansion scope guard.
+**Validated against the exact scan.** Because only *which* vectors get scored changes — the
+embeddings and cosine ranking are held fixed — the index is validated by fidelity to the
+exact flat scan on real queries rather than by gold labels. IVF_FLAT reproduces **0.91 of
+the exact top-10 with 94% top-1 retention** at `nprobes=50`. The new
+`benchmarks/ann_recall_bench.py` makes this measurement repeatable, and
+`docs/design-ann-index.md` records the design and full benchmark results.
 
-**A standard recall benchmark.** `benchmarks/recall_bench.py` makes these measurements
-repeatable: it A/Bs seeding conditions over prebuilt corpora using the gutenberg_kg
-labeled gold set (cost side) plus auto-generated, unique-in-book exact-phrase queries
-(benefit side), without modifying any corpus artifacts. Run it before shipping any
-future seeding change.
-
-**Query-path documentation.** `docs/query_path_visual.md` documents the full hybrid
-query path — both seed channels, scope gates, RRF fusion, expansion, ranking, and
-guards — as an image-generation brief plus a per-stage technical reference.
+**Incremental embedding and pruning.** Also folded into this release: embedding now skips
+nodes already present in the index (`build_embeddings(only_missing=True)`), and orphaned
+vectors left by removed or renamed nodes can be cleared (`DocKG.prune_index()` /
+`SemanticIndex.prune()`) — so incremental updates neither re-embed unchanged content nor
+leave stale hits behind.
 
 ## Upgrading
 
-Corpora built before v0.15.7 need a one-time `dockg reindex-fts` to gain the hybrid
-lexical channel this release calibrates — no re-embedding required. Corpora built on
-v0.15.7+ pick up the improvements automatically; no rebuild needed.
+No action is required for small corpora — they keep the exact flat scan. Large corpora
+(>50k vectors) pick up the IVF index automatically on the next build; because the index is
+derived and disposable, it can also be added to an existing index without re-embedding.
+Tune recall versus latency at query time with `DOCKG_ANN_NPROBES` if needed.
 
 ---
 
-_Full details: [CHANGELOG.md](CHANGELOG.md)_
+_Full changelog: [CHANGELOG.md](CHANGELOG.md)_
