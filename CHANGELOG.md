@@ -7,8 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-06-24
+
 ### Added
 
+- **Row-count-gated approximate-nearest-neighbour (ANN) index.** `SemanticIndex` now
+  builds a LanceDB IVF index automatically at the end of every build path once a table
+  crosses `ann_threshold` (default 50k rows), and `search()` consumes it transparently;
+  below the threshold the exact flat cosine scan is unchanged (sub-ms, exact). On the
+  683k-vector gutenberg-all corpus this cuts query latency ~64 ms → ~12 ms end-to-end.
+  Defaults: `IVF_FLAT` (full vectors, exact within probed cells; `IVF_PQ` available for
+  disk-constrained / multi-million-scale corpora), `nprobes=50`, `refine_factor=0` — all
+  overridable via `DOCKG_ANN_*` env vars. New helpers `_maybe_create_ann_index()`,
+  `_table_has_ann_index()`, `_pq_subvectors()`. Index-build failures fall back to flat
+  scan, so the index is never load-bearing. Additive: consumer repos (gutenberg_kg,
+  diary_kg) inherit it through `DocKG.build_index_from_cache` with no changes, and small
+  corpora are untouched.
+- **`benchmarks/ann_recall_bench.py`** — validates the ANN index by *fidelity to the exact
+  flat scan* on real query texts (the correct measure for an index change: embeddings and
+  ranking are held fixed; only *which* vectors get scored changes). On the 683k corpus,
+  IVF_FLAT reproduces 0.91 of the exact top-10 with 94% top-1 retention at `nprobes=50`.
+- **`docs/design-ann-index.md`** — design rationale, parameter table, and benchmark results
+  for the ANN index.
 - **Incremental embedding.** `precompute_embeddings(only_missing=True)` (and
   `DocKG.build_embeddings(only_missing=...)`) skips nodes whose id is already in the
   LanceDB table, so only new/changed nodes are embedded. Pair with
@@ -17,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`DocKG.prune_index()` / `SemanticIndex.prune(keep_ids)`** — delete index vectors whose
   node id is no longer in the graph (orphans from removed/renamed nodes), so incremental
   updates don't leave stale hits behind.
+
+### Changed
+
+- `pyproject.toml`, `src/doc_kg/__init__.py`, `README.md`: version bumped to 0.16.0.
 
 ## [0.15.9] - 2026-06-17
 
