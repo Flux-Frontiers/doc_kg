@@ -28,6 +28,7 @@ import gc
 import gzip
 import json
 import logging
+import os
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -135,6 +136,51 @@ class SeedHit:
 _DEFAULT_TABLE = "dockg_nodes"
 _DEFAULT_KINDS = ("document", "section", "chunk", "topic", "entity", "keyword")
 
+# ---------------------------------------------------------------------------
+# Approximate-nearest-neighbour (IVF) index configuration
+# ---------------------------------------------------------------------------
+# DocKG defaults to an exact flat cosine scan, which is optimal for small
+# corpora (sub-millisecond, exact).  Past ``_ANN_THRESHOLD`` rows the scan cost
+# grows linearly and an IVF index pays off (measured: ~64 ms flat at 683k rows
+# vs single-digit ms indexed).  The index is built automatically at the end of
+# a build and consumed transparently by ``search`` — both gated on row count so
+# small corpora are never touched.  All knobs are overridable via env so a
+# large-corpus build (e.g. the gutenberg bundle) can tune without code changes.
+#
+# Index type — measured on the 683k-vector gutenberg-all bundle (384-d):
+#   IVF_FLAT (default) — keeps full vectors; exact within probed cells, so it's
+#     literally the flat scan partitioned.  On real text queries, fidelity to the
+#     exact top-10 is 0.91 with 94% top-1 retention at nprobes=50 (the default),
+#     vs 0.83 / 81% at nprobes=20 — hence nprobes defaults to 50.  ``refine_factor``
+#     is a no-op for FLAT (full vectors already), so it defaults to 0 to avoid a
+#     pointless latency tax.  Costs ~1 GB index on disk at this scale.
+#   IVF_PQ — ~60× smaller index (product-quantized), but lossy: needs
+#     ``refine_factor`` >= 10 to recover recall (0.60 → 0.90 @ nprobes=20).
+#     Switch to it (and set DOCKG_ANN_REFINE_FACTOR) only at multi-million
+#     scale or under disk pressure.
+_ANN_THRESHOLD = int(os.environ.get("DOCKG_ANN_THRESHOLD", "50000"))
+_ANN_INDEX_TYPE = os.environ.get("DOCKG_ANN_INDEX_TYPE", "IVF_FLAT")
+_ANN_NPROBES = int(os.environ.get("DOCKG_ANN_NPROBES", "50"))
+_ANN_REFINE_FACTOR = int(os.environ.get("DOCKG_ANN_REFINE_FACTOR", "0"))
+
+
+def _pq_subvectors(dim: int) -> int:
+    """Pick a PQ sub-vector count that divides *dim* (≈16 dimensions each).
+
+    Product quantization splits each vector into ``num_sub_vectors`` contiguous
+    sub-vectors, so the count must divide the embedding dimension exactly.
+    Targets ~16 dims per sub-vector (e.g. 24 for a 384-d model) and walks down
+    to the nearest divisor.
+
+    :param dim: Embedding dimension.
+    :return: A divisor of *dim* suitable for ``num_sub_vectors`` (``1`` worst case).
+    """
+    target = max(1, dim // 16)
+    for m in range(target, 0, -1):
+        if dim % m == 0:
+            return m
+    return 1
+
 
 def _is_jsonl_cache(path: Path) -> bool:
     return path.suffix == ".jsonl" or path.name.endswith(".jsonl.gz")
@@ -179,12 +225,25 @@ class SemanticIndex:
         embedder: Embedder | None = None,
         table: str = _DEFAULT_TABLE,
         index_kinds: Sequence[str] = _DEFAULT_KINDS,
+        ann_threshold: int = _ANN_THRESHOLD,
+        ann_index_type: str = _ANN_INDEX_TYPE,
+        ann_nprobes: int = _ANN_NPROBES,
+        ann_refine_factor: int = _ANN_REFINE_FACTOR,
     ) -> None:
         self.lancedb_dir = Path(lancedb_dir)
         self.embedder: Embedder = embedder or SentenceTransformerEmbedder()
         self.table_name = table
         self.index_kinds = tuple(index_kinds)
+        # ANN index policy (see module-level _ANN_* constants).  ``ann_threshold``
+        # <= 0 disables IVF entirely (always exact flat scan).
+        self.ann_threshold = int(ann_threshold)
+        self.ann_index_type = str(ann_index_type)
+        self.ann_nprobes = int(ann_nprobes)
+        self.ann_refine_factor = int(ann_refine_factor)
         self._tbl = None
+        # Tri-state cache of "does the table have a vector index?": None = unknown
+        # (probe lazily), True/False once resolved.  Reset when a build (re)creates.
+        self._has_ann: bool | None = None
 
     # ------------------------------------------------------------------
     # Build
@@ -436,6 +495,9 @@ class SemanticIndex:
                 tbl.compact_files()
 
         self._tbl = tbl
+
+        # Build the IVF index now that all rows are loaded (no-op below threshold).
+        self._maybe_create_ann_index(tbl, quiet=quiet)
 
         # SIMILAR_TO edge discovery — uses LanceDB ANN (no N×N matmul)
         similar_edges_added = 0
@@ -853,6 +915,9 @@ class SemanticIndex:
 
         self._tbl = tbl
 
+        # Build the IVF index now that all rows are loaded (no-op below threshold).
+        self._maybe_create_ann_index(tbl, quiet=quiet)
+
         similar_edges_added = 0
         if discover_similar and chunk_pair_ids and chunk_pair_vecs is not None:
             similar_edges_added = self._discover_similar_edges(
@@ -961,6 +1026,9 @@ class SemanticIndex:
             indexed += len(pending_rows)
 
         self._tbl = tbl
+
+        # Build the IVF index now that all rows are loaded (no-op below threshold).
+        self._maybe_create_ann_index(tbl, quiet=quiet)
 
         similar_edges_added = 0
         if discover_similar and chunk_pair_ids and chunk_vecs_list:
@@ -1206,6 +1274,14 @@ class SemanticIndex:
         tbl = self._get_table()
         qvec = self.embedder.embed_query(query)
         builder = tbl.search(qvec).metric("cosine")
+        # Tune the IVF probe only when an index exists; otherwise this is the
+        # exact flat scan (byte-for-byte the small-corpus path).
+        if self._table_has_ann_index(tbl):
+            with contextlib.suppress(Exception):
+                builder = builder.nprobes(self.ann_nprobes)
+            if self.ann_refine_factor and self.ann_refine_factor > 0:
+                with contextlib.suppress(Exception):
+                    builder = builder.refine_factor(self.ann_refine_factor)
         if where:
             builder = builder.where(where, prefilter=True)
         raw = builder.limit(k).to_list()
@@ -1267,6 +1343,90 @@ class SemanticIndex:
             db = lancedb.connect(str(self.lancedb_dir))  # type: ignore[attr-defined]
             self._tbl = db.open_table(self.table_name)
         return self._tbl
+
+    # ------------------------------------------------------------------
+    # ANN (IVF) index — gated on row count
+    # ------------------------------------------------------------------
+
+    def _maybe_create_ann_index(self, tbl, *, quiet: bool = False) -> bool:
+        """Build an IVF index on the ``vector`` column when the table is large.
+
+        Below :attr:`ann_threshold` rows an exact flat scan is faster *and* more
+        accurate, so no index is built and :meth:`search` stays brute-force.  At
+        or above the threshold an approximate IVF index is created with cosine
+        metric; :meth:`search` then sets ``nprobes`` / ``refine_factor`` to
+        recover recall.  Any failure is logged and swallowed — the flat scan is
+        always correct, so the index is never load-bearing.
+
+        :param tbl: Open LanceDB table.
+        :param quiet: Suppress the summary line.
+        :return: ``True`` if an index was created, else ``False``.
+        """
+        if self.ann_threshold <= 0:
+            self._has_ann = False
+            return False
+        try:
+            n = int(tbl.count_rows())
+        except Exception:  # noqa: BLE001 — no count ⇒ no index, stay flat
+            return False
+        if n < self.ann_threshold:
+            self._has_ann = False
+            return False
+
+        import math  # pylint: disable=import-outside-toplevel
+
+        # IVF heuristic: num_partitions ≈ sqrt(n), but keep ~100+ vectors per
+        # partition so cells aren't starved on mid-size tables.
+        num_partitions = max(1, min(round(math.sqrt(n)), max(1, n // 100)))
+        index_type = (self.ann_index_type or "IVF_PQ").upper()
+        kwargs: dict[str, Any] = {
+            "metric": "cosine",
+            "vector_column_name": "vector",
+            "replace": True,
+            "num_partitions": num_partitions,
+        }
+        if index_type == "IVF_PQ":
+            kwargs["num_sub_vectors"] = _pq_subvectors(int(self.embedder.dim))
+
+        try:
+            # Newer LanceDB takes an explicit index_type; older infers it from
+            # the presence/absence of num_sub_vectors.
+            try:
+                tbl.create_index(index_type=index_type, **kwargs)
+            except TypeError:
+                tbl.create_index(**kwargs)
+            self._has_ann = True
+            if not quiet:
+                Console().print(
+                    f"  ann index: {index_type} built "
+                    f"(rows={n:,}, partitions={num_partitions}, metric=cosine)"
+                )
+            return True
+        except Exception as exc:  # noqa: BLE001 — fall back to flat scan
+            self._has_ann = False
+            if not quiet:
+                Console().print(
+                    f"  ann index: skipped, using flat scan ({type(exc).__name__}: {exc})"
+                )
+            return False
+
+    def _table_has_ann_index(self, tbl) -> bool:
+        """Return whether *tbl* carries a vector index (cached after first probe).
+
+        Used by :meth:`search` to decide whether to set ``nprobes`` /
+        ``refine_factor``.  With no index the search path is byte-for-byte the
+        exact flat scan, so small corpora are unaffected.
+
+        :param tbl: Open LanceDB table.
+        :return: ``True`` if at least one index is present.
+        """
+        if self._has_ann is not None:
+            return self._has_ann
+        try:
+            self._has_ann = bool(tbl.list_indices())
+        except Exception:  # noqa: BLE001 — unknown ⇒ treat as flat
+            self._has_ann = False
+        return self._has_ann
 
     def __repr__(self) -> str:
         return (
