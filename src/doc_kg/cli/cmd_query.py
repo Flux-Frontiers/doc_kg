@@ -121,6 +121,12 @@ def query(
     help="Max nodes returned in pack (default: no limit).",
 )
 @click.option(
+    "--traced/--no-traced",
+    default=False,
+    show_default=True,
+    help="Attach a seed→…→node provenance path with a quoted line per hop.",
+)
+@click.option(
     "--out",
     type=click.Path(),
     default=None,
@@ -145,6 +151,7 @@ def pack(
     rels: str,
     max_chars: int,
     max_nodes: int | None,
+    traced: bool,
     out: str | None,
     fmt: str,
 ) -> None:
@@ -169,6 +176,7 @@ def pack(
         rels=rels_tuple,
         max_chars=max_chars,
         max_nodes=max_nodes,
+        traced=traced,
     )
     kg.close()
 
