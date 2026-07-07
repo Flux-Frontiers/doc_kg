@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Traced provenance in `pack` (`traced=True`).** `DocKG.pack(..., traced=True)` now
+  attaches a `seed → … → node` provenance path to every returned node, with a quoted
+  source line (and a `file_path:char_start` citation) at each hop — turning a text pack
+  from "here are similar chunks" into a traceable chain of *why* each result surfaced.
+  Paths are reconstructed by a multi-source BFS over the edge set `pack` already fetches,
+  so tracing adds no extra queries, no schema change, and **no rebuild** — it works on the
+  existing `.dockg` graph. New helpers in `kg.py`: `_trace_paths()`, `_hop_label()`
+  (`"similar to (0.91)"`, `"links to (other.md)"`, `"contains"`, `"mentions"`, …),
+  `_node_quote()`, and `_render_path()`. `TextPack` gains an optional `paths` field that
+  serializes and renders **only when populated**, so untraced output is byte-identical.
+  Exposed through the MCP `pack_docs(traced=...)` tool and the `dockg pack --traced` CLI
+  flag. Inspired by zvizdo/ufo-knowledge-base's traversal-grounded, path-cited answers
+  (see `analysis/ufo_kb_comparison_20260702.md`).
+
 ## [0.16.0] - 2026-06-24
 
 ### Added

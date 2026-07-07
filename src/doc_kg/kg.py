@@ -157,6 +157,161 @@ class QueryResult:
         print(sep)
 
 
+# ---------------------------------------------------------------------------
+# Provenance path tracing (traced pack)
+# ---------------------------------------------------------------------------
+
+# Human-readable label for the edge relation connecting two path steps.
+_REL_LABELS = {
+    "CONTAINS": "contains",
+    "NEXT": "then",
+    "REFERENCES": "links to",
+    "SIMILAR_TO": "similar to",
+    "HAS_TOPIC": "on topic",
+    "MENTIONS_ENTITY": "mentions",
+    "HAS_KEYWORD": "keyword",
+    "CO_OCCURS_WITH": "co-occurs with",
+}
+
+_QUOTE_MAX_CHARS = 160
+
+
+def _hop_label(rel: str, evidence: dict | None) -> str:
+    """Return a human-readable label for an edge hop.
+
+    :param rel: Edge relation type.
+    :param evidence: Optional edge evidence dict (``similarity``, ``href``, …).
+    :return: Label such as ``"similar to (0.91)"`` or ``"contains"``.
+    """
+    base = _REL_LABELS.get(rel, rel.lower().replace("_", " "))
+    if evidence:
+        if "similarity" in evidence:
+            return f"{base} ({evidence['similarity']})"
+        if "href" in evidence:
+            return f"{base} ({evidence['href']})"
+    return base
+
+
+def _node_quote(node: dict) -> dict | None:
+    """Return a one-line quote + citation for *node*, or ``None``.
+
+    Chunk-like nodes are quoted from their source text (first sentence, capped);
+    structural/semantic nodes fall back to their title/name.
+
+    :param node: Node dict from the store.
+    :return: ``{"text": str, "cite": str}`` or ``None`` when nothing to quote.
+    """
+    raw = (node.get("text") or "").strip()
+    if raw:
+        # First line/sentence, collapsed and capped.
+        snippet = " ".join(raw.split())
+        for sep in (". ", "! ", "? "):
+            idx = snippet.find(sep)
+            if 0 < idx < _QUOTE_MAX_CHARS:
+                snippet = snippet[: idx + 1]
+                break
+        if len(snippet) > _QUOTE_MAX_CHARS:
+            snippet = snippet[:_QUOTE_MAX_CHARS].rstrip() + "…"
+        cite = node.get("file_path") or ""
+        if cite and node.get("char_start") is not None:
+            cite = f"{cite}:{node['char_start']}"
+        return {"text": snippet, "cite": cite}
+    return None
+
+
+def _trace_paths(
+    seed_ids: set[str],
+    node_map: dict[str, dict],
+    edges: list[dict],
+    targets: set[str],
+) -> dict[str, list[dict]]:
+    """Reconstruct a shortest provenance path from a seed to each target node.
+
+    Runs a multi-source breadth-first search from *seed_ids* over *edges*
+    (treated as undirected, matching :meth:`GraphStore.expand`'s traversal), then
+    walks parent pointers back to the nearest seed for every id in *targets*.
+
+    :param seed_ids: Semantic seed node ids (BFS sources, hop 0).
+    :param node_map: ``{id: node dict}`` for every expanded node.
+    :param edges: Edge dicts (``src``, ``rel``, ``dst``, optional ``evidence``)
+        spanning the expanded subgraph.
+    :param targets: Node ids to build paths for (the returned/kept nodes).
+    :return: ``{node_id: [step, …]}``; each step is a dict with keys ``id``,
+        ``kind``, ``title``, ``rel``, ``label``, ``quote``.  Seeds map to a
+        single-step path; unreachable targets are omitted.
+    """
+    # Undirected adjacency: neighbour -> connecting edge dict.
+    adj: dict[str, list[tuple[str, dict]]] = {}
+    for e in edges:
+        adj.setdefault(e["src"], []).append((e["dst"], e))
+        adj.setdefault(e["dst"], []).append((e["src"], e))
+
+    # Multi-source BFS: record parent + the edge used to reach each node.
+    parent: dict[str, str | None] = {}
+    via_edge: dict[str, dict | None] = {}
+    frontier: list[str] = []
+    for sid in seed_ids:
+        if sid in node_map:
+            parent[sid] = None
+            via_edge[sid] = None
+            frontier.append(sid)
+
+    while frontier:
+        nxt: list[str] = []
+        for nid in frontier:
+            for neighbour, edge in adj.get(nid, ()):
+                if neighbour in parent or neighbour not in node_map:
+                    continue
+                parent[neighbour] = nid
+                via_edge[neighbour] = edge
+                nxt.append(neighbour)
+        frontier = nxt
+
+    def _step(node_id: str, edge: dict | None) -> dict:
+        node = node_map[node_id]
+        rel = edge["rel"] if edge else None
+        return {
+            "id": node_id,
+            "kind": node.get("kind"),
+            "title": node.get("title") or node.get("name") or node_id,
+            "rel": rel,
+            "label": _hop_label(edge["rel"], edge.get("evidence")) if edge else None,
+            "quote": _node_quote(node),
+        }
+
+    paths: dict[str, list[dict]] = {}
+    for tid in targets:
+        if tid not in parent:
+            continue  # unreachable from any seed within the returned subgraph
+        chain: list[dict] = []
+        cur: str | None = tid
+        while cur is not None:
+            chain.append(_step(cur, via_edge[cur]))
+            cur = parent[cur]
+        chain.reverse()  # seed → … → target
+        paths[tid] = chain
+    return paths
+
+
+def _render_path(path: list[dict]) -> str:
+    """Render a provenance *path* as an indented Markdown block.
+
+    :param path: List of step dicts from :func:`_trace_paths`.
+    :return: Markdown string (arrow chain of titles + per-hop quotes).
+    """
+    arrow = " → ".join(f"`{s['title']}`" for s in path)
+    lines = [f"- provenance: {arrow}"]
+    for i, s in enumerate(path):
+        prefix = "seed" if i == 0 else s["label"]
+        quote = s.get("quote")
+        if quote and quote["text"]:
+            cite = f"  ({quote['cite']})" if quote.get("cite") else ""
+            lines.append(f'    - {prefix}: "{quote["text"]}"{cite}')
+        else:
+            lines.append(f"    - {prefix}: `{s['title']}`")
+    return "\n".join(lines)
+
+
 @dataclass
 class TextPack:
     """Result of :meth:`DocKG.pack` — nodes with attached text excerpts.
@@ -172,6 +327,11 @@ class TextPack:
     :param model: Embedding model name.
     :param nodes: Node dicts, each optionally containing an ``excerpt`` key.
     :param edges: Edge dicts within the returned node set.
+    :param paths: Optional provenance map ``{node_id: [step, …]}`` populated when
+        :meth:`DocKG.pack` is called with ``traced=True``.  Each step is a dict
+        with keys ``id``, ``kind``, ``title``, ``rel`` (edge from the previous
+        step, ``None`` for the seed), ``label`` (human-readable hop label), and
+        ``quote`` (a one-line source excerpt with a ``cite`` file:offset tag).
     """
 
     query: str
@@ -183,10 +343,11 @@ class TextPack:
     model: str
     nodes: list[dict]
     edges: list[dict]
+    paths: dict[str, list[dict]] | None = None
 
     def to_dict(self) -> dict:
         """Serialise the pack result to a JSON-compatible dictionary."""
-        return {
+        d: dict[str, Any] = {
             "query": self.query,
             "seeds": self.seeds,
             "expanded_nodes": self.expanded_nodes,
@@ -197,6 +358,9 @@ class TextPack:
             "nodes": self.nodes,
             "edges": self.edges,
         }
+        if self.paths is not None:
+            d["paths"] = self.paths
+        return d
 
     def to_json(self, *, indent: int = 2) -> str:
         """Serialise the pack result to a JSON string."""
@@ -227,6 +391,10 @@ class TextPack:
             if excerpt:
                 out.append("")
                 out.append(f"```\n{excerpt.strip()}\n```")
+            path = (self.paths or {}).get(n["id"])
+            if path:
+                out.append("")
+                out.append(_render_path(path))
             out.append("")
 
         out.append("\n---\n")
@@ -970,6 +1138,7 @@ class DocKG:
         max_nodes: int | None = 15,
         source_path_prefixes: tuple[str, ...] | None = None,
         node_kinds: tuple[str, ...] | None = None,
+        traced: bool = False,
     ) -> TextPack:
         """Hybrid query + text excerpt extraction.
 
@@ -983,6 +1152,9 @@ class DocKG:
             whose ``file_path`` starts with one of these prefixes (pushed down
             to both seed channels and enforced after expansion).
         :param node_kinds: When given, restrict results to these node kinds.
+        :param traced: When ``True``, attach a provenance path (seed → … → node,
+            with a quoted source line per hop) to each returned node.  The paths
+            ride on the edges already fetched for expansion — no extra queries.
         :return: :class:`TextPack`.
         """
         seed_rank = self._fused_seeds(
@@ -1054,6 +1226,12 @@ class DocKG:
             elif raw_text:
                 n["excerpt"] = raw_text
 
+        # Provenance paths (before stripping internal keys, using the full
+        # expanded subgraph so paths can traverse un-returned intermediate nodes).
+        paths: dict[str, list[dict]] | None = None
+        if traced:
+            paths = _trace_paths(seed_ids, node_map, all_edges, kept_ids)
+
         # Strip internal keys
         for n in kept:
             for key in [k for k in n if k.startswith("_")]:
@@ -1069,6 +1247,7 @@ class DocKG:
             model=self.model_name,
             nodes=kept,
             edges=edges,
+            paths=paths,
         )
 
     # ------------------------------------------------------------------

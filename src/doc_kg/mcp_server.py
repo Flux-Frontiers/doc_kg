@@ -69,8 +69,14 @@ def pack_docs(
     rels: str = _default_rels,
     max_chars: int = 2000,
     max_nodes: int = 15,
+    traced: bool = False,
 ) -> str:
-    """Run hybrid query and return Markdown text pack."""
+    """Run hybrid query and return Markdown text pack.
+
+    Set ``traced=True`` to attach a provenance path (seed → … → node, with a
+    quoted source line at each hop) under every returned node — a traceable
+    chain of *why* each result was retrieved.
+    """
     rel_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
     pack = _get_kg().pack(
         q,
@@ -79,6 +85,7 @@ def pack_docs(
         rels=rel_tuple or DEFAULT_RELS,
         max_chars=max_chars,
         max_nodes=max_nodes,
+        traced=traced,
     )
     return pack.to_markdown()
 

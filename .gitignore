@@ -253,3 +253,10 @@ assets/*-1024x1024.png
 assets/*-xl-*.png
 assets/code_kg_arch_*.png
 commit.txt
+
+# Claude Code — ignore personal/local state, keep shared commands/skills/settings
+.claude/settings.local.json
+.claude/projects/
+.claude/worktrees/
+.claude/plans/
+.claude/agents/
