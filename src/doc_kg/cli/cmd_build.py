@@ -543,9 +543,9 @@ def build_graph(
 @click.option(
     "--encode-batch",
     type=int,
-    default=1024,
+    default=128,
     show_default=True,
-    help="GPU encode batch size (higher = better MPS/CUDA utilisation; tune down if OOM).",
+    help="Encode page/batch size; the encode call is hard-capped at 128 (memory scales batch x seq^2, throughput flat above ~128).",
 )
 @click.option(
     "--device",

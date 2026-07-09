@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flag. Inspired by zvizdo/ufo-knowledge-base's traversal-grounded, path-cited answers
   (see `analysis/ufo_kb_comparison_20260702.md`).
 
+### Changed
+
+- **`index.py`: `SemanticIndex.build()` encode batch hard-capped at 128.** Default
+  `encode_batch_size` lowered 1024 → 128, and the per-call encode sub-batch is now
+  `min(current_encode_batch, 128)` **unconditionally** (previously only capped after
+  240k rows, so the first ~quarter-million rows encoded at 1024). Transformer attention
+  memory scales with `batch × seq²`, so a 1024 batch on long chunks allocates ~7–9 GB
+  per `model.encode` call and OOMs / stalls MPS; throughput is flat above ~128 on CPU
+  and MPS, so the cap costs nothing. `dockg build-index --encode-batch` default likewise
+  1024 → 128. (The `dockg build` cache path via `CorpusEmbedder` was already at batch 64;
+  unaffected.)
+
 ## [0.16.0] - 2026-06-24
 
 ### Added

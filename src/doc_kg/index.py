@@ -255,7 +255,7 @@ class SemanticIndex:
         *,
         wipe: bool = False,
         batch_size: int = 8192,
-        encode_batch_size: int = 1024,
+        encode_batch_size: int = 128,
         quiet: bool = False,
         discover_similar: bool = True,
         similar_k: int = 5,
@@ -270,9 +270,12 @@ class SemanticIndex:
         :param store: Authoritative :class:`~doc_kg.store.GraphStore`.
         :param wipe: If ``True``, delete all existing vectors first.
         :param batch_size: LanceDB write batch size.
-        :param encode_batch_size: Tokens fed to ``model.encode()`` per GPU call.
-                                   Larger values improve MPS/CUDA utilisation
-                                   (default 1024; tune down if OOM).
+        :param encode_batch_size: Nodes fetched per streaming page and fed to
+                                   ``model.encode()``.  Attention memory scales
+                                   with ``batch x seq^2`` and throughput is flat
+                                   above ~128 on CPU/MPS, so the encode sub-batch
+                                   is hard-capped at 128 regardless (default 128;
+                                   raise only for large-VRAM CUDA with short seqs).
         :param quiet: Suppress progress output (default: ``False``).
         :param discover_similar: If ``True``, run SIMILAR_TO edge discovery.
         :param similar_k: k-nearest neighbors to examine per chunk.
@@ -351,13 +354,12 @@ class SemanticIndex:
                 enc_texts = [_build_index_text(n) for n in enc_nodes]
                 t_embed0 = time.perf_counter()
                 embedder_any: Any = self.embedder
-                # Deterministic late-run cliffs have appeared around ~274k rows.
-                # After that point, force smaller sub-batches to avoid long kernel stalls.
-                eff_batch = (
-                    min(current_encode_batch, 128)
-                    if processed_rows >= 240_000
-                    else current_encode_batch
-                )
+                # Hard-cap the encode sub-batch at 128 from row 0: transformer
+                # attention memory scales with batch x seq^2, so a larger batch on
+                # long (near-max-sequence) chunks allocates many GB per encode and
+                # OOMs / stalls MPS.  Throughput is flat above ~128 on CPU/MPS, so
+                # the cap costs nothing and protects even an explicit large override.
+                eff_batch = min(current_encode_batch, 128)
                 enc_vecs: list[list[float]] = []
                 for i in range(0, len(enc_texts), eff_batch):
                     sub = enc_texts[i : i + eff_batch]
