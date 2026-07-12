@@ -9,7 +9,7 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
-        exclude: '^(src|docs)/.*\.(png|jpg|jpeg|gif|pdf)$|^\.pycodekg/'
+        exclude: '^(src|docs)/.*\.(png|jpg|jpeg|gif|pdf)$|^\.pycodekg/|^\.kgcache/'
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
