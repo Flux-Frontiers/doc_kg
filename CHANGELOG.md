@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`embedder_worker.py`: `CorpusEmbedder`/`EmbeddingCache` moved to `kg_utils.corpus_embedder`.**
+  This file carried the canonical implementation of the multi-process, device-safe corpus
+  embedder — but it had been independently forked into memory_kg and diary_kg, and the
+  device-pinning/GPU-guard/shard-recycling fixes from 0.15.9 (the 683k-node consolidated-build
+  incident; see `gutenberg_kg/SUMMARY.md`) never propagated to those copies. The implementation
+  now lives in `kgmodule-utils>=0.4.7` (`kg_utils.corpus_embedder`); `doc_kg.embedder_worker`
+  re-exports `CorpusEmbedder`/`EmbeddingCache`/`PIPELINE_MODEL` for backward compatibility, so
+  no caller-facing change. `kg_utils.embedder.resolve_device()` is the new public device
+  resolver `_resolve_device()` delegated to. `tests/test_embedder_worker.py` now only tests
+  doc_kg's own surface (`PIPELINE_MODEL`, re-export identity); the low-level `_embed_shard`/
+  `EmbeddingCache`/save-load unit coverage moved to `kg_utils`'s own test suite.
+
 - **`index.py`: `SemanticIndex.build()` encode batch hard-capped at 128.** Default
   `encode_batch_size` lowered 1024 → 128, and the per-call encode sub-batch is now
   `min(current_encode_batch, 128)` **unconditionally** (previously only capped after

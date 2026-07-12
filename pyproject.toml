@@ -79,7 +79,7 @@ dependencies = [
     "rich>=13.0.0,<15.0.0",
     "sentence-transformers>=5.4.1",
     "transformers>=4.40.0,<4.57",
-    "kgmodule-utils>=0.4.6",
+    "kgmodule-utils>=0.4.8",
     "pymupdf4llm>=0.0.17",
 ]
 
