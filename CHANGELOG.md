@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`index.py`: MPS cache evicted each batch in the streaming embed.**
+  `_precompute_embeddings_jsonl_stream` embeds batch-by-batch and flushes to disk, but
+  never freed the Metal/MPS allocator cache; on Apple Silicon the allocator hoards freed
+  blocks, so a long consolidated embed (700k+ nodes) grows unbounded and dies with
+  "MPS backend out of memory" even though the working set stays ~1 GB.
+  `torch.mps.empty_cache` is now invoked after each batch flush (guarded on torch + MPS
+  availability), keeping GPU memory flat across arbitrarily large corpora. CPU/CUDA paths
+  unaffected. Re-applies the orphaned `fix/mps-cache-streaming-embed` branch (June 14)
+  onto the post-0.17.0 code, where the GPU precompute path deliberately routes through
+  this stream.
+
 ## [0.17.0] - 2026-07-13
 
 ### Added
