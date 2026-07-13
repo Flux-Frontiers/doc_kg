@@ -302,11 +302,12 @@ class SemanticIndex:
         write_batch_size = max(int(batch_size), int(encode_batch_size))
         pending_rows: list[dict[str, Any]] = []
         pending_ids: list[str] = []
-        processed_rows = 0
-        refresh_every_rows = 120_000
-        next_refresh_at = refresh_every_rows
-        current_encode_batch = max(64, int(encode_batch_size))
-        min_encode_batch = 64
+        # Fixed encode sub-batch for the whole run. Long-run backend drift is
+        # handled by releasing allocator caches at each telemetry checkpoint
+        # (below), never by reloading the model mid-run: a reload discards a
+        # caller-supplied shared embedder (e.g. DiaryKG reuses its transformer's
+        # model) and on MPS risks a second-load SIGBUS.
+        eff_encode_batch = min(max(64, int(encode_batch_size)), 128)
         # Pre-allocate a contiguous (n_chunks × dim) matrix for chunk vectors so
         # the SIMILAR_TO ANN pass has a compact array rather than 300K+ loose ndarrays.
         chunk_pair_ids: list[str] = []
@@ -350,7 +351,6 @@ class SemanticIndex:
                 kinds=list(self.index_kinds), batch_size=encode_batch_size
             ):
                 batches += 1
-                processed_rows += len(enc_nodes)
                 enc_texts = [_build_index_text(n) for n in enc_nodes]
                 t_embed0 = time.perf_counter()
                 embedder_any: Any = self.embedder
@@ -359,7 +359,7 @@ class SemanticIndex:
                 # long (near-max-sequence) chunks allocates many GB per encode and
                 # OOMs / stalls MPS.  Throughput is flat above ~128 on CPU/MPS, so
                 # the cap costs nothing and protects even an explicit large override.
-                eff_batch = min(current_encode_batch, 128)
+                eff_batch = eff_encode_batch
                 enc_vecs: list[list[float]] = []
                 for i in range(0, len(enc_texts), eff_batch):
                     sub = enc_texts[i : i + eff_batch]
@@ -438,25 +438,6 @@ class SemanticIndex:
                             f"encode_batch_eff={eff_batch}"
                         )
 
-                        # Adjust encode batch dynamically based on recent latency.
-                        if embed_ms >= 1.2 and current_encode_batch > min_encode_batch:
-                            current_encode_batch = max(min_encode_batch, current_encode_batch // 2)
-                        elif embed_ms <= 0.35 and current_encode_batch < int(encode_batch_size):
-                            current_encode_batch = min(
-                                int(encode_batch_size), current_encode_batch * 2
-                            )
-
-                        # Adaptive refresh if embedding latency spikes (MPS/CUDA drift).
-                        if embed_ms >= 0.6:
-                            model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
-                            device = getattr(self.embedder, "device", "auto")
-                            Console().print(
-                                f"  ingest   : refreshing embedder at rows={processed_rows:,} "
-                                f"(embed_ms_per_row={embed_ms:.3f})"
-                            )
-                            self.embedder = make_embedder(model_name, device=device)
-                            next_refresh_at = processed_rows + refresh_every_rows
-
                         # Long MPS/CUDA runs can degrade as allocator caches grow.
                         # Proactively release backend caches at telemetry checkpoints.
                         with contextlib.suppress(Exception):
@@ -470,13 +451,6 @@ class SemanticIndex:
                         window_embed_s = 0.0
                         window_add_s = 0.0
                         window_rows = 0
-
-                if processed_rows >= next_refresh_at:
-                    # Refresh embedder periodically to avoid long-run backend state buildup.
-                    model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
-                    device = getattr(self.embedder, "device", "auto")
-                    self.embedder = make_embedder(model_name, device=device)
-                    next_refresh_at += refresh_every_rows
 
                 if prog is not None and task_id is not None:
                     prog.advance(task_id, len(enc_nodes))
@@ -620,10 +594,25 @@ class SemanticIndex:
         :return: Path to the saved cache file (*out*).
         """
         if _is_jsonl_cache(out):
-            return self._precompute_embeddings_jsonl_stream(
+            # pylint: disable=import-outside-toplevel
+            from kg_utils.embedder import resolve_device
+
+            # A GPU device can't fan out across spawn workers, and the single-process
+            # stream reuses the (possibly caller-shared) embedder — no second model
+            # load, so no MPS double-load SIGBUS. CPU streams in parallel via
+            # CorpusEmbedder.embed_to_cache: multi-process AND bounded memory
+            # (peak scales with shard size, not corpus size — the 689k-node OOM fix).
+            if resolve_device(device) in {"mps", "cuda"}:
+                return self._precompute_embeddings_jsonl_stream(
+                    store, out, batch_size=batch_size, quiet=quiet
+                )
+            return self._precompute_embeddings_parallel_stream(
                 store,
                 out,
+                n_workers=n_workers,
                 batch_size=batch_size,
+                device=device,
+                only_missing=only_missing,
                 quiet=quiet,
             )
 
@@ -634,6 +623,38 @@ class SemanticIndex:
         if quiet:
             suppress_ingestion_logging()
 
+        texts, metadata = self._read_texts_metadata(store, only_missing=only_missing, quiet=quiet)
+
+        model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
+        corp_embedder = CorpusEmbedder(
+            model_name=model_name,
+            n_workers=n_workers,
+            batch_size=batch_size,
+            device=device,
+        )
+
+        if not quiet:
+            Console().print(
+                f"  nodes    : {len(texts):,} to embed  ({corp_embedder.n_workers} workers)"
+            )
+
+        cache = corp_embedder.embed(texts, metadata)
+        CorpusEmbedder.save_cache(cache, out)
+
+        if not quiet:
+            Console().print(f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})")
+
+        return out
+
+    def _read_texts_metadata(
+        self, store: GraphStore, *, only_missing: bool, quiet: bool
+    ) -> tuple[list[str], list[dict]]:
+        """Read index nodes (optionally dropping already-vectorized ones) as
+        aligned ``(texts, metadata)`` ready for embedding.
+
+        :param only_missing: Skip nodes whose ``id`` is already in the LanceDB
+            table (incremental embedding). No-op when the table is absent.
+        """
         nodes = self._read_nodes(store)
         if only_missing:
             existing = self._existing_index_ids()
@@ -656,7 +677,34 @@ class SemanticIndex:
             }
             for n in nodes
         ]
+        return texts, metadata
 
+    def _precompute_embeddings_parallel_stream(
+        self,
+        store: GraphStore,
+        out: Path,
+        *,
+        n_workers: int | None,
+        batch_size: int,
+        device: str | None,
+        only_missing: bool,
+        quiet: bool,
+    ) -> Path:
+        """Embed via the multi-process ``CorpusEmbedder``, streaming vectors to a
+        JSONL cache so peak memory scales with shard size, not corpus size.
+
+        The CPU counterpart to :meth:`_precompute_embeddings_jsonl_stream` (which
+        is single-process for GPU). Output is the same JSONL format consumed by
+        :meth:`build_from_cache`.
+        """
+        from doc_kg.embedder_worker import (  # pylint: disable=import-outside-toplevel
+            CorpusEmbedder,
+        )
+
+        if quiet:
+            suppress_ingestion_logging()
+
+        texts, metadata = self._read_texts_metadata(store, only_missing=only_missing, quiet=quiet)
         model_name = getattr(self.embedder, "model_name", DEFAULT_MODEL)
         corp_embedder = CorpusEmbedder(
             model_name=model_name,
@@ -667,14 +715,15 @@ class SemanticIndex:
 
         if not quiet:
             Console().print(
-                f"  nodes    : {len(nodes):,} to embed  ({corp_embedder.n_workers} workers)"
+                f"  nodes    : {len(texts):,} to embed  "
+                f"({corp_embedder.n_workers} workers, streaming JSONL)"
             )
 
-        cache = corp_embedder.embed(texts, metadata)
-        CorpusEmbedder.save_cache(cache, out)
+        corp_embedder.embed_to_cache(texts, metadata, out_path=out)
 
         if not quiet:
-            Console().print(f"  cache    : {out}  ({cache.n_vectors:,} vectors, dim={cache.dim})")
+            size_mb = out.stat().st_size / 1_048_576
+            Console().print(f"  cache    : {out}  ({len(texts):,} vectors, {size_mb:,.0f} MB)")
 
         return out
 

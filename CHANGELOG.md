@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.17.0] - 2026-07-13
 
 ### Added
 
@@ -46,6 +46,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and MPS, so the cap costs nothing. `dockg build-index --encode-batch` default likewise
   1024 → 128. (The `dockg build` cache path via `CorpusEmbedder` was already at batch 64;
   unaffected.)
+
+- **`index.py`: no more mid-run embedder reloads in `SemanticIndex.build()`.** Both the
+  adaptive "refresh embedder on latency spike" and the periodic every-120k-rows reload
+  are gone — a mid-run `make_embedder()` discards a caller-supplied shared embedder
+  (e.g. DiaryKG reusing its transformer's model) and on MPS risks a second-load SIGBUS.
+  The encode sub-batch is likewise fixed for the whole run
+  (`min(max(64, encode_batch_size), 128)`) instead of dynamically halving/doubling on
+  latency; long-run backend drift is handled solely by releasing allocator caches at
+  telemetry checkpoints, which stays.
+
+- **`index.py`: CPU embedding-cache precompute is now multi-process *and* streaming.**
+  `precompute_embeddings` with a JSONL cache target now routes by device
+  (`kg_utils.embedder.resolve_device`): MPS/CUDA keeps the single-process JSONL stream
+  (a GPU can't fan out across spawn workers, and reusing the live embedder avoids a
+  second model load), while CPU goes through the new
+  `_precompute_embeddings_parallel_stream()` — `CorpusEmbedder.embed_to_cache()` from
+  `kgmodule-utils>=0.4.9` (floor bumped 0.4.8 → 0.4.9) streams vectors shard-by-shard
+  to the JSONL cache, so peak memory scales with shard size, not corpus size (the
+  689k-node OOM fix, now on the precompute path too). Node reading is factored into
+  `_read_texts_metadata()`, shared with the in-memory cache path and keeping
+  `only_missing` incremental support.
 
 ## [0.16.0] - 2026-06-24
 
