@@ -1,44 +1,44 @@
-# Release Notes — v0.16.0
+# Release Notes — v0.17.0
 
-> Released: 2026-06-24
+> Released: 2026-07-13
 
-DocKG 0.16.0 adds a **row-count-gated approximate-nearest-neighbour (ANN) index** to the
-LanceDB vector store. Below a configurable threshold the exact flat cosine scan is
-unchanged (sub-millisecond, exact); above it, `SemanticIndex` builds an IVF index
-automatically and `search()` uses it transparently. On the 683k-vector gutenberg-all
-corpus this cuts query latency **~64 ms → ~12 ms end-to-end** with no change to the
-embedding model or ranking. The change is additive and backward-compatible — small
-corpora are untouched, and consumer repos inherit it through `DocKG.build_index_from_cache`
-with no code changes.
+DocKG 0.17.0 makes a text pack **explain itself**: `pack(..., traced=True)` attaches a
+`seed → … → node` provenance path to every returned node, with a quoted source line and a
+`file_path:char_start` citation at each hop — turning "here are similar chunks" into a
+traceable chain of *why* each result surfaced. Tracing is reconstructed from edges the
+pack already fetches, so it adds no extra queries, no schema change, and **no rebuild**;
+untraced output is byte-identical. The release also consolidates the embedding pipeline
+into `kgmodule-utils` and hardens long builds against the memory blowups seen on
+multi-hundred-thousand-node corpora.
 
 ## What changed
 
-**Gated IVF index.** Once a table crosses `ann_threshold` (default 50k rows), the index is
-built at the end of every build path and consumed by `search()`; below it, nothing changes.
-Defaults are `IVF_FLAT` (full vectors — exact within probed cells, best recall; `IVF_PQ`
-available for disk-constrained or multi-million-scale corpora), `nprobes=50`, and
-`refine_factor=0`, all overridable via `DOCKG_ANN_*` environment variables. Index-build
-failures fall back to the flat scan, so the index is never load-bearing.
+**Traced provenance in `pack`.** Available everywhere packs are made: the Python API
+(`DocKG.pack(traced=True)`), the MCP tool (`pack_docs(traced=...)`), and the CLI
+(`dockg pack --traced`). Each hop is labeled with its relation ("similar to (0.91)",
+"links to (other.md)", "contains", "mentions") and grounded in a quoted line from the
+source document, in the spirit of traversal-grounded, path-cited answering.
 
-**Validated against the exact scan.** Because only *which* vectors get scored changes — the
-embeddings and cosine ranking are held fixed — the index is validated by fidelity to the
-exact flat scan on real queries rather than by gold labels. IVF_FLAT reproduces **0.91 of
-the exact top-10 with 94% top-1 retention** at `nprobes=50`. The new
-`benchmarks/ann_recall_bench.py` makes this measurement repeatable, and
-`docs/design-ann-index.md` records the design and full benchmark results.
+**One canonical corpus embedder.** `CorpusEmbedder`/`EmbeddingCache` had been forked into
+sibling KG projects, and the device-pinning and shard-recycling fixes from 0.15.9 never
+propagated to the copies. The implementation now lives in `kgmodule-utils` (≥0.4.9) as
+`kg_utils.corpus_embedder`; `doc_kg.embedder_worker` re-exports it, so existing imports
+keep working unchanged.
 
-**Incremental embedding and pruning.** Also folded into this release: embedding now skips
-nodes already present in the index (`build_embeddings(only_missing=True)`), and orphaned
-vectors left by removed or renamed nodes can be cleared (`DocKG.prune_index()` /
-`SemanticIndex.prune()`) — so incremental updates neither re-embed unchanged content nor
-leave stale hits behind.
+**Memory-safe long builds.** The encode batch in `SemanticIndex.build()` is hard-capped at
+128 (throughput is flat above that on CPU and MPS, while a 1024 batch on long chunks
+allocates several GB per encode call), and mid-run embedder reloads are gone — they
+discarded caller-shared embedders and risked a second-load SIGBUS on MPS. Embedding-cache
+precompute now routes by device: GPU stays single-process, while CPU streams shard-by-shard
+through the multi-process `CorpusEmbedder.embed_to_cache()`, so peak memory scales with
+shard size rather than corpus size.
 
 ## Upgrading
 
-No action is required for small corpora — they keep the exact flat scan. Large corpora
-(>50k vectors) pick up the IVF index automatically on the next build; because the index is
-derived and disposable, it can also be added to an existing index without re-embedding.
-Tune recall versus latency at query time with `DOCKG_ANN_NPROBES` if needed.
+No action required — no schema change and no index rebuild. Existing `.dockg` graphs gain
+`traced=True` immediately. `kgmodule-utils>=0.4.9` is pulled in automatically on install.
+If you had tuned `--encode-batch` above 128, note it is now clamped; the cap is deliberate
+and costs no throughput.
 
 ---
 
