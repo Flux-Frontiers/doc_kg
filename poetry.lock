@@ -1264,14 +1264,14 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.4.9"
+version = "0.5.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 files = [
-    {file = "kgmodule_utils-0.4.9-py3-none-any.whl", hash = "sha256:7d9fae6a88ad32c473d2b4df76887333a98193156207011c8cc3defc8ab443cb"},
-    {file = "kgmodule_utils-0.4.9.tar.gz", hash = "sha256:dfd1fbd68da16b7927e0c31436c3fc50c6d9d4d0c88e08533d5aad93191c6d19"},
+    {file = "kgmodule_utils-0.5.0-py3-none-any.whl", hash = "sha256:f0842980241656bf2c1287807bfe3f9cab2807034e87de8d81731a976957f704"},
+    {file = "kgmodule_utils-0.5.0.tar.gz", hash = "sha256:82a15ae789d2266d478f274da6cbcb7a2d5ed560efeaee04576f38df0a76f2c0"},
 ]
 
 [package.dependencies]
@@ -1285,6 +1285,7 @@ ty = ">=0.0.44,<0.0.45"
 
 [package.extras]
 semantic = ["lancedb (>=0.19.0)", "numpy (>=1.24.0)", "rich (>=13.0.0)", "sentence-transformers (>=5.4.1)", "torch (>=2.5.1)", "transformers (>=4.40.0,<4.57)"]
+sqlite-vec = ["sqlite-vec (==0.1.9)"]
 synthesis = ["httpx (>=0.27.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
 synthesis-mflux = ["httpx (>=0.27.0)", "mflux (>=0.9.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
 
@@ -3710,6 +3711,22 @@ files = [
 ]
 
 [[package]]
+name = "sqlite-vec"
+version = "0.1.9"
+description = ""
+optional = true
+python-versions = "*"
+groups = ["main"]
+markers = "extra == \"sqlite-vec\""
+files = [
+    {file = "sqlite_vec-0.1.9-py3-none-macosx_10_6_x86_64.whl", hash = "sha256:1b62a7f0a060d9475575d4e599bbf94a13d85af896bc1ce86ee80d1b5b48e5fb"},
+    {file = "sqlite_vec-0.1.9-py3-none-macosx_11_0_arm64.whl", hash = "sha256:1d52e30513bae4cc9778ddbf6145610434081be4c3afe57cd877893bad9f6b6c"},
+    {file = "sqlite_vec-0.1.9-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4e921e592f24a5f9a18f590b6ddd530eb637e2d474e3b1972f9bbeb773aa3cb9"},
+    {file = "sqlite_vec-0.1.9-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux1_x86_64.whl", hash = "sha256:1515727990b49e79bcaf75fdee2ffc7d461f8b66905013231251f1c8938e7786"},
+    {file = "sqlite_vec-0.1.9-py3-none-win_amd64.whl", hash = "sha256:4a28dc12fa4b53d7b1dced22da2488fade444e96b5d16fd2d698cd670675cf32"},
+]
+
+[[package]]
 name = "sse-starlette"
 version = "3.4.5"
 description = "SSE plugin for Starlette"
@@ -4439,9 +4456,10 @@ files = [
 all = ["detect-secrets", "pdoc", "plotly", "pre-commit", "pycode-kg", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit", "ty"]
 dev = ["detect-secrets", "pdoc", "pre-commit", "pycode-kg", "pytest", "pytest-cov", "ruff", "ty"]
 kgdeps = ["pycode-kg"]
+sqlite-vec = ["sqlite-vec"]
 viz = ["plotly", "pyvis", "streamlit"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "4e607077cb457522b256ca04b650ccf7dcc7c4c6e26a32088e84753bdc7ddd23"
+content-hash = "3e8c12f675a02e7614c6af2cf8088466e8a8c94023a21f71eebd82d7646e916f"

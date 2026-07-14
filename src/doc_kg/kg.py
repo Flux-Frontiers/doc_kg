@@ -17,7 +17,9 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 from dataclasses import dataclass
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
@@ -25,7 +27,7 @@ from typing import Any
 
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.graph import DocGraph
-from doc_kg.index import Embedder, SemanticIndex, make_embedder
+from doc_kg.index import Embedder, SemanticIndex, make_backend, make_embedder
 from doc_kg.store import DEFAULT_RELS, GraphStore, ProvMeta
 
 # ---------------------------------------------------------------------------
@@ -647,6 +649,7 @@ class DocKG:
         exclude: set[str] | None = None,
         embedder: Embedder | None = None,
         device: str = "auto",
+        vector_backend: str | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.exclude: set[str] = exclude or set()
@@ -661,6 +664,11 @@ class DocKG:
         self.model_name = model
         self.device = device
         self.table_name = table
+        # Vector store backend: "auto" (default), "lancedb", or "sqlite-vec".
+        # Explicit arg wins; else DOCKG_VECTOR_BACKEND env; else "auto" — which
+        # picks sqlite-vec for fresh/converted corpora and lancedb only when an
+        # un-migrated lancedb store is all that exists (see resolve_backend_name).
+        self.vector_backend = vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "auto"
         self.chunk_strategy = chunk_strategy
         self.sentences_per_chunk = sentences_per_chunk
         self.chunk_size = chunk_size
@@ -726,12 +734,19 @@ class DocKG:
 
     @property
     def index(self) -> SemanticIndex:
-        """LanceDB semantic index (lazy)."""
+        """Semantic vector index (lazy). Backend chosen by ``vector_backend``."""
         if self._index is None:
+            backend = make_backend(
+                self.vector_backend,
+                lancedb_dir=self.lancedb_dir,
+                dim=self.embedder.dim,
+                table=self.table_name,
+            )
             self._index = SemanticIndex(
                 self.lancedb_dir,
                 embedder=self.embedder,
                 table=self.table_name,
+                backend=backend,
             )
         return self._index
 
@@ -1268,6 +1283,17 @@ class DocKG:
         try:
             s = self.store.stats()
             nc = s.get("node_counts", {})
+            # Count vectors without loading the embedder/model: a read-only
+            # count doesn't need the true dim, so use a throwaway backend.
+            # count() opens existing stores lazily and never creates one.
+            vector_count = 0
+            with contextlib.suppress(Exception):
+                vector_count = make_backend(
+                    self.vector_backend,
+                    lancedb_dir=self.lancedb_dir,
+                    dim=384,
+                    table=self.table_name,
+                ).count()
             return {
                 "node_count": s.get("total_nodes", 0),
                 "edge_count": s.get("total_edges", 0),
@@ -1277,6 +1303,8 @@ class DocKG:
                 "topic_count": nc.get("topic", 0),
                 "entity_count": nc.get("entity", 0),
                 "keyword_count": nc.get("keyword", 0),
+                "vector_backend": self.vector_backend,
+                "vector_count": vector_count,
             }
         except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
             return {

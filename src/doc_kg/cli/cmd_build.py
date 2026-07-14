@@ -22,7 +22,13 @@ from rich.console import Console
 from rich.rule import Rule
 
 from doc_kg.cli.group import cli
-from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
+from doc_kg.cli.options import (
+    lancedb_option,
+    model_option,
+    repo_option,
+    sqlite_option,
+    vector_backend_option,
+)
 from doc_kg.config import load_exclude_dirs
 from doc_kg.kg import DocKG
 
@@ -51,6 +57,7 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
 @repo_option
 @sqlite_option
 @lancedb_option
+@vector_backend_option
 @model_option
 @click.option(
     "--table",
@@ -205,6 +212,7 @@ def build(
     repo: str,
     sqlite: str,
     lancedb: str,
+    vector_backend: str | None,
     model: str,
     table: str,
     chunk_size: int,
@@ -248,6 +256,7 @@ def build(
         lancedb_dir=lancedb_dir,
         model=model,
         table=table,
+        vector_backend=vector_backend,
         chunk_strategy=chunk_strategy,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -935,3 +944,85 @@ def reindex_fts(repo: str, sqlite: str) -> None:
         _console.print("\n[green]Lexical index ready.[/green]")
     else:
         _console.print("\n[yellow]No lexical index built (FTS5 unavailable or no chunks).[/yellow]")
+
+
+@cli.command("convert-index")
+@repo_option
+@lancedb_option
+@click.option(
+    "--table", default="dockg_nodes", show_default=True, help="Source LanceDB table name."
+)
+@click.option(
+    "--to",
+    "to_backend",
+    type=click.Choice(["sqlite-vec"]),
+    default="sqlite-vec",
+    show_default=True,
+    help="Target backend.",
+)
+@click.option(
+    "--dtype",
+    type=click.Choice(["fp32", "int8"]),
+    default="fp32",
+    show_default=True,
+    help="fp32 (exact) or int8 (3x smaller; assumes unit-norm vectors).",
+)
+@click.option(
+    "--vectors-path",
+    default=None,
+    type=click.Path(),
+    help="Destination sqlite path (default: <repo>/.dockg/vectors.sqlite).",
+)
+@click.option("--wipe/--no-wipe", default=True, show_default=True, help="Overwrite destination.")
+@click.option(
+    "--delete-lancedb",
+    is_flag=True,
+    default=False,
+    help="After a VALIDATED conversion, delete the source LanceDB directory "
+    "to reclaim space. No-op if validation fails.",
+)
+def convert_index(
+    repo: str,
+    lancedb: str,
+    table: str,
+    to_backend: str,
+    dtype: str,
+    vectors_path: str | None,
+    wipe: bool,
+    delete_lancedb: bool,
+) -> None:
+    """Convert an existing LanceDB vector index to a sqlite-vec store.
+
+    Reads vectors straight out of LanceDB and writes ``vectors.sqlite`` — no
+    model load, no re-embedding. Validates row count and re-reads a sample of
+    vectors to confirm the conversion is lossless (fp32) / near-lossless (int8).
+    With ``--delete-lancedb`` the source LanceDB dir is removed *only after*
+    validation succeeds.
+    """
+    import shutil  # pylint: disable=import-outside-toplevel
+
+    from doc_kg.index import convert_lancedb_to_sqlite  # pylint: disable=import-outside-toplevel
+
+    repo_root = Path(repo).resolve()
+    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
+
+    _console.print(Rule(f"DocKG convert-index — {repo_root.name}", style="bold blue"))
+    _console.print(f"  source lancedb : {lancedb_dir}")
+    _console.print(f"  target backend : {to_backend} (dtype={dtype})")
+
+    stats = convert_lancedb_to_sqlite(
+        lancedb_dir,
+        table=table,
+        vectors_path=vectors_path,
+        dtype="int8" if dtype == "int8" else "float",
+        wipe=wipe,
+    )
+    if not stats["validated"]:
+        raise click.ClickException("conversion validation failed")
+    _console.print("\n[green]Conversion complete and validated.[/green]")
+
+    if delete_lancedb:
+        # Guarded: only reached after validation passed above.
+        if lancedb_dir.exists():
+            shutil.rmtree(lancedb_dir)
+            _console.print(f"[yellow]Deleted source LanceDB dir:[/yellow] {lancedb_dir}")

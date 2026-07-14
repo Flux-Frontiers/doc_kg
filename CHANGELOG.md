@@ -15,6 +15,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.18.0] - 2026-07-14
+
+### Added
+
+- **Pluggable vector backend: `sqlite-vec` alongside LanceDB.** `SemanticIndex`
+  now routes all vector storage through `kg_utils.vector_backend.VectorBackend`
+  (requires `kgmodule-utils>=0.5.0`). Select per-KG with `DocKG(...,
+  vector_backend="sqlite-vec")`, the `DOCKG_VECTOR_BACKEND` env var, or
+  `dockg build/query --vector-backend sqlite-vec`. The sqlite-vec store is a
+  sidecar `.dockg/vectors.sqlite` (exact brute-force cosine, ~10× smaller than
+  LanceDB, recall 1.0). Backend selection defaults to `"auto"` (see Changed).
+  Opt-in dependency: `pip install 'doc-kg[sqlite-vec]'`.
+- `make_backend()` / `sqlite_vectors_path()` helpers in `index.py`;
+  `DocKG.stats()` now reports `vector_backend` and `vector_count`.
+- **`dockg convert-index --to sqlite-vec [--dtype fp32|int8] [--delete-lancedb]`**
+  — convert an existing LanceDB index to a `vectors.sqlite` store with no
+  re-embedding (reads vectors straight out of LanceDB, validates row count + a
+  vector sample). `--delete-lancedb` reclaims space by removing the source dir
+  **only after** validation passes. `convert_lancedb_to_sqlite()` in `index.py`.
+
+### Changed
+
+- **Default vector backend is now `"auto"`** (was implicitly lancedb):
+  `resolve_backend_name()` picks sqlite-vec for fresh/converted corpora and
+  lancedb only when an un-migrated lancedb store is all that exists — so new
+  builds go to sqlite-vec while existing lancedb corpora keep working untouched.
+  Force either with `--vector-backend` / `DOCKG_VECTOR_BACKEND`.
+- **`index.py::SemanticIndex` refactored onto the backend seam.** `build`,
+  `build_from_cache`, `_build_from_jsonl_cache`, `search`, `prune`, and
+  `_existing_index_ids` now delegate storage to the backend; the LanceDB table
+  plumbing and IVF ANN machinery moved into `kg_utils`'s `LanceDBBackend`
+  (ANN applies to LanceDB only — sqlite-vec is always exact). Public API
+  (`SemanticIndex(...)`, `build()`, `search()`, stats keys) unchanged; a new
+  `backend=` parameter defaults to LanceDB.
+
+### Removed
+
+- Dead `index.py` internals folded into `kg_utils.vector_backend`:
+  `_open_table`, `_get_table`, `_maybe_create_ann_index`,
+  `_table_has_ann_index`, `_pq_subvectors`, `_escape`.
+
+### Fixed
+
 - **`index.py`: MPS cache evicted each batch in the streaming embed.**
   `_precompute_embeddings_jsonl_stream` embeds batch-by-batch and flushes to disk, but
   never freed the Metal/MPS allocator cache; on Apple Silicon the allocator hoards freed

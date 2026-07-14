@@ -16,7 +16,13 @@ from pathlib import Path
 import click
 
 from doc_kg.cli.group import cli
-from doc_kg.cli.options import lancedb_option, model_option, repo_option, sqlite_option
+from doc_kg.cli.options import (
+    lancedb_option,
+    model_option,
+    repo_option,
+    sqlite_option,
+    vector_backend_option,
+)
 from doc_kg.kg import DocKG
 from doc_kg.store import DEFAULT_RELS
 
@@ -28,6 +34,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
 @repo_option
 @sqlite_option
 @lancedb_option
+@vector_backend_option
 @click.option(
     "--table",
     default="dockg_nodes",
@@ -55,6 +62,7 @@ def query(
     repo: str,
     sqlite: str,
     lancedb: str,
+    vector_backend: str | None,
     table: str,
     model: str,
     k: int,
@@ -74,6 +82,7 @@ def query(
         lancedb_dir=lancedb_dir,
         model=model,
         table=table,
+        vector_backend=vector_backend,
     )
 
     result = kg.query(

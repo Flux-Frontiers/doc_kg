@@ -316,7 +316,7 @@ def main() -> None:
                 height=cfg["graph_height"],
                 physics=cfg["physics_on"],
             )
-            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)  # ty: ignore[possibly-missing-submodule]
+            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)
             st.caption(f"Showing {len(nodes)} nodes and {len(edges)} edges.")
 
     with tab_query:
@@ -360,7 +360,7 @@ def main() -> None:
                 seed_ids={n["id"] for n in result.nodes[: cfg["k"]]},
                 physics=cfg["physics_on"],
             )
-            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)  # ty: ignore[possibly-missing-submodule]
+            st.components.v1.html(html, height=int(cfg["graph_height"].replace("px", "")) + 30)
 
     with tab_pack:
         pquery = st.text_input("Pack query", value="MCP setup and usage")
