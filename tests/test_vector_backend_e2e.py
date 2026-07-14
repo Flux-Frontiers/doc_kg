@@ -16,8 +16,12 @@ import hashlib
 import numpy as np
 import pytest
 
-from doc_kg.dockg import DocNode
-from doc_kg.index import (
+# Every test here exercises the sqlite-vec backend; skip the module when the
+# optional dependency is absent (CI installs the `sqlite-vec` extra).
+pytest.importorskip("sqlite_vec")
+
+from doc_kg.dockg import DocNode  # noqa: E402
+from doc_kg.index import (  # noqa: E402
     SemanticIndex,
     convert_lancedb_to_sqlite,
     make_backend,

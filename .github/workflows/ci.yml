@@ -94,7 +94,8 @@ jobs:
           key: test-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction --extras dev
+        # sqlite-vec extra so the SqliteVecBackend tests run (not skipped).
+        run: poetry install --no-interaction --extras dev --extras sqlite-vec
 
       - name: Run tests
         run: poetry run pytest

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 from kg_utils.vector_backend import LanceDBBackend, SqliteVecBackend, _pq_subvectors
 
 from doc_kg.index import (
@@ -112,6 +113,7 @@ def test_explicit_backend_is_used(tmp_path):
 
 
 def test_sqlite_backend_has_no_lance_table(tmp_path):
+    pytest.importorskip("sqlite_vec")
     sb = SqliteVecBackend(tmp_path / "v.sqlite", dim=384, meta_columns=_META_COLUMNS)
     idx = _make_index(tmp_path, backend=sb)
     sb.open(wipe=True)
@@ -119,6 +121,7 @@ def test_sqlite_backend_has_no_lance_table(tmp_path):
 
 
 def test_finalize_backend_is_noop_on_sqlite(tmp_path):
+    pytest.importorskip("sqlite_vec")
     sb = SqliteVecBackend(tmp_path / "v.sqlite", dim=384, meta_columns=_META_COLUMNS)
     idx = _make_index(tmp_path, backend=sb)
     sb.open(wipe=True)

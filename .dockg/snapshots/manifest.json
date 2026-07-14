@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-07-14T19:58:06.474878+00:00",
+  "last_update": "2026-07-14T20:05:58.984546+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -3569,11 +3569,11 @@
       }
     },
     {
-      "key": "097b760bbc33787fdf2c61ec9742797e38ebe38f",
+      "key": "8235ae156d453a93767e95b7cd86d356b22bbfd4",
       "branch": "feat/sqllite-vec",
-      "timestamp": "2026-07-14T19:58:06.473401+00:00",
+      "timestamp": "2026-07-14T20:05:58.983065+00:00",
       "version": "0.16.0",
-      "file": "097b760bbc33787fdf2c61ec9742797e38ebe38f.json",
+      "file": "8235ae156d453a93767e95b7cd86d356b22bbfd4.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 3880,
