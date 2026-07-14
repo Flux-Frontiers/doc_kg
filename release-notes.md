@@ -1,44 +1,46 @@
-# Release Notes — v0.17.0
+# Release Notes — v0.18.0
 
-> Released: 2026-07-13
+> Released: 2026-07-14
 
-DocKG 0.17.0 makes a text pack **explain itself**: `pack(..., traced=True)` attaches a
-`seed → … → node` provenance path to every returned node, with a quoted source line and a
-`file_path:char_start` citation at each hop — turning "here are similar chunks" into a
-traceable chain of *why* each result surfaced. Tracing is reconstructed from edges the
-pack already fetches, so it adds no extra queries, no schema change, and **no rebuild**;
-untraced output is byte-identical. The release also consolidates the embedding pipeline
-into `kgmodule-utils` and hardens long builds against the memory blowups seen on
-multi-hundred-thousand-node corpora.
+DocKG 0.18.0 adds a second vector store: an exact **`sqlite-vec`** backend that lives beside
+LanceDB behind a pluggable seam. On the consolidated Gutenberg corpus it returns the exact
+top-k (recall@10 = 1.0) where LanceDB's approximate index averaged ~0.825 — surfacing hits
+the old index quietly dropped — while taking roughly a tenth of the disk and keeping query
+latency in the same class. Vectors move over with a converter that reads them straight out
+of an existing LanceDB table, so adopting it is a conversion, never a re-embed. LanceDB
+stays fully supported; the default is `auto`, which does the right thing without a flag.
 
 ## What changed
 
-**Traced provenance in `pack`.** Available everywhere packs are made: the Python API
-(`DocKG.pack(traced=True)`), the MCP tool (`pack_docs(traced=...)`), and the CLI
-(`dockg pack --traced`). Each hop is labeled with its relation ("similar to (0.91)",
-"links to (other.md)", "contains", "mentions") and grounded in a quoted line from the
-source document, in the spirit of traversal-grounded, path-cited answering.
+**Pluggable vector backend.** `SemanticIndex` now routes all vector storage through a
+`VectorBackend` seam (from `kgmodule-utils>=0.5.0`). The new `sqlite-vec` store is a sidecar
+`.dockg/vectors.sqlite` — an exact brute-force cosine index that unifies dense vectors, FTS5,
+and the graph on one storage engine. Public API is unchanged; the switch is a single knob,
+via `DocKG(vector_backend=...)`, the `DOCKG_VECTOR_BACKEND` env var, or
+`dockg build/query --vector-backend`.
 
-**One canonical corpus embedder.** `CorpusEmbedder`/`EmbeddingCache` had been forked into
-sibling KG projects, and the device-pinning and shard-recycling fixes from 0.15.9 never
-propagated to the copies. The implementation now lives in `kgmodule-utils` (≥0.4.9) as
-`kg_utils.corpus_embedder`; `doc_kg.embedder_worker` re-exports it, so existing imports
-keep working unchanged.
+**An `auto` default that won't surprise you.** Backend selection defaults to `auto`: fresh
+and already-converted corpora build and read `sqlite-vec`, while a corpus that still has only
+a LanceDB store keeps using LanceDB untouched. Nothing silently changes store type under an
+existing index; forcing either backend is always one flag away.
 
-**Memory-safe long builds.** The encode batch in `SemanticIndex.build()` is hard-capped at
-128 (throughput is flat above that on CPU and MPS, while a 1024 batch on long chunks
-allocates several GB per encode call), and mid-run embedder reloads are gone — they
-discarded caller-shared embedders and risked a second-load SIGBUS on MPS. Embedding-cache
-precompute now routes by device: GPU stays single-process, while CPU streams shard-by-shard
-through the multi-process `CorpusEmbedder.embed_to_cache()`, so peak memory scales with
-shard size rather than corpus size.
+**Convert without re-embedding.** `dockg convert-index --to sqlite-vec [--dtype fp32|int8]`
+reads vectors directly out of a LanceDB table and writes `vectors.sqlite`, validating the row
+count and re-reading a sample to prove the conversion is lossless. `--delete-lancedb` reclaims
+the old store's space, but only after that validation passes.
+
+**Internals consolidated.** The LanceDB table plumbing and the IVF/ANN index machinery moved
+out of `doc_kg` into `kgmodule-utils`' `LanceDBBackend` (ANN applies to LanceDB only —
+`sqlite-vec` is exact by construction). `DocKG.stats()` now reports the active
+`vector_backend` and `vector_count`.
 
 ## Upgrading
 
-No action required — no schema change and no index rebuild. Existing `.dockg` graphs gain
-`traced=True` immediately. `kgmodule-utils>=0.4.9` is pulled in automatically on install.
-If you had tuned `--encode-batch` above 128, note it is now clamped; the cap is deliberate
-and costs no throughput.
+No rebuild required. Existing LanceDB corpora keep working exactly as before under the `auto`
+default. To move a corpus to the smaller, exact store, run `dockg convert-index --to
+sqlite-vec` (optionally `--delete-lancedb` once you've confirmed it) — no model load, no
+re-embedding. `sqlite-vec` is an opt-in dependency: `pip install 'doc-kg[sqlite-vec]'`.
+`kgmodule-utils>=0.5.0` is pulled in automatically on install.
 
 ---
 
