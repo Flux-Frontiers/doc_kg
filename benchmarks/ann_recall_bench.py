@@ -135,7 +135,7 @@ def main() -> None:
 
     embedder = make_embedder()
     index = SemanticIndex(lancedb_dir, embedder=embedder, table=args.table)
-    tbl = index._get_table()
+    tbl = index._lance_table()
     indices = tbl.list_indices()
     print(f"corpus rows : {tbl.count_rows():,}")
     print(f"index       : {indices}")

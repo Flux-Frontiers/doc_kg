@@ -26,6 +26,17 @@ lancedb_option = click.option(
     help="Path to LanceDB directory (default: <repo>/.dockg/lancedb).",
 )
 
+vector_backend_option = click.option(
+    "--vector-backend",
+    default=None,
+    show_default=False,
+    type=click.Choice(["auto", "lancedb", "sqlite-vec"]),
+    help="Vector store backend (default: auto, or $DOCKG_VECTOR_BACKEND). "
+    "auto picks sqlite-vec for fresh/converted corpora, lancedb only for "
+    "un-migrated ones. sqlite-vec is exact and ~10x smaller "
+    "(<repo>/.dockg/vectors.sqlite).",
+)
+
 model_option = click.option(
     "--model",
     default=DEFAULT_MODEL,

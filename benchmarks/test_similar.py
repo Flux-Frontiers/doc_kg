@@ -75,7 +75,9 @@ def main():
 
         # Build a tiny LanceDB table (required by SemanticIndex init)
         idx = SemanticIndex(lancedb_dir, embedder=FakeEmbedder())
-        tbl = idx._open_table(wipe=True)
+        backend = idx._get_backend()
+        backend.open(wipe=True)
+        tbl = idx._lance_table()
         rows = [
             {
                 "id": nid,
