@@ -338,6 +338,15 @@ class SemanticIndex:
         indexed = 0
         all_ids: list[str] = []
         telemetry_every = 25
+        # Per-batch ingest telemetry is noisy on long corpus builds; silent
+        # unless DOCKG_EMBED_TELEMETRY is set truthy. The periodic allocator
+        # cache-release below still runs regardless.
+        show_telemetry = os.getenv("DOCKG_EMBED_TELEMETRY", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         write_batch_size = max(int(batch_size), int(encode_batch_size))
         pending_rows: list[dict[str, Any]] = []
         pending_ids: list[str] = []
@@ -449,30 +458,35 @@ class SemanticIndex:
 
                 if not quiet and batches % telemetry_every == 0:
                     with contextlib.suppress(Exception):
-                        frags = small = None
-                        if lance_tbl is not None:
-                            stats = lance_tbl.stats()
-                            if isinstance(stats, dict):
-                                frag_stats = stats.get("fragment_stats", {})
-                                frags = frag_stats.get("num_fragments")
-                                small = frag_stats.get("num_small_fragments")
-                            else:
-                                frag_stats = getattr(stats, "fragment_stats", None)
-                                frags = getattr(frag_stats, "num_fragments", None)
-                                small = getattr(frag_stats, "num_small_fragments", None)
-                        embed_ms = (
-                            (window_embed_s / max(window_rows, 1)) * 1000.0 if window_rows else 0.0
-                        )
-                        add_ms = (
-                            (window_add_s / max(window_rows, 1)) * 1000.0 if window_rows else 0.0
-                        )
+                        if show_telemetry:
+                            frags = small = None
+                            if lance_tbl is not None:
+                                stats = lance_tbl.stats()
+                                if isinstance(stats, dict):
+                                    frag_stats = stats.get("fragment_stats", {})
+                                    frags = frag_stats.get("num_fragments")
+                                    small = frag_stats.get("num_small_fragments")
+                                else:
+                                    frag_stats = getattr(stats, "fragment_stats", None)
+                                    frags = getattr(frag_stats, "num_fragments", None)
+                                    small = getattr(frag_stats, "num_small_fragments", None)
+                            embed_ms = (
+                                (window_embed_s / max(window_rows, 1)) * 1000.0
+                                if window_rows
+                                else 0.0
+                            )
+                            add_ms = (
+                                (window_add_s / max(window_rows, 1)) * 1000.0
+                                if window_rows
+                                else 0.0
+                            )
 
-                        Console().print(
-                            f"  ingest   : batch={batches} rows={indexed:,} "
-                            f"fragments={frags} small={small} "
-                            f"embed_ms_per_row={embed_ms:.3f} add_ms_per_row={add_ms:.3f} "
-                            f"encode_batch_eff={eff_batch}"
-                        )
+                            Console().print(
+                                f"  ingest   : batch={batches} rows={indexed:,} "
+                                f"fragments={frags} small={small} "
+                                f"embed_ms_per_row={embed_ms:.3f} add_ms_per_row={add_ms:.3f} "
+                                f"encode_batch_eff={eff_batch}"
+                            )
 
                         # Long MPS/CUDA runs can degrade as allocator caches grow.
                         # Proactively release backend caches at telemetry checkpoints.

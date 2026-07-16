@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.18.1] - 2026-07-15
+
+### Fixed
+
+- **`dockg build` no longer leaves `embeddings.json` behind.** The main build
+  command wrote the intermediate embedding cache in step 2a and consumed it in
+  step 2b but never deleted it, littering every corpus's `.dockg/` (one leaked
+  into pycode_kg's staging area). The cache is now removed after indexing, with
+  a `--keep-cache/--delete-cache` opt-out matching `build-two-phase`'s existing
+  convention. `dockg pipeline` was unaffected (in-memory embeddings).
+
+- **Silenced noisy per-batch ingest telemetry during index builds.**
+  `SemanticIndex.build()` printed an `ingest : batch=… fragments=… embed_ms_per_row=…`
+  line every 25 batches, which floods the console on large corpus builds. It is
+  now suppressed by default and opt-in via the `DOCKG_EMBED_TELEMETRY` env var
+  (truthy: `1`/`true`/`yes`/`on`). The periodic allocator cache-release still
+  runs regardless, so long-build memory behaviour is unchanged.
+
 ## [0.18.0] - 2026-07-14
 
 ### Added

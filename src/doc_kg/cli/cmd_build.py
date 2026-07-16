@@ -208,6 +208,12 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
         "Merged with [tool.dockg].exclude from pyproject.toml."
     ),
 )
+@click.option(
+    "--keep-cache/--delete-cache",
+    default=False,
+    show_default=True,
+    help="Keep the intermediate embeddings.json cache after indexing.",
+)
 def build(
     repo: str,
     sqlite: str,
@@ -234,6 +240,7 @@ def build(
     update: bool,
     ext: tuple[str, ...],
     exclude_dir: tuple[str, ...],
+    keep_cache: bool,
 ) -> None:
     """Build the DocKG from a corpus directory.
 
@@ -324,6 +331,14 @@ def build(
     _console.print(f"  indexed  : {idx_stats.indexed_rows} vectors")
     if not no_similar:
         _console.print(f"  SIMILAR_TO: {idx_stats.similar_edges_added or 0} edges")
+
+    # The cache is an intermediate artifact — the vectors now live in the index.
+    if not keep_cache:
+        try:
+            cache_path.unlink(missing_ok=True)
+            _console.print(f"  cache    : deleted {cache_path}")
+        except OSError as exc:
+            _console.print(f"  cache    : failed to delete {cache_path} ({exc})")
 
     _console.print("\n[green]Build complete.[/green]")
     kg.close()
