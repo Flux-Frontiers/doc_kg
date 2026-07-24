@@ -95,7 +95,6 @@ dev = [
     "pycode-kg>=0.19.3",
 ]
 viz = [
-    "plotly>=5.14.0",
     "pyvis>=0.3.2",
     "streamlit>=1.35.0",
 ]
@@ -115,7 +114,6 @@ all = [
     "detect-secrets>=1.5.0",
     "ty>=0.0.41",
     "pdoc>=14.0.0",
-    "plotly>=5.14.0",
     "pre-commit>=4.5.1",
     "pycode-kg>=0.19.3",
     "pytest>=8.0.0",
