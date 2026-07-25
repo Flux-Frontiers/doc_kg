@@ -4425,7 +4425,8 @@ files = [
 ]
 
 [extras]
-all = ["detect-secrets", "pdoc", "pre-commit", "pycode-kg", "pytest", "pytest-cov", "pyvis", "ruff", "streamlit", "ty"]
+all = ["detect-secrets", "pdoc", "pre-commit", "pycode-kg", "pytest", "pytest-cov", "pyvis", "ruff", "scikit-learn", "streamlit", "ty"]
+analysis = ["scikit-learn"]
 dev = ["detect-secrets", "pdoc", "pre-commit", "pycode-kg", "pytest", "pytest-cov", "ruff", "ty"]
 kgdeps = ["pycode-kg"]
 sqlite-vec = ["sqlite-vec"]
@@ -4434,4 +4435,4 @@ viz = ["pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "53058b88e9ba5a2803e055f59dceb2c6a17af799f970500af28006230eab580b"
+content-hash = "c43b166933af9c32902d55b4706ace81e02119dbd10b8977482aea7bbbd9f54f"
