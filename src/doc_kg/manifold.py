@@ -123,7 +123,13 @@ class ManifoldAnalyzer:
 
     def _pca_analysis(self, X: np.ndarray, report: ManifoldReport) -> None:
         """PCA explained variance analysis."""
-        from sklearn.decomposition import PCA  # pylint: disable=import-outside-toplevel
+        try:
+            from sklearn.decomposition import PCA  # pylint: disable=import-outside-toplevel
+        except ImportError as exc:
+            raise ImportError(
+                "scikit-learn is required for manifold analysis. "
+                "Install it with: pip install 'doc-kg[analysis]'"
+            ) from exc
 
         n, d = X.shape
         n_components = min(self.pca_max_components, n, d)
@@ -146,7 +152,13 @@ class ManifoldAnalyzer:
 
         Measures the effective number of dimensions used by the data.
         """
-        from sklearn.decomposition import PCA  # pylint: disable=import-outside-toplevel
+        try:
+            from sklearn.decomposition import PCA  # pylint: disable=import-outside-toplevel
+        except ImportError as exc:
+            raise ImportError(
+                "scikit-learn is required for manifold analysis. "
+                "Install it with: pip install 'doc-kg[analysis]'"
+            ) from exc
 
         n, d = X.shape
         n_components = min(self.pca_max_components, n, d)
@@ -169,9 +181,15 @@ class ManifoldAnalyzer:
 
         Uses the ratio of second-nearest to nearest neighbor distances.
         """
-        from sklearn.neighbors import (  # pylint: disable=import-outside-toplevel
-            NearestNeighbors,
-        )
+        try:
+            from sklearn.neighbors import (  # pylint: disable=import-outside-toplevel
+                NearestNeighbors,
+            )
+        except ImportError as exc:
+            raise ImportError(
+                "scikit-learn is required for manifold analysis. "
+                "Install it with: pip install 'doc-kg[analysis]'"
+            ) from exc
 
         n = X.shape[0]
         if n < 10:
