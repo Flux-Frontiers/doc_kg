@@ -260,3 +260,6 @@ commit.txt
 .claude/worktrees/
 .claude/plans/
 .claude/agents/
+.agents/
+.codex/
+
