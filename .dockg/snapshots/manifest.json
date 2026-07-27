@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-07-16T12:06:36.753154+00:00",
+  "last_update": "2026-07-27T00:30:56.120362+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -3784,11 +3784,54 @@
       }
     },
     {
-      "key": "196589f3c2f6dc3fe30b3b84fd3eadecc4b636f7",
-      "branch": "main",
-      "timestamp": "2026-07-16T12:06:36.751557+00:00",
+      "key": "fc4823b16d6dcb2da7438eb1b2eedc4dea63b064",
+      "branch": "feat/assets-lock",
+      "timestamp": "2026-07-26T23:55:13.393603+00:00",
       "version": "0.16.0",
-      "file": "196589f3c2f6dc3fe30b3b84fd3eadecc4b636f7.json",
+      "file": "fc4823b16d6dcb2da7438eb1b2eedc4dea63b064.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 3869,
+        "total_edges": 29832,
+        "node_counts": {
+          "chunk": 816,
+          "document": 45,
+          "entity": 1050,
+          "keyword": 936,
+          "section": 506,
+          "topic": 516
+        },
+        "edge_counts": {
+          "CONTAINS": 1322,
+          "CO_OCCURS_WITH": 18680,
+          "HAS_KEYWORD": 3249,
+          "HAS_TOPIC": 841,
+          "MENTIONS_ENTITY": 3780,
+          "NEXT": 240,
+          "REFERENCES": 25,
+          "SIMILAR_TO": 1695
+        },
+        "meaningful_nodes": 3824,
+        "coverage_score": 0.9820261437908497,
+        "issues_count": 0,
+        "complexity_median": 24.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 1902,
+          "edges": 18143,
+          "coverage_delta": 0.09714641870493912,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "fd020cf8ee2617ba6754922d16a2bcf3b6d2573f",
+      "branch": "main",
+      "timestamp": "2026-07-27T00:30:56.118481+00:00",
+      "version": "0.18.1",
+      "file": "fd020cf8ee2617ba6754922d16a2bcf3b6d2573f.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 3869,
