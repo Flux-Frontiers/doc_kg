@@ -22,6 +22,7 @@ from doc_kg.cli.options import (
     repo_option,
     sqlite_option,
     vector_backend_option,
+    vectors_path_option,
 )
 from doc_kg.kg import DocKG
 from doc_kg.store import DEFAULT_RELS
@@ -35,6 +36,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
 @sqlite_option
 @lancedb_option
 @vector_backend_option
+@vectors_path_option
 @click.option(
     "--table",
     default="dockg_nodes",
@@ -69,6 +71,7 @@ def query(
     hop: int,
     rels: str,
     max_nodes: int,
+    vectors_path: str | None,
 ) -> None:
     """Run a hybrid semantic + graph query and print a ranked result summary."""
     repo_root = Path(repo).resolve()
@@ -83,6 +86,7 @@ def query(
         model=model,
         table=table,
         vector_backend=vector_backend,
+        vectors_path=vectors_path,
     )
 
     result = kg.query(
@@ -148,6 +152,7 @@ def query(
     show_default=True,
     help="Output format.",
 )
+@vectors_path_option
 def pack(
     query_text: str,
     repo: str,
@@ -163,6 +168,7 @@ def pack(
     traced: bool,
     out: str | None,
     fmt: str,
+    vectors_path: str | None,
 ) -> None:
     """Run a hybrid query and emit text excerpt packs."""
     repo_root = Path(repo).resolve()
@@ -176,6 +182,7 @@ def pack(
         lancedb_dir=lancedb_dir,
         model=model,
         table=table,
+        vectors_path=vectors_path,
     )
 
     text_pack = kg.pack(

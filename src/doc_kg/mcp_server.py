@@ -124,6 +124,11 @@ def _parse_args(argv: list | None = None) -> argparse.Namespace:
         help="Path to LanceDB directory (default: .dockg/lancedb)",
     )
     p.add_argument(
+        "--vectors-path",
+        default=None,
+        help="Path to the sqlite-vec vector store (default: derived next to the graph)",
+    )
+    p.add_argument(
         "--model",
         default=DEFAULT_MODEL,
         help=f"Sentence-transformer model name (default: {DEFAULT_MODEL})",
@@ -146,19 +151,24 @@ def main(argv: list | None = None) -> None:
     repo = Path(args.repo).resolve()
     db = Path(args.db) if Path(args.db).is_absolute() else repo / args.db
     lancedb_dir = Path(args.lancedb) if Path(args.lancedb).is_absolute() else repo / args.lancedb
+    vectors_path = None
+    if args.vectors_path:
+        vp = Path(args.vectors_path)
+        vectors_path = vp if vp.is_absolute() else repo / vp
 
     if not db.exists():
         print(
-            f"WARNING: SQLite database not found at '{db}'.\\nRun 'dockg build' first.",
+            f"WARNING: SQLite database not found at '{db}'.\nRun 'dockg build' first.",
             file=sys.stderr,
         )
 
     print(
-        f"DocKG MCP server starting\\n"
-        f"  repo     : {repo}\\n"
-        f"  db       : {db}\\n"
-        f"  lancedb  : {lancedb_dir}\\n"
-        f"  model    : {args.model}\\n"
+        f"DocKG MCP server starting\n"
+        f"  repo     : {repo}\n"
+        f"  db       : {db}\n"
+        f"  lancedb  : {lancedb_dir}\n"
+        f"  vectors  : {vectors_path or '(derived)'}\n"
+        f"  model    : {args.model}\n"
         f"  transport: {args.transport}",
         file=sys.stderr,
     )
@@ -168,6 +178,7 @@ def main(argv: list | None = None) -> None:
         db_path=db,
         lancedb_dir=lancedb_dir,
         model=args.model,
+        vectors_path=vectors_path,
     )
 
     mcp.run(transport=args.transport)
