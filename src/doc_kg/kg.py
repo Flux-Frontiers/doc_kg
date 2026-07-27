@@ -622,6 +622,13 @@ class DocKG:
                      so the lazy-init never fires ``SentenceTransformerEmbedder``.
                      Defaults to ``None`` (preserves existing behaviour).
     :param device: Embedding device override: ``auto`` (default), ``cpu``, ``mps``, ``cuda``.
+    :param vector_backend: ``"auto"`` (default), ``"lancedb"``, or ``"sqlite-vec"``.
+    :param vectors_path: Explicit location of the sqlite-vec store.  Defaults to
+                         ``None``, which derives the sidecar next to the graph
+                         (``<store>/.dockg/vectors.sqlite``).  Set this when the
+                         vector store does not live beside ``lancedb_dir`` — an
+                         explicit path also lets ``vector_backend="auto"`` resolve
+                         to sqlite-vec.
     """
 
     def __init__(
@@ -650,6 +657,7 @@ class DocKG:
         embedder: Embedder | None = None,
         device: str = "auto",
         vector_backend: str | None = None,
+        vectors_path: str | Path | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.exclude: set[str] = exclude or set()
@@ -669,6 +677,10 @@ class DocKG:
         # picks sqlite-vec for fresh/converted corpora and lancedb only when an
         # un-migrated lancedb store is all that exists (see resolve_backend_name).
         self.vector_backend = vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "auto"
+        # Explicit sqlite-vec store location. None derives the sidecar next to
+        # the graph (see sqlite_vectors_path); an explicit path also lets
+        # "auto" resolve to sqlite-vec when that file exists.
+        self.vectors_path = Path(vectors_path) if vectors_path else None
         self.chunk_strategy = chunk_strategy
         self.sentences_per_chunk = sentences_per_chunk
         self.chunk_size = chunk_size
@@ -741,6 +753,7 @@ class DocKG:
                 lancedb_dir=self.lancedb_dir,
                 dim=self.embedder.dim,
                 table=self.table_name,
+                vectors_path=self.vectors_path,
             )
             self._index = SemanticIndex(
                 self.lancedb_dir,
@@ -1293,6 +1306,7 @@ class DocKG:
                     lancedb_dir=self.lancedb_dir,
                     dim=384,
                     table=self.table_name,
+                    vectors_path=self.vectors_path,
                 ).count()
             return {
                 "node_count": s.get("total_nodes", 0),

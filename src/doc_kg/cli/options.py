@@ -26,6 +26,16 @@ lancedb_option = click.option(
     help="Path to LanceDB directory (default: <repo>/.dockg/lancedb).",
 )
 
+vectors_path_option = click.option(
+    "--vectors-path",
+    default=None,
+    show_default=False,
+    type=click.Path(),
+    help="Path to the sqlite-vec vector store (default: <repo>/.dockg/vectors.sqlite, "
+    "derived next to the graph). Set this when the store lives elsewhere; an "
+    "explicit path also lets --vector-backend=auto resolve to sqlite-vec.",
+)
+
 vector_backend_option = click.option(
     "--vector-backend",
     default=None,

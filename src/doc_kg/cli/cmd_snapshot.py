@@ -18,7 +18,7 @@ from pathlib import Path
 import click
 
 from doc_kg.cli.group import cli
-from doc_kg.cli.options import sqlite_option
+from doc_kg.cli.options import sqlite_option, vectors_path_option
 from doc_kg.dockg_thorough_analysis import DocKGAnalyzer
 from doc_kg.kg import DocKG
 from doc_kg.snapshots import SnapshotManager
@@ -58,6 +58,7 @@ def snapshot() -> None:
     type=str,
     help="Branch name; auto-detected if not provided.",
 )
+@vectors_path_option
 def save_snapshot(
     version: str | None,
     repo: str,
@@ -65,6 +66,7 @@ def save_snapshot(
     snapshots_dir: str | None,
     tree_hash: str | None,
     branch: str | None,
+    vectors_path: str | None,
 ) -> None:
     """Capture current DocKG metrics and save as a temporal snapshot."""
     repo_root = Path(repo).resolve()
@@ -83,6 +85,7 @@ def save_snapshot(
         corpus_root=repo_root,
         db_path=db_path,
         lancedb_dir=repo_root / ".dockg" / "lancedb",
+        vectors_path=vectors_path,
     )
     try:
         analyzer = DocKGAnalyzer(kg)

@@ -1,5 +1,6 @@
 """CLI smoke tests for Click command registration."""
 
+import pytest
 from click.testing import CliRunner
 
 from doc_kg.cli.main import cli
@@ -152,3 +153,161 @@ def test_download_model_saves_to_path(tmp_path):
         result = runner.invoke(cli, ["download-model", "--model", "BAAI/bge-small-en-v1.5"])
     assert result.exit_code == 0
     mock_st_instance.save.assert_called_once_with(str(save_target))
+
+
+# ---------------------------------------------------------------------------
+# --vectors-path wiring
+#
+# The option must reach DocKG(vectors_path=...) on every command that touches
+# the vector store, and must stay off the graph-only commands.
+# ---------------------------------------------------------------------------
+
+_VECTORS_PATH_COMMANDS = [
+    ["build"],
+    ["build-index"],
+    ["build-index-from-cache"],
+    ["build-two-phase"],
+    ["query"],
+    ["pack"],
+    ["mcp"],
+    ["snapshot", "save"],
+]
+
+# Graph-only commands: no vector store is read or written, so the option would
+# be misleading noise.
+_NO_VECTORS_PATH_COMMANDS = [
+    ["build-graph"],
+    ["build-embeddings"],
+    ["status"],
+    ["reindex-fts"],
+]
+
+
+@pytest.mark.parametrize("command", _VECTORS_PATH_COMMANDS, ids=lambda c: "-".join(c))
+def test_vectors_path_option_exposed(command):
+    result = CliRunner().invoke(cli, command + ["--help"])
+    assert result.exit_code == 0, result.output
+    assert "--vectors-path" in result.output
+
+
+@pytest.mark.parametrize("command", _NO_VECTORS_PATH_COMMANDS, ids=lambda c: "-".join(c))
+def test_vectors_path_option_absent_on_graph_only_commands(command):
+    result = CliRunner().invoke(cli, command + ["--help"])
+    assert result.exit_code == 0, result.output
+    assert "--vectors-path" not in result.output
+
+
+def test_query_forwards_vectors_path_to_dockg(tmp_path):
+    """Parsing the flag is not enough — it must reach the DocKG constructor."""
+    from unittest.mock import MagicMock, patch
+
+    db = tmp_path / ".dockg" / "graph.sqlite"
+    db.parent.mkdir(parents=True)
+    _seed_db(db)
+    custom = tmp_path / "offsite" / "vectors.sqlite"
+
+    with patch("doc_kg.cli.cmd_query.DocKG") as mock_kg:
+        mock_kg.return_value = MagicMock()
+        CliRunner().invoke(
+            cli,
+            [
+                "query",
+                "--repo",
+                str(tmp_path),
+                "--sqlite",
+                str(db),
+                "--vectors-path",
+                str(custom),
+                "whale",
+            ],
+        )
+
+    assert mock_kg.call_args is not None, "DocKG was never constructed"
+    assert mock_kg.call_args.kwargs["vectors_path"] == str(custom)
+
+
+def test_query_defaults_vectors_path_to_none(tmp_path):
+    """Omitting the flag must keep the derived-sidecar behaviour."""
+    from unittest.mock import MagicMock, patch
+
+    db = tmp_path / ".dockg" / "graph.sqlite"
+    db.parent.mkdir(parents=True)
+    _seed_db(db)
+
+    with patch("doc_kg.cli.cmd_query.DocKG") as mock_kg:
+        mock_kg.return_value = MagicMock()
+        CliRunner().invoke(cli, ["query", "--repo", str(tmp_path), "--sqlite", str(db), "whale"])
+
+    assert mock_kg.call_args.kwargs["vectors_path"] is None
+
+
+def test_mcp_forwards_vectors_path_through_argv(tmp_path):
+    """The mcp command shells out via argv — the flag must survive that hop."""
+    from unittest.mock import patch
+
+    custom = tmp_path / "offsite" / "vectors.sqlite"
+    with patch("doc_kg.mcp_server.main") as mock_main:
+        CliRunner().invoke(cli, ["mcp", "--repo", str(tmp_path), "--vectors-path", str(custom)])
+
+    assert mock_main.call_args is not None, "mcp_server.main was never called"
+    argv = mock_main.call_args.kwargs["argv"]
+    assert "--vectors-path" in argv
+    assert argv[argv.index("--vectors-path") + 1] == str(custom)
+
+
+# ---------------------------------------------------------------------------
+# MCP server startup output
+# ---------------------------------------------------------------------------
+
+
+def _run_mcp_main(argv):
+    """Drive mcp_server.main with the transport and KG stubbed; return stderr."""
+    import io
+    import sys as _sys
+    from unittest.mock import patch
+
+    import doc_kg.mcp_server as ms
+
+    buf = io.StringIO()
+    with (
+        patch.object(ms.mcp, "run"),
+        patch.object(ms, "DocKG"),
+        patch.object(_sys, "stderr", buf),
+    ):
+        ms.main(argv=argv)
+    return buf.getvalue()
+
+
+def test_mcp_banner_uses_real_newlines(tmp_path):
+    """The banner is built from escaped strings; a doubled backslash makes it
+    print a literal \\n and collapse into one run-on line."""
+    db = tmp_path / ".dockg" / "graph.sqlite"
+    db.parent.mkdir(parents=True)
+    _seed_db(db)
+
+    out = _run_mcp_main(["--repo", str(tmp_path), "--db", str(db)])
+
+    assert "\\n" not in out
+    lines = [ln for ln in out.splitlines() if ln.strip()]
+    assert lines[0] == "DocKG MCP server starting"
+    # Each field lands on its own line.
+    for field in ("repo", "db", "lancedb", "vectors", "model", "transport"):
+        assert any(ln.strip().startswith(field) for ln in lines), field
+
+
+def test_mcp_missing_db_warning_uses_real_newline(tmp_path):
+    out = _run_mcp_main(["--repo", str(tmp_path), "--db", "absent/graph.sqlite"])
+
+    assert "\\n" not in out
+    assert "WARNING: SQLite database not found" in out
+    assert any(ln.strip() == "Run 'dockg build' first." for ln in out.splitlines())
+
+
+def test_mcp_banner_reports_derived_vectors_path(tmp_path):
+    """With no --vectors-path the banner must say so rather than print None."""
+    db = tmp_path / ".dockg" / "graph.sqlite"
+    db.parent.mkdir(parents=True)
+    _seed_db(db)
+
+    out = _run_mcp_main(["--repo", str(tmp_path), "--db", str(db)])
+    assert "vectors  : (derived)" in out

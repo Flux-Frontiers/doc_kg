@@ -28,6 +28,7 @@ from doc_kg.cli.options import (
     repo_option,
     sqlite_option,
     vector_backend_option,
+    vectors_path_option,
 )
 from doc_kg.config import load_exclude_dirs
 from doc_kg.kg import DocKG
@@ -58,6 +59,7 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
 @sqlite_option
 @lancedb_option
 @vector_backend_option
+@vectors_path_option
 @model_option
 @click.option(
     "--table",
@@ -219,6 +221,7 @@ def build(
     sqlite: str,
     lancedb: str,
     vector_backend: str | None,
+    vectors_path: str | None,
     model: str,
     table: str,
     chunk_size: int,
@@ -264,6 +267,7 @@ def build(
         model=model,
         table=table,
         vector_backend=vector_backend,
+        vectors_path=vectors_path,
         chunk_strategy=chunk_strategy,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -585,6 +589,7 @@ def build_graph(
     type=click.Choice(_INDEX_KIND_CHOICES),
     help=("Restrict embedded node kinds (repeatable). If omitted, embeds all default kinds."),
 )
+@vectors_path_option
 def build_index(
     repo: str,
     sqlite: str,
@@ -597,6 +602,7 @@ def build_index(
     encode_batch: int,
     device: str,
     index_kinds: tuple[str, ...],
+    vectors_path: str | None,
 ) -> None:
     """Build only the LanceDB semantic index from an existing SQLite graph."""
     repo_root = Path(repo).resolve()
@@ -610,6 +616,7 @@ def build_index(
         model=model,
         table=table,
         device=device,
+        vectors_path=vectors_path,
     )
 
     if index_kinds:
@@ -750,6 +757,7 @@ def build_embeddings(
     default=False,
     help="Skip SIMILAR_TO edge discovery after indexing.",
 )
+@vectors_path_option
 def build_index_from_cache(
     repo: str,
     sqlite: str,
@@ -759,6 +767,7 @@ def build_index_from_cache(
     cache_path: str | None,
     update: bool,
     no_similar: bool,
+    vectors_path: str | None,
 ) -> None:
     """Build LanceDB index from an embedding cache JSON (no model inference)."""
     repo_root = Path(repo).resolve()
@@ -773,6 +782,7 @@ def build_index_from_cache(
         lancedb_dir=lancedb_dir,
         model=model,
         table=table,
+        vectors_path=vectors_path,
     )
 
     _console.print(Rule(f"DocKG build-index-from-cache — {db_path.name}", style="bold blue"))
@@ -860,6 +870,7 @@ def build_index_from_cache(
     show_default=True,
     help="Keep or delete embedding cache after successful indexing.",
 )
+@vectors_path_option
 def build_two_phase(
     repo: str,
     sqlite: str,
@@ -874,6 +885,7 @@ def build_two_phase(
     update: bool,
     no_similar: bool,
     keep_cache: bool,
+    vectors_path: str | None,
 ) -> None:
     """Run the stable two-phase pipeline: cache embeddings, then index from cache."""
     repo_root = Path(repo).resolve()
@@ -889,6 +901,7 @@ def build_two_phase(
         model=model,
         table=table,
         device=device,
+        vectors_path=vectors_path,
     )
 
     if index_kinds:

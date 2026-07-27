@@ -15,6 +15,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.18.2] - 2026-07-26
+
+### Added
+
+- **`DocKG(vectors_path=...)`** — the sqlite-vec store location is now settable
+  from the `DocKG` constructor. `doc_kg.index` has always accepted an explicit
+  `vectors_path`; `DocKG` was the one layer that neither accepted nor forwarded
+  it, so the store was always derived as the sidecar next to `graph.sqlite`
+  (`<store>/.dockg/vectors.sqlite`). Callers that track the vector store
+  independently — notably the KGRAG registry's `KGEntry.vectors_path` — can now
+  point `DocKG` at a store that does not sit beside `lancedb_dir`.
+
+  Defaults to `None`, which reproduces the previous derived-sidecar behaviour
+  exactly, so this is backward compatible. The path is forwarded to both
+  backend construction sites (`DocKG.index` and `DocKG.stats`) — `stats()`
+  builds its own throwaway backend, and had it been missed, a corpus with an
+  explicit store would have silently reported `vector_count: 0`.
+
+  Because `make_backend` also passes the path to `resolve_backend_name`, an
+  explicit `vectors_path` lets `vector_backend="auto"` resolve to sqlite-vec
+  when a store exists there, even with no sidecar at the derived location.
+
+- **`--vectors-path` CLI option** on every command that reads or writes the
+  vector store: `build`, `build-index`, `build-index-from-cache`,
+  `build-two-phase`, `query`, `pack`, `mcp`, and `snapshot save`. The `mcp`
+  command forwards it through its argv hop into `mcp_server.main`, which
+  resolves a relative path against `--repo` (matching how `--db` and
+  `--lancedb` behave) and reports it in the startup banner.
+
+  Deliberately **not** added to the graph-only commands — `build-graph`,
+  `build-embeddings`, `status`, and `reindex-fts` never touch a vector store,
+  so the option would be misleading there. A test asserts both the presence
+  and the absence, so the boundary does not drift.
+
+### Fixed
+
+- **MCP server startup output printed literal `\n` instead of newlines.**
+  The startup banner and the missing-database warning in `mcp_server.main`
+  were written with doubled backslashes (`\\n`) inside f-strings, so every
+  field collapsed onto a single run-on line in stderr — e.g.
+  `DocKG MCP server starting\n  repo     : …\n  db       : …`. Affected all 7
+  escapes in the file; nothing else in the codebase had the same defect.
+  Regression-tested by asserting the rendered stderr contains no literal
+  `\n` and that each field lands on its own line.
+
 ## [0.18.1] - 2026-07-15
 
 ### Fixed

@@ -12,6 +12,7 @@ sqlite build writes ``vectors.sqlite`` rather than a LanceDB directory.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -28,6 +29,7 @@ from doc_kg.index import (  # noqa: E402
     resolve_backend_name,
     sqlite_vectors_path,
 )
+from doc_kg.kg import DocKG  # noqa: E402
 from doc_kg.store import GraphStore
 
 _KEYWORDS = ["whale", "rocket", "bread", "planet"]
@@ -182,3 +184,82 @@ def test_convert_lancedb_to_sqlite_matches(tmp_path, store):
         lids = [h.id for h in lidx.search(q, k=4)]
         sids = [h.id for h in sidx.search(q, k=4)]
         assert lids == sids, f"{q}: {lids} != {sids}"
+
+
+# ---------------------------------------------------------------------------
+# DocKG(vectors_path=...) — explicit store location
+#
+# doc_kg.index has always supported an explicit vectors_path; these cover the
+# DocKG-level plumbing that forwards it, so a caller (e.g. the KGRAG registry)
+# can point at a store that does not sit beside lancedb_dir.
+# ---------------------------------------------------------------------------
+
+
+def _dockg(tmp_path, **kwargs):
+    """A DocKG wired to the fake embedder so no model is ever downloaded."""
+    return DocKG(
+        corpus_root=tmp_path,
+        db_path=tmp_path / "graph.sqlite",
+        lancedb_dir=tmp_path / ".dockg" / "lancedb",
+        embedder=_FakeEmbedder(),
+        **kwargs,
+    )
+
+
+def test_vectors_path_defaults_to_none(tmp_path):
+    """Omitting the argument must preserve the derived-sidecar behaviour."""
+    assert _dockg(tmp_path).vectors_path is None
+
+
+def test_vectors_path_is_normalised_to_path(tmp_path):
+    kg = _dockg(tmp_path, vectors_path=str(tmp_path / "custom" / "v.sqlite"))
+    assert isinstance(kg.vectors_path, Path)
+    assert kg.vectors_path == tmp_path / "custom" / "v.sqlite"
+
+
+def test_index_writes_to_explicit_vectors_path(tmp_path, store):
+    """The override must reach the backend, not just be stored on the object."""
+    custom = tmp_path / "elsewhere" / "vectors.sqlite"
+    custom.parent.mkdir()
+    kg = _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom)
+
+    kg.index.build(store, wipe=True, discover_similar=False, quiet=True)
+
+    assert custom.exists()
+    # The derived sidecar must NOT have been used.
+    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
+
+
+def test_explicit_path_lets_auto_resolve_to_sqlite(tmp_path, store):
+    """An existing store at the explicit path makes `auto` pick sqlite-vec even
+    though nothing sits at the derived sidecar location."""
+    custom = tmp_path / "elsewhere" / "vectors.sqlite"
+    custom.parent.mkdir()
+    _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom).index.build(
+        store, wipe=True, discover_similar=False, quiet=True
+    )
+
+    # Pin down *which* store answered: the custom one must exist and the
+    # derived sidecar must not, else this passes on the fallback path.
+    assert custom.exists()
+    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
+
+    auto = _dockg(tmp_path, vectors_path=custom)  # vector_backend defaults to "auto"
+    hits = auto.index.search("tell me about the whale", k=3)
+    assert "whale" in hits[0].id
+    assert not (tmp_path / ".dockg" / "lancedb").exists()
+
+
+def test_stats_counts_vectors_at_explicit_path(tmp_path, store):
+    """stats() builds its own backend — it must honour the override too, or it
+    silently reports 0 vectors for a corpus that has them."""
+    custom = tmp_path / "elsewhere" / "vectors.sqlite"
+    custom.parent.mkdir()
+    kg = _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom)
+    kg.index.build(store, wipe=True, discover_similar=False, quiet=True)
+
+    # The vectors live only at the custom path, so a stats() that ignored the
+    # override would count the (absent) sidecar and report 0.
+    assert custom.exists()
+    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
+    assert kg.stats()["vector_count"] == 8

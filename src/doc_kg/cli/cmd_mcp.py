@@ -30,6 +30,12 @@ from doc_kg.dockg import DEFAULT_MODEL
     help="LanceDB directory path.",
 )
 @click.option(
+    "--vectors-path",
+    default=None,
+    type=click.Path(),
+    help="Path to the sqlite-vec vector store (default: <repo>/.dockg/vectors.sqlite).",
+)
+@click.option(
     "--model",
     default=DEFAULT_MODEL,
     help="Sentence-transformer model name.",
@@ -40,7 +46,9 @@ from doc_kg.dockg import DEFAULT_MODEL
     default="stdio",
     help="MCP transport protocol.",
 )
-def mcp(repo: str, db: str, lancedb: str, model: str, transport: str) -> None:
+def mcp(
+    repo: str, db: str, lancedb: str, vectors_path: str | None, model: str, transport: str
+) -> None:
     """Start the DocKG MCP server."""
     try:
         import importlib.util  # pylint: disable=import-outside-toplevel
@@ -63,6 +71,8 @@ def mcp(repo: str, db: str, lancedb: str, model: str, transport: str) -> None:
         "--transport",
         transport,
     ]
+    if vectors_path:
+        argv += ["--vectors-path", vectors_path]
 
     from doc_kg.mcp_server import main  # pylint: disable=import-outside-toplevel
 
