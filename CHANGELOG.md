@@ -60,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Regression-tested by asserting the rendered stderr contains no literal
   `\n` and that each field lands on its own line.
 
+- **CI `Lint & Format` failed on Markdown, not on any source file.** ruff
+  (>=0.14, pulled in by the recent dependency pins) formats Python code blocks
+  embedded in Markdown, so `ruff format --check .` began failing on four
+  documents no source change had touched — `docs/SNAPSHOTS.md`, the two
+  `benchmarks/*.md`, and a vendored HuggingFace model card under `.kgcache/`.
+  `.kgcache` and `*.md` are now excluded in `[tool.ruff]`: prose docs use
+  illustrative, deliberately-formatted snippets, and the model card is not ours
+  to reformat. All 75 Python files remain covered.
+
 ## [0.18.1] - 2026-07-15
 
 ### Fixed
