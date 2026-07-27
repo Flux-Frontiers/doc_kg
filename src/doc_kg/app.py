@@ -15,6 +15,10 @@ from pathlib import Path
 
 # pylint: disable=import-error
 import streamlit as st  # type: ignore[import-not-found]
+
+# Explicit submodule import so `st.components.v1.html` resolves (the submodule
+# isn't auto-imported with `streamlit`); kept for its registration side effect.
+import streamlit.components.v1  # type: ignore[import-not-found]  # noqa: F401
 from pyvis.network import Network  # type: ignore[import-not-found]
 
 from doc_kg.kg import DocKG
