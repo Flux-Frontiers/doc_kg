@@ -1253,18 +1253,18 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.8.0"
+version = "0.9.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 files = [
-    {file = "kgmodule_utils-0.8.0-py3-none-any.whl", hash = "sha256:1244e46ac8d9004508bfb9cf93c8aa580b65041c5681a2263237abe224baf6f5"},
-    {file = "kgmodule_utils-0.8.0.tar.gz", hash = "sha256:b12bf3929038396ce9b2fd90e7c736efcb3710bc24c4bd86a12cceb9aa5c8d4e"},
+    {file = "kgmodule_utils-0.9.0-py3-none-any.whl", hash = "sha256:7f32869af0a8b6028314b84d3c00415ea85f0b66dc3207d8cad17e231cdcadf5"},
+    {file = "kgmodule_utils-0.9.0.tar.gz", hash = "sha256:7fa21007dd70ff0f019863ea6536c957c2973d47448aa07e4c459f6cc9c187c1"},
 ]
 
 [package.extras]
-semantic = ["lancedb (>=0.19.0)", "numpy (>=1.24.0)", "rich (>=13.0.0)", "sentence-transformers (>=5.4.1)", "sqlite-vec (==0.1.9)", "torch (>=2.5.1)", "transformers (>=4.40.0,<4.57)"]
+semantic = ["lancedb (>=0.19.0)", "numpy (>=1.24.0)", "rich (>=13.0.0)", "sentence-transformers (>=5.4.1)", "sqlite-vec (==0.1.9)", "torch (>=2.5.1)", "transformers (>=5.5.0,<6)"]
 sqlite-vec = ["sqlite-vec (==0.1.9)"]
 synthesis = ["httpx (>=0.27.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
 synthesis-mflux = ["httpx (>=0.27.0)", "mflux (>=0.9.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
@@ -4383,4 +4383,4 @@ viz = ["pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "fcd128ff4fb9e3edf068ef87df9a5b7f44569aef3d1079b5bb82c8bf16eb0fd3"
+content-hash = "40a68791c84b9f876ebdf76209fb372a8f371ab9af4015b1ba9d4088aba5d959"
