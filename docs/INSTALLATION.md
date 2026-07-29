@@ -26,14 +26,22 @@ pip install doc-kg
 # With Streamlit / Plotly / PyVis visualizer
 pip install 'doc-kg[viz]'
 
-# With PyCodeKG and KGRAG integrations
-pip install 'doc-kg[kgdeps]'
-
 # Everything above
 pip install 'doc-kg[all]'
 
 # Development (adds pytest, ruff, mypy, pre-commit, pdoc)
 pip install 'doc-kg[dev]'
+```
+
+**Cross-KG siblings** (PyCodeKG, KGRAG, AgentKG) are deliberately *not* declared
+as extras of `doc-kg`. Each sibling pins its own `transformers` range, and
+declaring them here forces the resolver to reconcile every published sibling's
+pin against this one — which deadlocks, since `doc-kg` and `pycode-kg` each
+depend on the other. Install whichever you need by hand, after `doc-kg`:
+
+```bash
+pip install pycode-kg
+pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
 ```
 
 **AgentKG** is not yet on PyPI — install it separately if needed:
@@ -49,7 +57,7 @@ pip install git+https://github.com/Flux-Frontiers/agent_kg.git
 ```bash
 poetry add doc-kg                            # core
 poetry add 'doc-kg[viz]'                     # core + visualizer
-poetry add 'doc-kg[kgdeps]'                  # core + KG integrations
+poetry add pycode-kg                         # KG integrations, added separately
 poetry add --group dev 'doc-kg[dev]'         # dev tools
 ```
 
