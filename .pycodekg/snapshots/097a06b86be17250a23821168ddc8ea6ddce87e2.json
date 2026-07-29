@@ -1,0 +1,149 @@
+{
+  "key": "097a06b86be17250a23821168ddc8ea6ddce87e2",
+  "branch": "main",
+  "timestamp": "2026-07-29T02:28:27.736146+00:00",
+  "version": "0.20.0",
+  "metrics": {
+    "db_path": ".pycodekg/graph.sqlite",
+    "total_nodes": 5392,
+    "meaningful_nodes": 359,
+    "total_edges": 5002,
+    "node_counts": {
+      "class": 36,
+      "function": 116,
+      "method": 169,
+      "module": 38,
+      "symbol": 5033
+    },
+    "edge_counts": {
+      "ATTR_ACCESS": 1534,
+      "CALLS": 1926,
+      "CONTAINS": 321,
+      "IMPORTS": 305,
+      "INHERITS": 2,
+      "RESOLVES_TO": 914
+    },
+    "module_count": 38,
+    "class_count": 36,
+    "function_count": 116,
+    "method_count": 169,
+    "docstring_coverage": 0.805,
+    "snapshot_count": 4,
+    "critical_issues": 3,
+    "complexity_median": 5,
+    "module_node_counts": {
+      "src/doc_kg/__init__.py": 3,
+      "src/doc_kg/__main__.py": 1,
+      "src/doc_kg/app.py": 148,
+      "src/doc_kg/chunker.py": 308,
+      "src/doc_kg/cli/__init__.py": 1,
+      "src/doc_kg/cli/cmd_analyze.py": 8,
+      "src/doc_kg/cli/cmd_build.py": 289,
+      "src/doc_kg/cli/cmd_hooks.py": 22,
+      "src/doc_kg/cli/cmd_mcp.py": 13,
+      "src/doc_kg/cli/cmd_model.py": 16,
+      "src/doc_kg/cli/cmd_pipeline.py": 112,
+      "src/doc_kg/cli/cmd_query.py": 66,
+      "src/doc_kg/cli/cmd_semantic_analyze.py": 8,
+      "src/doc_kg/cli/cmd_snapshot.py": 169,
+      "src/doc_kg/cli/cmd_status.py": 52,
+      "src/doc_kg/cli/cmd_viz.py": 21,
+      "src/doc_kg/cli/group.py": 2,
+      "src/doc_kg/cli/main.py": 1,
+      "src/doc_kg/cli/options.py": 13,
+      "src/doc_kg/config.py": 16,
+      "src/doc_kg/discover_topics.py": 107,
+      "src/doc_kg/dockg.py": 213,
+      "src/doc_kg/dockg_semantic_analysis.py": 278,
+      "src/doc_kg/dockg_thorough_analysis.py": 170,
+      "src/doc_kg/embedder_worker.py": 2,
+      "src/doc_kg/entry_chunk.py": 21,
+      "src/doc_kg/graph.py": 76,
+      "src/doc_kg/index.py": 685,
+      "src/doc_kg/kg.py": 534,
+      "src/doc_kg/manifold.py": 143,
+      "src/doc_kg/mcp_server.py": 77,
+      "src/doc_kg/pdf_reader.py": 7,
+      "src/doc_kg/pipeline.py": 187,
+      "src/doc_kg/relations.py": 51,
+      "src/doc_kg/sampler.py": 208,
+      "src/doc_kg/snapshots.py": 162,
+      "src/doc_kg/store.py": 280,
+      "src/doc_kg/topics.py": 127
+    }
+  },
+  "hotspots": [
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.close",
+      "callers": 17,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/store.py:GraphStore.close",
+      "callers": 17,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/store.py:GraphStore.con",
+      "callers": 16,
+      "callees": 6,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.store",
+      "callers": 10,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/index.py:SemanticIndex._get_backend",
+      "callers": 8,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/index.py:suppress_ingestion_logging",
+      "callers": 7,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/snapshots.py:_rewrap",
+      "callers": 5,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:DocKG.index",
+      "callers": 5,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/doc_kg/kg.py:TextPack.to_markdown",
+      "callers": 5,
+      "callees": 6,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/doc_kg/chunker.py:_extract_links",
+      "callers": 4,
+      "callees": 5,
+      "risk_level": "low"
+    }
+  ],
+  "issues": [
+    "[WARN] 2 orphaned functions found (`main`, `_silent_init`) -- consider archiving or documenting",
+    "[WARN] `kg.py` has 44 functions/methods/classes -- consider splitting into focused submodules",
+    "[WARN] `store.py` has 31 functions/methods/classes -- consider splitting into focused submodules"
+  ],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 1024,
+    "edges": 830,
+    "coverage_delta": 0.017000000000000126,
+    "critical_issues_delta": 0
+  }
+}

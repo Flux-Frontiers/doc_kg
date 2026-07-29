@@ -220,6 +220,7 @@ __marimo__/
 # PyCodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
 .pycodekg/lancedb/
 .pycodekg/lancedb-*
+.pycodekg/vectors.sqlite
 .pycodekg/graph.sqlite
 .pycodekg/graph.sqlite*
 .pycodekg/models
@@ -262,4 +263,3 @@ commit.txt
 .claude/agents/
 .agents/
 .codex/
-

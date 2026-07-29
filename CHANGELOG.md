@@ -15,6 +15,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.19.0] - 2026-07-28
+
+### Changed
+
+- **`transformers` unpinned: `>=4.40.0,<4.57` → `>=5.5.0,<6`.** The old cap held
+  the stack at 4.56.2, which carries two open high-severity advisories — remote
+  code execution (fixed in 5.3.0) and arbitrary code execution in the LightGlue
+  model-loading path (fixed in 5.5.0). The cap was introduced without a recorded
+  rationale, bundled into an unrelated commit, and no longer matched anything:
+  doc-kg 0.12.3 had already shipped on transformers 5.6.2, and the `<4.57` value
+  was aligned to a `personal_agent` constraint that has since moved.
+
+  **This is a breaking dependency change** — the old and new ranges are disjoint,
+  so an environment holding transformers 4.x can no longer install doc-kg.
+
+  **Embeddings are unaffected and no re-index is required.** Verified against
+  transformers 5.14.1 with the rest of the stack unchanged: vectors are *bitwise
+  identical* on `bge-small-en-v1.5` (384d), `bge-large-en-v1.5` (1024d) and
+  `nomic-embed-text-v1.5` (768d, the `trust_remote_code` path), across empty,
+  whitespace-only, 3000-character, unicode/emoji and CRLF inputs. A full rebuild
+  of a 2847-vector corpus produces a *byte-identical* `vectors.sqlite`, and
+  queries against an index built on 4.56.2 return identical rankings and scores.
+
+  `huggingface-hub` moves from 0.36.x to 1.x as a consequence (transformers 5
+  requires `>=1.5.0,<2.0`), and `typer` arrives as a new transitive dependency.
+  Nothing in the stack caps either, and `rich` still resolves below its `<15`
+  cap.
+
+- **`kgmodule-utils` floor raised to `>=0.9.0`.** 0.9.0 is the first release
+  carrying both the relaxed transformers range and the
+  `transformers.utils.logging` embedder fix. The floor is load-bearing, not
+  cosmetic: 0.8.0 scopes its transformers cap to the `semantic` extra, and
+  doc-kg requires *plain* `kgmodule-utils`, so the cap never conflicted and the
+  resolver was free to keep 0.8.0 — pairing transformers 5 with an embedder
+  whose `importlib.import_module("transformers.logging")` raises
+  `ModuleNotFoundError` on 5.x and is silently swallowed, disabling log and
+  progress-bar suppression.
+
+### Removed
+
+- **The `kgdeps` extra.** `pip install 'doc-kg[kgdeps]'` no longer resolves —
+  install the sibling by hand instead: `pip install pycode-kg`. `pycode-kg` was
+  also dropped from the `dev` and `all` extras.
+
+  doc-kg and pycode-kg each declared the other in their extras, and Poetry locks
+  optional groups too, so once either relaxed its transformers pin no *published*
+  sibling could satisfy it and resolution deadlocked — neither could lock until
+  the other was released. Nothing under `src/` or `tests/` imports `pycode_kg`;
+  the dependency was purely a dev convenience. Removing it breaks the cycle
+  permanently, following the pattern memory_kg already uses for the same reason.
+  Manual-install instructions replace the extra as a comment in `pyproject.toml`,
+  and `docs/INSTALLATION.md` was updated in both its `pip` and `poetry add`
+  sections.
+
 ## [0.18.2] - 2026-07-26
 
 ### Added

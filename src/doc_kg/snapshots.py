@@ -3,7 +3,7 @@ snapshots.py — Temporal Snapshots of DocKG Metrics
 
 Author: Eric G. Suchanek, PhD
 License: Elastic-2.0
-Last Revision: 2026-04-07
+Last Revision: 2026-06-01
 
 Thin compatibility layer over the shared ``kg_utils.snapshots`` module.
 
