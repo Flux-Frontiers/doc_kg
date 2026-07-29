@@ -205,7 +205,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
 # LaTeX intermediate files
 *.aux
 *.out
@@ -217,27 +216,6 @@ __marimo__/
 *.fdb_latexmk
 *.synctex.gz
 
-# PyCodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
-.pycodekg/lancedb/
-.pycodekg/lancedb-*
-.pycodekg/vectors.sqlite
-.pycodekg/graph.sqlite
-.pycodekg/graph.sqlite*
-.pycodekg/models
-
-# DocKG generated artifacts — same pattern as CodeKG; snapshots will be tracked once added
-.dockg/lancedb*
-.dockg/*.sqlite
-.dockg/*.sqlite-shm
-.dockg/*.sqlite-wal
-.dockg/models
-
-# Also ignore .dockg/ nested under subdirectories (e.g. docs/.dockg/)
-**/.dockg/
-
-.agentkg/
-
-# Local MCP configuration (contains absolute paths)
 #.mcp.json
 
 # Benchmark working data (LongMemEval corpus + result logs)
@@ -261,5 +239,37 @@ commit.txt
 .claude/worktrees/
 .claude/plans/
 .claude/agents/
+
+# === KG generated artifacts (normalized across the fleet) ===
+# Databases, vector indexes and model caches are transient and
+# reproducible. snapshots/ is TRACKED and must never be ignored --
+# never use a bare `**/.<ns>/` pattern here, it swallows snapshots too.
+
+**/.pycodekg/lancedb/
+**/.pycodekg/lancedb-*
+**/.pycodekg/*.sqlite
+**/.pycodekg/*.sqlite-shm
+**/.pycodekg/*.sqlite-wal
+**/.pycodekg/*.db
+**/.pycodekg/models
+
+**/.dockg/lancedb/
+**/.dockg/lancedb-*
+**/.dockg/*.sqlite
+**/.dockg/*.sqlite-shm
+**/.dockg/*.sqlite-wal
+**/.dockg/*.db
+**/.dockg/models
+**/.dockg/embeddings.json
+
+# AgentKG local store -- nothing under it is ever tracked
+**/.agentkg/
+
+# Agent scratch dirs (Claude Code / Codex)
 .agents/
 .codex/
+
+# MCP server config -- machine-specific, contains absolute paths
+.mcp.json
+.mcp.json.sav
+# === end KG generated artifacts ===
