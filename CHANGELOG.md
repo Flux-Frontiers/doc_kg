@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.19.1] - 2026-07-29
+
+**Hotfix for 0.19.0**, which was published with an unbounded `mcp>=1.0.0` and so
+resolves `mcp` 2.0 on a clean install, crashing `dockg-mcp` at import. Anyone who
+installed 0.19.0 from PyPI should upgrade.
+
+### Added
+
 - **`tests/test_mcp_server.py`** — import-level regression tests for the MCP
   server. It builds its `FastMCP` instance and registers all four tools with
   module-level decorators, so an incompatible `mcp` release breaks it at
