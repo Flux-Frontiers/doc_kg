@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-07-29T02:29:52.062936+00:00",
+  "last_update": "2026-07-29T16:18:17.141435+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -3999,11 +3999,11 @@
       }
     },
     {
-      "key": "cddf10b7c046f78cdfb50b99503b849962e05ff2",
-      "branch": "main",
-      "timestamp": "2026-07-29T02:29:52.061485+00:00",
+      "key": "53d03d04e0c1a54345d934e3b1a88fde78f45aca",
+      "branch": "fix/pin-mcp-below-2",
+      "timestamp": "2026-07-29T16:10:28.540635+00:00",
       "version": "0.19.0",
-      "file": "cddf10b7c046f78cdfb50b99503b849962e05ff2.json",
+      "file": "53d03d04e0c1a54345d934e3b1a88fde78f45aca.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 3953,
@@ -4037,6 +4037,49 @@
           "nodes": 1986,
           "edges": 18596,
           "coverage_delta": 0.09797513934790114,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "dde916cce68651fc42a88ec5300cc914ce9ddcf8",
+      "branch": "fix/pin-mcp-below-2",
+      "timestamp": "2026-07-29T16:18:17.139974+00:00",
+      "version": "0.19.0",
+      "file": "dde916cce68651fc42a88ec5300cc914ce9ddcf8.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 3971,
+        "total_edges": 30385,
+        "node_counts": {
+          "chunk": 840,
+          "document": 45,
+          "entity": 1065,
+          "keyword": 971,
+          "section": 506,
+          "topic": 544
+        },
+        "edge_counts": {
+          "CONTAINS": 1346,
+          "CO_OCCURS_WITH": 19002,
+          "HAS_KEYWORD": 3345,
+          "HAS_TOPIC": 864,
+          "MENTIONS_ENTITY": 3851,
+          "NEXT": 260,
+          "REFERENCES": 25,
+          "SIMILAR_TO": 1692
+        },
+        "meaningful_nodes": 3926,
+        "coverage_score": 0.9829365079365079,
+        "issues_count": 0,
+        "complexity_median": 24.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 2004,
+          "edges": 18696,
+          "coverage_delta": 0.09805678285059727,
           "issues_delta": 0
         }
       }
