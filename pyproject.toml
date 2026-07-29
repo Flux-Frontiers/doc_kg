@@ -78,7 +78,7 @@ dependencies = [
     "pyyaml>=6.0.0",
     "rich>=13.0.0,<15.0.0",
     "sentence-transformers>=5.4.1",
-    "transformers>=4.40.0,<4.57",
+    "transformers>=5.5.0,<6",
     "kgmodule-utils>=0.8.0",
     "pymupdf4llm>=0.0.17",
 ]
