@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-0.20.0-blue.svg)](https://github.com/Flux-Frontiers/doc_kg/releases)
 [![CI](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/doc_kg/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19742773.svg)](https://doi.org/10.5281/zenodo.19742773)
 
 # DocKG — A Knowledge Graph for Document Corpora
 
@@ -132,11 +132,11 @@ A **short-chunk boost** surfaces factual asides and single-sentence callouts tha
 
 If you use DocKG in research or a project, please cite it:
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19770973.svg)](https://doi.org/10.5281/zenodo.19770973)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19742773.svg)](https://doi.org/10.5281/zenodo.19742773)
 
 **APA**
 
-> Suchanek, E. G. (2026). *DocKG: Hybrid Knowledge Graph for Document Corpora* (Version 0.20.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.19770973
+> Suchanek, E. G. (2026). *DocKG: Hybrid Knowledge Graph for Document Corpora* (Version 0.20.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.19742773
 
 **BibTeX**
 
@@ -148,7 +148,7 @@ If you use DocKG in research or a project, please cite it:
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/doc_kg},
-  doi       = {10.5281/zenodo.19770973},
+  doi       = {10.5281/zenodo.19742773},
 }
 ```
 
