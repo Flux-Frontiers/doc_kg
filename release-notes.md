@@ -1,49 +1,65 @@
-# Release Notes — v0.19.1
+# Release Notes — v0.20.0
 
-> Released: 2026-07-29
+> Released: 2026-07-31
 
-A hotfix for 0.19.0. That release went out with an unbounded `mcp>=1.0.0`, and
-`mcp` 2.0 has since landed on PyPI — so a clean `pip install doc-kg` now
-resolves a combination that `dockg-mcp` cannot import. If you installed 0.19.0
-from PyPI, upgrade. If you work from a checkout with a lock file you were never
-affected, which is precisely why this reached the index unnoticed.
+**`lancedb` is no longer a dependency of DocKG.** Installing `doc-kg` no longer
+drags LanceDB and its transitive weight into your environment; the vector
+backend is sqlite-vec, now a core dependency and the default. LanceDB survives
+as an optional `[lancedb]` extra whose only job is to *read* a pre-0.20.0 store
+long enough to convert it. This is the last repo-level step of the fleet-wide
+sqlite-vec migration, and the one that actually removes the package from
+downstream installs — every sibling that depends on doc-kg was still getting
+`lancedb` transitively no matter what it declared for itself.
 
 ## What changed
 
-**`mcp` is pinned below 2.0.** mcp 2.0 removed the bundled `mcp.server.fastmcp`
-module — FastMCP now ships as the standalone `fastmcp` package — and rebuilt
-`mcp.server` around a new set of submodules. DocKG's MCP server imports
-`FastMCP` at module scope, so the import fails outright and the console script
-dies before registering a single tool. The constraint is now `>=1.0.0,<2`;
-lifting it means porting to the standalone package rather than simply widening a
-range.
+**The default backend is now a declaration, not an inference.** `vector_backend`
+previously defaulted to `"auto"`, which resolved per-store from whatever
+happened to be on disk — so a corpus stayed on LanceDB purely because a
+`lancedb/` directory existed next to it. That is the trap that let a repo look
+migrated in its source while still running the retired backend in practice. The
+default is now `"sqlite-vec"` outright. `auto` and `lancedb` still resolve when
+asked for explicitly, both now require the extra, and `$DOCKG_VECTOR_BACKEND`
+still overrides everything. Correspondingly, a bare `SemanticIndex` builds a
+`SqliteVecBackend` at the sidecar derived from `lancedb_dir` rather than
+reaching for a package that may not be installed.
 
-**The gap that let it ship is closed.** The server registers all four tools with
-module-level decorators, so an incompatible release breaks at *import* time —
-and a developer's pinned lock file masks that entirely, leaving the failure
-visible only to someone installing fresh from PyPI. A new test module imports the
-server, checks the entry point resolves, and asserts the tool surface survives
-registration. One test asserts `mcp.server.fastmcp` exists on its own, so the
-next incompatibility names itself instead of surfacing as an opaque
-`ImportError` from our own code.
+**Asking for LanceDB without the extra fails with instructions.** Instead of a
+bare `ImportError` on a missing module, the error names the extra, the install
+command, and the one-time `convert-index` migration.
 
-**The break was reproduced, not inferred.** The pin was chosen after installing
-mcp 2.0 into a clean environment and confirming that `mcp.server.fastmcp` raises
-`ModuleNotFoundError`. Worth knowing if you maintain a sibling package: the
-low-level `mcp.server.Server` API *does* still import under 2.0, but its
-decorators were removed — so packages built on it fail at call time instead, and
-need a different fix and a different test.
+**Packaging.** `sqlite-vec` moved from an extra to a core dependency, pinned
+exactly at `==0.1.9` — it is pre-1.0 and a breaking minor is a real
+possibility. The `[sqlite-vec]` extra is deliberately retained as an empty
+no-op alias so `pip install 'doc-kg[sqlite-vec]'` still resolves; sister
+packages pin it that way and removing it would break their installs. `lancedb`
+is *not* folded into `[all]` — that would put the weight straight back into the
+common "install everything" path.
+
+**Documentation.** The LanceDB assumption ran through most of the docs and has
+been corrected across README, CLI, MCP, SCHEMA, SNAPSHOTS, INSTALLATION,
+ingestion, workflow, deployment, and the cheatsheet. `INSTALLATION.md` was the
+worst of it — it told readers DocKG *requires* `lancedb>=0.29.0` and to upgrade
+it when the API errored. The ANN design doc is left as written with a scope
+note: ANN is a LanceDB-only concern, since sqlite-vec is always an exact flat
+scan, so it now documents an opt-in path rather than the default one.
 
 ## Upgrading
 
-`pip install --upgrade doc-kg`. Nothing to rebuild — no graph, index, or
-snapshot format changed, and the only difference in resolved dependencies is
-that `mcp` stays on the 1.x line.
+If you have never had a LanceDB store, upgrade and carry on — `pip install
+--upgrade doc-kg`, and your next build writes sqlite-vec.
 
-If you pinned `doc-kg==0.19.0` and your MCP server stopped starting, this is the
-fix. If you install DocKG alongside other KGRAG packages, note that `memory-kg`
-is still published with an unbounded `mcp` floor and may pull 2.0 independently
-of this release.
+If you do have one, nothing is stranded. `dockg convert-index` is unchanged and
+reads vectors straight out of the LanceDB store with no re-embedding:
+
+```bash
+pip install 'doc-kg[lancedb]'
+dockg convert-index --repo . --delete-lancedb
+```
+
+The one behavioural change to watch for is the default: code that relied on
+`auto` silently selecting LanceDB from an on-disk directory must now name
+`lancedb` explicitly, and install the extra, to keep that behaviour.
 
 ---
 
