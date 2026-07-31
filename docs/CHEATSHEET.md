@@ -439,7 +439,7 @@ dockg pipeline manifold
 | Chunking | Semantic (embedding-based) | Sentence-group (4 sentences) |
 | Topic classification | Supervised only | Hybrid: supervised + unsupervised K-means |
 | Sampling | All files | Diversity sampling (K-means on features) |
-| Output | SQLite + LanceDB | Pipe-delimited `.psv` + JSON embedding cache |
+| Output | SQLite + sqlite-vec | Pipe-delimited `.psv` + JSON embedding cache |
 
 ### Pipeline Output
 

@@ -2,6 +2,15 @@
 
 Status: draft · Branch: `feat/ann-index-gate` · Owner: doc_kg
 
+> **Scope note (added 0.20.0).** ANN is a **LanceDB-only** concern: sqlite-vec
+> is always an exact flat scan, so none of the IVF gating below applies to it.
+> As of 0.20.0 sqlite-vec is DocKG's default and only installed backend, and
+> LanceDB moved to the optional `[lancedb]` extra — so everything here describes
+> a path reached only when LanceDB is explicitly requested. The `_ANN_*`
+> constants and the gating logic are unchanged and still correct for that path;
+> this document is retained as its design record, not as a description of the
+> default query path.
+
 ## Problem
 
 `SemanticIndex` (LanceDB) never calls `create_index()`. Every query is a

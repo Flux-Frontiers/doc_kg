@@ -41,10 +41,10 @@ vector_backend_option = click.option(
     default=None,
     show_default=False,
     type=click.Choice(["auto", "lancedb", "sqlite-vec"]),
-    help="Vector store backend (default: auto, or $DOCKG_VECTOR_BACKEND). "
-    "auto picks sqlite-vec for fresh/converted corpora, lancedb only for "
-    "un-migrated ones. sqlite-vec is exact and ~10x smaller "
-    "(<repo>/.dockg/vectors.sqlite).",
+    help="Vector store backend (default: sqlite-vec, or $DOCKG_VECTOR_BACKEND). "
+    "sqlite-vec is exact and ~10x smaller (<repo>/.dockg/vectors.sqlite). "
+    "auto and lancedb read a pre-0.20.0 store and need the [lancedb] extra: "
+    "pip install 'doc-kg[lancedb]'.",
 )
 
 model_option = click.option(

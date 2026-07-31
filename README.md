@@ -13,7 +13,7 @@
 
 **DocKG turns a document corpus into a deterministic, queryable knowledge graph — and uses it to produce source-grounded passage packs that LLMs can actually trust.**
 
-It walks every `.md`, `.txt`, `.rst`, and `.pdf` file in your corpus, chunks the text with heading-aware segmentation, extracts topics, named entities, keywords, and cross-document references, and stores the result in SQLite. A LanceDB vector index sits alongside the graph so that both *"authentication flow"* and *"configure the webhook"* find the right passage to start from. From there you can rank chunks by structural importance, trace how documents reference each other, snapshot corpus health metrics across time, or hand the whole thing to Claude over MCP.
+It walks every `.md`, `.txt`, `.rst`, and `.pdf` file in your corpus, chunks the text with heading-aware segmentation, extracts topics, named entities, keywords, and cross-document references, and stores the result in SQLite. A sqlite-vec vector index sits alongside the graph so that both *"authentication flow"* and *"configure the webhook"* find the right passage to start from. From there you can rank chunks by structural importance, trace how documents reference each other, snapshot corpus health metrics across time, or hand the whole thing to Claude over MCP.
 
 The design philosophy is borrowed from its sibling [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg): **structure is ground truth; embeddings are an acceleration layer**. This is a deliberate departure from standard RAG. Vanilla RAG embeds chunks in isolation and retrieves by cosine similarity alone — it has no model of which section a chunk belongs to, no awareness of cross-document references, and no way to suppress a redundant document-level summary when a more specific chunk is already in the result set. The retrieved context looks plausible but is structurally blind. DocKG keeps the vector index for semantic seeding, then expands through a typed graph so that structural relationships — containment, sequencing, citation, similarity — shape what gets returned. When the graph and the vector index disagree, the graph wins. Every retrieved passage is traceable to a specific file, heading, and character offset. There are no hallucinated citations because there is no inference — every result is computed from the graph.
 
@@ -89,7 +89,7 @@ Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) 
 
 Search is hybrid by design. A query runs in two phases:
 
-1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and LanceDB returns the `k` closest chunks by cosine similarity.
+1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) the sqlite-vec index returns the `k` closest chunks by exact cosine similarity.
 2. **Graph expansion phase** — each seed hit is expanded `hop` BFS steps along typed edges (`CONTAINS`, `REFERENCES`, `SIMILAR_TO`, `NEXT`) so co-cited passages and structurally adjacent sections surface alongside the direct semantic matches.
 
 A **deduplication pass** then suppresses coarser nodes (document, section) from files where finer chunks are already present — the pack contains the most specific evidence available, not redundant summaries of the same content.
@@ -164,7 +164,7 @@ If you use DocKG in research or a project, please cite it:
 
 - **Issues** — [GitHub Issues](https://github.com/Flux-Frontiers/doc_kg/issues)
 - Sister projects: [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [AgentKG](https://github.com/Flux-Frontiers/agent_kg), [MetaboKG](https://github.com/Flux-Frontiers/metabo_kg)
-- Built on: LanceDB, sentence-transformers, SQLite, Streamlit, and FastMCP
+- Built on: sqlite-vec, sentence-transformers, SQLite, Streamlit, and FastMCP
 
 ---
 

@@ -45,7 +45,7 @@ class BuildStats:
     :param total_edges: Total edges written to SQLite.
     :param node_counts: Node counts broken down by kind.
     :param edge_counts: Edge counts broken down by relation.
-    :param indexed_rows: Number of nodes embedded into LanceDB (None if not built).
+    :param indexed_rows: Number of nodes embedded into the vector index (None if not built).
     :param index_dim: Embedding dimension (None if not built).
     :param similar_edges_added: Number of SIMILAR_TO edges discovered.
     """
@@ -498,7 +498,7 @@ def _lance_where(
     file_prefixes: tuple[str, ...] | None,
     node_kinds: tuple[str, ...] | None,
 ) -> str | None:
-    """Build a LanceDB SQL prefilter from scope constraints.
+    """Build a vector-store SQL prefilter from scope constraints.
 
     Returns ``None`` when no constraints are given so callers can skip the
     ``where`` clause entirely.  String literals are single-quote-escaped; the
@@ -581,7 +581,7 @@ class DocKG:
 
     * :class:`~doc_kg.graph.DocGraph` — corpus parsing and chunking
     * :class:`~doc_kg.store.GraphStore` — SQLite persistence
-    * :class:`~doc_kg.index.SemanticIndex` — LanceDB vector index
+    * :class:`~doc_kg.index.SemanticIndex` — sqlite-vec vector index
     * Query / text-packing logic
 
     Typical usage::
@@ -600,7 +600,7 @@ class DocKG:
     :param db_path: SQLite database path.
     :param lancedb_dir: LanceDB directory.
     :param model: Sentence-transformer model name.
-    :param table: LanceDB table name.
+    :param table: LanceDB table name (legacy backend only).
     :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
     :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
     :param chunk_size: Approximate max characters per chunk.
@@ -622,13 +622,13 @@ class DocKG:
                      so the lazy-init never fires ``SentenceTransformerEmbedder``.
                      Defaults to ``None`` (preserves existing behaviour).
     :param device: Embedding device override: ``auto`` (default), ``cpu``, ``mps``, ``cuda``.
-    :param vector_backend: ``"auto"`` (default), ``"lancedb"``, or ``"sqlite-vec"``.
+    :param vector_backend: ``"sqlite-vec"`` (default), ``"auto"``, or
+                           ``"lancedb"``.  The latter two read a legacy store and
+                           need the ``[lancedb]`` extra installed.
     :param vectors_path: Explicit location of the sqlite-vec store.  Defaults to
                          ``None``, which derives the sidecar next to the graph
                          (``<store>/.dockg/vectors.sqlite``).  Set this when the
-                         vector store does not live beside ``lancedb_dir`` — an
-                         explicit path also lets ``vector_backend="auto"`` resolve
-                         to sqlite-vec.
+                         vector store does not live beside ``lancedb_dir``.
     """
 
     def __init__(
@@ -672,11 +672,18 @@ class DocKG:
         self.model_name = model
         self.device = device
         self.table_name = table
-        # Vector store backend: "auto" (default), "lancedb", or "sqlite-vec".
-        # Explicit arg wins; else DOCKG_VECTOR_BACKEND env; else "auto" — which
-        # picks sqlite-vec for fresh/converted corpora and lancedb only when an
-        # un-migrated lancedb store is all that exists (see resolve_backend_name).
-        self.vector_backend = vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "auto"
+        # Vector store backend. Explicit arg wins; else DOCKG_VECTOR_BACKEND
+        # env; else "sqlite-vec".
+        #
+        # The default was "auto" before 0.20.0, which resolved per-store from
+        # what happened to be on disk — so a corpus stayed on LanceDB simply
+        # because a lancedb/ directory existed, and a repo could look migrated
+        # in code while still running the retired backend. The default is now
+        # pinned. "auto" and "lancedb" still resolve for callers that ask
+        # explicitly, and both require the [lancedb] extra.
+        self.vector_backend = (
+            vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "sqlite-vec"
+        )
         # Explicit sqlite-vec store location. None derives the sidecar next to
         # the graph (see sqlite_vectors_path); an explicit path also lets
         # "auto" resolve to sqlite-vec when that file exists.
@@ -776,7 +783,7 @@ class DocKG:
         similarity_edge_threshold: float = 0.85,
         similar_max_degree: int = 0,
     ) -> BuildStats:
-        """Full pipeline: corpus parsing → SQLite → LanceDB + SIMILAR_TO edges.
+        """Full pipeline: corpus parsing → SQLite → vector index + SIMILAR_TO edges.
 
         :param wipe: Clear existing data before writing.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
@@ -830,7 +837,7 @@ class DocKG:
         only_missing: bool = False,
         quiet: bool = False,
     ) -> Path:
-        """Embed all nodes and save to a JSON cache file (no LanceDB writes).
+        """Embed all nodes and save to a JSON cache file (no vector-store writes).
 
         The graph must already exist — run :meth:`build_graph` first.
 

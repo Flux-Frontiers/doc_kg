@@ -5,6 +5,9 @@ Builds a real doc_kg GraphStore with a handful of nodes and runs
 backends with a deterministic fake embedder (no model download). Asserts the
 two backends agree on top-k, that the ``where`` prefilter works, and that the
 sqlite build writes ``vectors.sqlite`` rather than a LanceDB directory.
+
+The LanceDB half skips unless the optional ``[lancedb]`` extra is installed —
+see ``requires_lancedb`` below.
 """
 
 # pylint: disable=redefined-outer-name,missing-function-docstring
@@ -12,13 +15,14 @@ sqlite build writes ``vectors.sqlite`` rather than a LanceDB directory.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-# Every test here exercises the sqlite-vec backend; skip the module when the
-# optional dependency is absent (CI installs the `sqlite-vec` extra).
+# sqlite-vec is a core dependency as of 0.20.0; the guard stays as cheap
+# insurance for a partial install.
 pytest.importorskip("sqlite_vec")
 
 from doc_kg.dockg import DocNode  # noqa: E402
@@ -31,6 +35,17 @@ from doc_kg.index import (  # noqa: E402
 )
 from doc_kg.kg import DocKG  # noqa: E402
 from doc_kg.store import GraphStore
+
+# lancedb is NOT installed by default as of 0.20.0 — it moved to the optional
+# [lancedb] extra, needed only to read a pre-0.20.0 store. The cross-backend
+# parity tests below are kept rather than deleted: they are what proves the
+# converter is lossless and that the two backends rank identically. They simply
+# skip unless the extra is present, so `pip install 'doc-kg[lancedb]'` turns the
+# full parity guard back on.
+requires_lancedb = pytest.mark.skipif(
+    importlib.util.find_spec("lancedb") is None,
+    reason="optional [lancedb] extra not installed",
+)
 
 _KEYWORDS = ["whale", "rocket", "bread", "planet"]
 
@@ -115,7 +130,10 @@ def _index(tmp_path, backend_name):
     return SemanticIndex(lancedb_dir, embedder=_FakeEmbedder(), backend=be)
 
 
-@pytest.mark.parametrize("backend_name", ["lancedb", "sqlite-vec"])
+@pytest.mark.parametrize(
+    "backend_name",
+    [pytest.param("lancedb", marks=requires_lancedb), "sqlite-vec"],
+)
 def test_build_and_search(tmp_path, store, backend_name):
     idx = _index(tmp_path, backend_name)
     stats = idx.build(store, wipe=True, discover_similar=False, quiet=True)
@@ -129,6 +147,7 @@ def test_build_and_search(tmp_path, store, backend_name):
     assert chunk_hits and all(h.kind == "chunk" for h in chunk_hits)
 
 
+@requires_lancedb
 def test_backends_agree(tmp_path, store):
     # build both in isolated dirs
     lidx = _index(tmp_path / "ldir", "lancedb")
@@ -164,6 +183,7 @@ def test_resolve_backend_name_auto(tmp_path):
     assert resolve_backend_name("sqlite-vec", lancedb_dir=lancedb_dir) == "sqlite-vec"
 
 
+@requires_lancedb
 def test_convert_lancedb_to_sqlite_matches(tmp_path, store):
     # Build a LanceDB index, convert it, and confirm the sqlite store returns
     # the same top-k as the original LanceDB index (no re-embedding).
