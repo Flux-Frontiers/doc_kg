@@ -22,7 +22,7 @@ Chunks are the primary retrieval unit. Document and section nodes are suppressed
 | `CONTAINS` | Parent → child (document→section, section→chunk) |
 | `NEXT` | Sequential ordering between same-level nodes |
 | `REFERENCES` | Chunk cites another document or section |
-| `SIMILAR_TO` | Semantic similarity between chunks (LanceDB-derived) |
+| `SIMILAR_TO` | Semantic similarity between chunks (vector-derived) |
 | `HAS_TOPIC` | Chunk → topic |
 | `MENTIONS_ENTITY` | Chunk → named entity |
 | `HAS_KEYWORD` | Chunk → keyword |
@@ -37,15 +37,13 @@ Chunks are the primary retrieval unit. Document and section nodes are suppressed
 ```
 .dockg/
   graph.sqlite        # SQLite knowledge graph (nodes + edges)
-  lancedb/            # LanceDB vector index
-    data/
-    _versions/
+  vectors.sqlite      # sqlite-vec vector index
   snapshots/          # Temporal metric snapshots (JSON)
     manifest.json
     <sha>.json        # one file per captured snapshot
 ```
 
-The SQLite store is the canonical source of truth. LanceDB is a pure acceleration layer — it can be rebuilt at any time with `dockg build` without losing any structural information. Snapshots are append-only; `manifest.json` is the index.
+The SQLite store is the canonical source of truth. The vector index is a pure acceleration layer — it can be rebuilt at any time with `dockg build` without losing any structural information. Snapshots are append-only; `manifest.json` is the index.
 
 ---
 

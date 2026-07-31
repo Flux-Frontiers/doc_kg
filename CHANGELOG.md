@@ -15,6 +15,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.20.0] - 2026-07-31
+
+**`lancedb` is no longer a dependency.** DocKG builds and queries sqlite-vec
+only; LanceDB moved to an optional `[lancedb]` extra needed solely to *read* a
+pre-0.20.0 store. This is Phase 4 — the last repo-level step — of the fleet
+migration tracked in `pycode_kg/MIGRATION-sqlite-vec.md`, and the one that
+actually removes the package from downstream installs: every sibling that
+depends on doc-kg (diary-kg, gutenberg-kg, corpus_pepys) was still getting
+`lancedb` transitively no matter what it declared itself.
+
+**Nothing is stranded.** `dockg convert-index` is unchanged and still reads
+vectors straight out of a LanceDB store with no re-embedding:
+
+```bash
+pip install 'doc-kg[lancedb]'
+dockg convert-index --repo . --delete-lancedb
+```
+
+### Changed
+
+- **`vector_backend` now defaults to `"sqlite-vec"`, not `"auto"`.** `auto`
+  resolved per-store from whatever was on disk, so a corpus stayed on LanceDB
+  purely because a `lancedb/` directory existed — the trap that let a repo look
+  migrated in code while still running the retired backend. `auto` and
+  `lancedb` still resolve when asked for explicitly; both now require the
+  extra. `$DOCKG_VECTOR_BACKEND` still overrides.
+
+- **`SemanticIndex._get_backend()` defaults to `SqliteVecBackend`** at the
+  sidecar derived from `lancedb_dir`, so a bare `SemanticIndex` no longer
+  reaches for a package that is not installed. It previously constructed a
+  `LanceDBBackend`.
+
+- **`sqlite-vec` promoted from an extra to a core dependency**, pinned exactly
+  (`==0.1.9`; it is pre-1.0 and breaking minors are possible). The
+  `[sqlite-vec]` extra is **retained as an empty no-op alias** so that
+  `pip install 'doc-kg[sqlite-vec]'` still resolves — sister packages pin it
+  that way (diary-kg >=0.94.0 requires `doc-kg[sqlite-vec]`) and removing it
+  would break their installs.
+
+- **Asking for LanceDB without the extra now fails with instructions** rather
+  than a bare `ImportError` on a missing module — naming the extra, the install
+  command, and the one-time `convert-index` migration.
+
+### Removed
+
+- **`lancedb>=0.29.0` from core dependencies**, and `lancedb` from the package
+  keywords. It is deliberately **not** included in `[all]`: folding it in would
+  put the weight straight back into the common "install everything" path.
+
+### Fixed
+
+- Docs corrected throughout — `README`, `CLI`, `MCP`, `SCHEMA`, `SNAPSHOTS`,
+  `INSTALLATION`, `ingestion`, `dockg_workflow`, `deployment`, `CHEATSHEET`.
+  `INSTALLATION.md` was the worst offender: it told readers DocKG *requires*
+  `lancedb>=0.29.0` and to upgrade it on API errors. CLI option tables now
+  document `--vectors-path` and mark `--lancedb` as legacy.
+
+  `docs/design-ann-index.md` is left as written, with a scope note: ANN is a
+  LanceDB-only concern (sqlite-vec is always an exact flat scan), so it now
+  documents an opt-in path rather than the default one.
+
+### Notes for maintainers
+
+- **The cross-backend parity tests are kept, not deleted.** They are what proves
+  the converter is lossless and that both backends rank identically, so they
+  skip behind `importlib.util.find_spec("lancedb")` — installing the extra turns
+  the full guard back on. `test_ann_index.py`'s "default backend is LanceDB"
+  test was rewritten to assert the new sqlite-vec default, plus a case pinning
+  that the `_ANN_*` constants still reach an explicitly-requested LanceDB
+  backend, and one asserting the actionable error when the extra is absent.
+
+- `kgmodule-utils` still ships `lancedb` inside its `[semantic]` extra. DocKG
+  depends on bare `kgmodule-utils>=0.9.0` with no extras, so that path does not
+  reintroduce it here — but a downstream installing `kgmodule-utils[semantic]`
+  will still pull it.
+
 ## [0.19.1] - 2026-07-29
 
 **Hotfix for 0.19.0**, which was published with an unbounded `mcp>=1.0.0` and so

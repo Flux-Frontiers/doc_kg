@@ -22,13 +22,13 @@ DocKG offers two ingestion paths: the **Core Build Pipeline** for fast, determin
      │     (dockg build)      │              │     (dockg pipeline run)       │
      │                        │              │                                │
      │  Fast, deterministic   │              │  Deep NLP, diary_kg-style      │
-     │  SQLite + LanceDB      │              │  5-phase transformation        │
+     │  SQLite + sqlite-vec   │              │  5-phase transformation        │
      └────────────┬───────────┘              └──────────────┬─────────────────┘
                   │                                         │
                   ▼                                         ▼
      ┌────────────────────────┐              ┌────────────────────────────────┐
      │  .dockg/graph.sqlite   │              │  .dockg/pipeline/*.psv         │
-     │  .dockg/lancedb/       │              │  .dockg/pipeline/embeddings.json│
+     │  .dockg/vectors.sqlite │              │  .dockg/pipeline/embeddings.json│
      │                        │              │  .dockg/cache/*.pkl            │
      │  → MCP server          │              │                                │
      │  → query / pack        │              │  → manifold analysis           │
@@ -40,7 +40,7 @@ DocKG offers two ingestion paths: the **Core Build Pipeline** for fast, determin
 
 ## 1. Core Build Pipeline (`dockg build`)
 
-The standard ingestion path. Parses a corpus into a hybrid SQLite + LanceDB knowledge graph in a single command.
+The standard ingestion path. Parses a corpus into a hybrid SQLite + sqlite-vec knowledge graph in a single command.
 
 ### Architecture
 
@@ -75,13 +75,13 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + LanceDB know
 │  1. Read all nodes from SQLite                              │
 │  2. Batch-embed via SentenceTransformerEmbedder             │
 │     Model: all-mpnet-base-v2 (768-dim)                      │
-│  3. Write vectors to LanceDB                                │
+│  3. Write vectors to the sqlite-vec store                   │
 │  4. SIMILAR_TO edge discovery:                              │
 │     - k-NN search per chunk                                 │
 │     - Emit edge when cosine similarity ≥ 0.85              │
 │     - Write SIMILAR_TO edges back to SQLite                 │
 │                                                             │
-│  Output: LanceDB index + SIMILAR_TO edges in SQLite         │
+│  Output: vector index + SIMILAR_TO edges in SQLite          │
 └─────────────────────────────────────────────────────────────┘
 ```
 

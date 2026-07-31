@@ -130,7 +130,7 @@ The fastest way to share the Streamlit app publicly — free tier available.
 poetry export -f requirements.txt --without-hashes -o requirements.txt
 ```
 
-**Limitation:** Streamlit Cloud has no persistent filesystem — the SQLite/LanceDB
+**Limitation:** Streamlit Cloud has no persistent filesystem — the SQLite/vector
 artifacts won't survive restarts. Best suited for demos with a pre-built DB
 committed to the repo or stored in cloud storage (S3, GCS).
 
@@ -149,7 +149,7 @@ fly auth login
 # From the repo root
 fly launch --name dockg --region iad
 
-# Add a persistent volume for SQLite + LanceDB
+# Add a persistent volume for SQLite + the vector store
 fly volumes create dockg_data --size 10 --region iad
 
 # Deploy

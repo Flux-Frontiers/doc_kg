@@ -238,23 +238,22 @@ class SemanticIndex:
     # ------------------------------------------------------------------
 
     def _get_backend(self) -> VectorBackend:
-        """Return the vector backend, constructing the default LanceDB one lazily.
+        """Return the vector backend, constructing the default sqlite-vec one lazily.
 
-        The default preserves DocKG's historical behaviour: a LanceDB store at
-        :attr:`lancedb_dir` with the same ANN gating policy. Pass a
-        :class:`~kg_utils.vector_backend.SqliteVecBackend` (via ``backend=`` or a
-        ``vector_backend`` config key upstream) for the exact sqlite-vec store.
+        Changed in 0.20.0: this used to default to a LanceDB store at
+        :attr:`lancedb_dir`.  It now builds a
+        :class:`~kg_utils.vector_backend.SqliteVecBackend` at the sidecar derived
+        from that directory, so a bare ``SemanticIndex`` no longer reaches for a
+        dependency that is not installed by default.
+
+        Pass ``backend=`` explicitly (see :func:`make_backend`) for anything
+        else, including LanceDB.
         """
         if self._backend is None:
-            self._backend = LanceDBBackend(
-                self.lancedb_dir,
-                table=self.table_name,
+            self._backend = SqliteVecBackend(
+                sqlite_vectors_path(self.lancedb_dir),
                 dim=self.embedder.dim,
                 meta_columns=_META_COLUMNS,
-                ann_threshold=self.ann_threshold,
-                ann_nprobes=self.ann_nprobes,
-                ann_refine_factor=self.ann_refine_factor,
-                ann_index_type=self.ann_index_type,
             )
         return self._backend
 
@@ -1387,12 +1386,18 @@ def resolve_backend_name(
     lancedb_dir: str | Path,
     vectors_path: str | Path | None = None,
 ) -> str:
-    """Resolve ``"auto"`` (the default) to a concrete backend by what exists.
+    """Resolve ``"auto"`` to a concrete backend by what exists on disk.
 
     ``auto`` prefers an existing ``vectors.sqlite`` sidecar; else an existing
     LanceDB store (don't silently change an un-migrated corpus's store type);
     else sqlite-vec for a fresh build (migration-forward). Concrete names pass
     through unchanged.
+
+    .. note::
+       ``auto`` stopped being :class:`~doc_kg.kg.DocKG`'s default in 0.20.0 — it
+       is reached only when a caller asks for it. Resolving to ``"lancedb"``
+       therefore needs the ``[lancedb]`` extra, which :func:`make_backend`
+       enforces.
 
     :param vector_backend: ``"auto"`` / ``None`` / ``"lancedb"`` / ``"sqlite-vec"``.
     :param lancedb_dir: LanceDB directory (also locates the sqlite sidecar).
@@ -1408,6 +1413,34 @@ def resolve_backend_name(
     if Path(lancedb_dir).exists():
         return "lancedb"
     return "sqlite-vec"
+
+
+def _require_lancedb(what: str) -> None:
+    """Raise a actionable error if the optional ``lancedb`` extra is absent.
+
+    ``lancedb`` stopped being a core dependency in 0.20.0 — DocKG builds and
+    queries sqlite-vec only.  It is still needed to *read* a legacy store, which
+    is what :func:`convert_lancedb_to_sqlite` does, so the dependency is
+    installable on demand rather than removed outright.
+
+    :param what: Human description of the operation needing LanceDB, used in the
+        error message.
+    :raises ImportError: If ``lancedb`` is not importable.
+    """
+    import importlib.util  # pylint: disable=import-outside-toplevel
+
+    if importlib.util.find_spec("lancedb") is not None:
+        return
+    raise ImportError(
+        f"{what} requires the 'lancedb' package, which DocKG no longer installs "
+        "by default (it was dropped as a core dependency in 0.20.0).\n"
+        "\n"
+        "Install it only if you are reading a pre-0.20.0 store:\n"
+        "    pip install 'doc-kg[lancedb]'\n"
+        "\n"
+        "Then migrate the store once and you will not need it again:\n"
+        "    dockg convert-index --repo <repo> --delete-lancedb"
+    )
 
 
 def sqlite_vectors_path(lancedb_dir: str | Path) -> Path:
@@ -1452,6 +1485,7 @@ def make_backend(
         path = Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
         return SqliteVecBackend(path, dim=dim, meta_columns=_META_COLUMNS, dtype=dtype)
     if key in _LANCE_ALIASES:
+        _require_lancedb("the 'lancedb' vector backend")
         return LanceDBBackend(
             lancedb_dir,
             table=table,
@@ -1502,6 +1536,8 @@ def convert_lancedb_to_sqlite(
     :raises FileNotFoundError: If the source table is absent.
     :raises RuntimeError: If validation fails.
     """
+    _require_lancedb("Reading a LanceDB store (dockg convert-index)")
+
     import lancedb  # pylint: disable=import-outside-toplevel
     import numpy as np  # pylint: disable=import-outside-toplevel
 
@@ -1513,7 +1549,9 @@ def convert_lancedb_to_sqlite(
     # Project only the columns we persist — never load the big ``text`` blob.
     # ``columns=`` exists on newer LanceDB; on versions whose ``to_arrow()`` lacks
     # it we fall back to a full read (TypeError). The ty stub tracks the older
-    # signature, hence the suppression.
+    # signature, hence the suppression — which only fires when the ``[lancedb]``
+    # extra is installed and ty can resolve the type at all (see the
+    # ``unused-ignore-comment`` note in pyproject.toml).
     wanted = ["id", *[c for c in _META_COLUMNS if c != "id"], "vector"]
     try:
         arrow = tbl.to_arrow(columns=wanted)  # ty: ignore[unknown-argument]

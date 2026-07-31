@@ -51,7 +51,7 @@ dockg-mcp --repo /absolute/path/to/repo
 Optional flags:
 
 - `--db .dockg/graph.sqlite`
-- `--lancedb .dockg/lancedb`
+- `--vectors-path .dockg/vectors.sqlite`
 - `--model all-mpnet-base-v2`
 - `--transport stdio|sse`
 
@@ -70,8 +70,8 @@ Create `.mcp.json` in project root:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--lancedb",
-        "/absolute/path/to/repo/.dockg/lancedb"
+        "--vectors-path",
+        "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
   }
@@ -94,8 +94,8 @@ Create `.vscode/mcp.json`:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--lancedb",
-        "/absolute/path/to/repo/.dockg/lancedb"
+        "--vectors-path",
+        "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
   }
@@ -117,8 +117,8 @@ Add to `claude_desktop_config.json`:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--lancedb",
-        "/absolute/path/to/repo/.dockg/lancedb"
+        "--vectors-path",
+        "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
   }
@@ -171,4 +171,4 @@ Run `dockg build <corpus_root>` first.
 Verify absolute paths in MCP config and restart the client.
 
 - Wrong corpus queried
-Ensure `--repo`, `--db`, and `--lancedb` all point to the same repository.
+Ensure `--repo`, `--db`, and `--vectors-path` all point to the same repository.
