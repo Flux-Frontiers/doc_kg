@@ -196,6 +196,14 @@ root = ["src"]
 [tool.ty.rules]
 # Be lenient about third-party stubs (mirrors mypy's ignore_missing_imports).
 unresolved-import = "ignore"
+# Whether a `ty: ignore` is *needed* now depends on which optional extras are
+# installed. `lancedb` became an opt-in extra in 0.20.0, so in a default env ty
+# cannot resolve LanceDB types at all: the diagnostics they suppress never fire,
+# and every such suppression reports as unused. Installing `[lancedb]` makes the
+# very same comments load-bearing again. Deleting them to satisfy a default
+# install would just break `ty` for anyone working on the converter, so the
+# unused-suppression check is off rather than the suppressions removed.
+unused-ignore-comment = "ignore"
 
 [tool.pytest.ini_options]
 testpaths  = ["tests"]

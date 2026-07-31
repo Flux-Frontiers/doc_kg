@@ -1549,7 +1549,9 @@ def convert_lancedb_to_sqlite(
     # Project only the columns we persist — never load the big ``text`` blob.
     # ``columns=`` exists on newer LanceDB; on versions whose ``to_arrow()`` lacks
     # it we fall back to a full read (TypeError). The ty stub tracks the older
-    # signature, hence the suppression.
+    # signature, hence the suppression — which only fires when the ``[lancedb]``
+    # extra is installed and ty can resolve the type at all (see the
+    # ``unused-ignore-comment`` note in pyproject.toml).
     wanted = ["id", *[c for c in _META_COLUMNS if c != "id"], "vector"]
     try:
         arrow = tbl.to_arrow(columns=wanted)  # ty: ignore[unknown-argument]
