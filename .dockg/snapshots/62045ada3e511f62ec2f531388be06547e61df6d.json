@@ -1,0 +1,123 @@
+{
+  "key": "62045ada3e511f62ec2f531388be06547e61df6d",
+  "branch": "feature/per-genre-query",
+  "timestamp": "2026-06-09T15:50:24.394392+00:00",
+  "version": "0.15.6",
+  "metrics": {
+    "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+    "total_nodes": 3055,
+    "total_edges": 22766,
+    "node_counts": {
+      "chunk": 630,
+      "document": 38,
+      "entity": 831,
+      "keyword": 730,
+      "section": 426,
+      "topic": 400
+    },
+    "edge_counts": {
+      "CONTAINS": 1056,
+      "CO_OCCURS_WITH": 14218,
+      "HAS_KEYWORD": 2505,
+      "HAS_TOPIC": 649,
+      "MENTIONS_ENTITY": 2864,
+      "NEXT": 150,
+      "REFERENCES": 25,
+      "SIMILAR_TO": 1299
+    },
+    "meaningful_nodes": 3017,
+    "coverage_score": 0.978835978835979,
+    "issues_count": 0,
+    "complexity_median": 24.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:docs/ingestion.md:0001",
+      "file_path": "docs/ingestion.md",
+      "label": "Pipeline Overview",
+      "references": 0,
+      "semantic_links": 31,
+      "total_links": 31
+    },
+    {
+      "id": "chunk:docs/CLI.md:0004",
+      "file_path": "docs/CLI.md",
+      "label": "`dockg build` \u2014 Full pipeline",
+      "references": 0,
+      "semantic_links": 28,
+      "total_links": 28
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0014",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Docstring Coverage",
+      "references": 0,
+      "semantic_links": 25,
+      "total_links": 26
+    },
+    {
+      "id": "chunk:docs/CLI.md:0015",
+      "file_path": "docs/CLI.md",
+      "label": "`dockg mcp` \u2014 MCP server",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 25
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 24
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0032",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Graph Traversal Node Edge",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 23
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0030",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Data Persistence Storage Database",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:docs/CLI.md:0002",
+      "file_path": "docs/CLI.md",
+      "label": "Unified CLI",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0005",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Fan-In Ranking",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0031",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Query Search Retrieval Semantic",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 21
+    }
+  ],
+  "issues": [],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 1088,
+    "edges": 11077,
+    "coverage_delta": 0.09395625375006833,
+    "issues_delta": 0
+  }
+}
