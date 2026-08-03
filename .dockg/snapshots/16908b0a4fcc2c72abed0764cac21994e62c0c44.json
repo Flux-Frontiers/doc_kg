@@ -1,7 +1,7 @@
 {
-  "key": "195a834e01c1df603f88946a25c1e58853f90a59",
-  "branch": "main",
-  "timestamp": "2026-08-03T15:38:45.983462+00:00",
+  "key": "16908b0a4fcc2c72abed0764cac21994e62c0c44",
+  "branch": "ci/wheel-smoke-test",
+  "timestamp": "2026-08-03T18:22:16.556052+00:00",
   "version": "0.20.0",
   "metrics": {
     "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
