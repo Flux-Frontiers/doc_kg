@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.21.0] - 2026-08-03
+
 Dependency hygiene pass. The declared dependency set now matches what the code
 actually imports — in both directions.
 

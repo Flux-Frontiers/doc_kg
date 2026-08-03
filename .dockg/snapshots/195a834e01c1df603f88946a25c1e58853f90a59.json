@@ -1,0 +1,123 @@
+{
+  "key": "195a834e01c1df603f88946a25c1e58853f90a59",
+  "branch": "main",
+  "timestamp": "2026-08-03T15:38:45.983462+00:00",
+  "version": "0.20.0",
+  "metrics": {
+    "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+    "total_nodes": 4058,
+    "total_edges": 31025,
+    "node_counts": {
+      "chunk": 869,
+      "document": 45,
+      "entity": 1079,
+      "keyword": 985,
+      "section": 510,
+      "topic": 570
+    },
+    "edge_counts": {
+      "CONTAINS": 1379,
+      "CO_OCCURS_WITH": 19338,
+      "HAS_KEYWORD": 3461,
+      "HAS_TOPIC": 894,
+      "MENTIONS_ENTITY": 3928,
+      "NEXT": 279,
+      "REFERENCES": 25,
+      "SIMILAR_TO": 1721
+    },
+    "meaningful_nodes": 4013,
+    "coverage_score": 0.9819716148830073,
+    "issues_count": 0,
+    "complexity_median": 24.0
+  },
+  "hotspots": [
+    {
+      "id": "chunk:docs/ingestion.md:0001",
+      "file_path": "docs/ingestion.md",
+      "label": "Pipeline Overview",
+      "references": 0,
+      "semantic_links": 34,
+      "total_links": 34
+    },
+    {
+      "id": "chunk:SQLITE_VEC_MIGRATION_PLAN.md:0000",
+      "file_path": "SQLITE_VEC_MIGRATION_PLAN.md",
+      "label": "sqlite-vec Migration Plan \u2014 LanceDB \u2192 SQLite across the KG fleet",
+      "references": 0,
+      "semantic_links": 27,
+      "total_links": 27
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0014",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Docstring Coverage",
+      "references": 0,
+      "semantic_links": 26,
+      "total_links": 27
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0032",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Graph Traversal Node Edge",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 25
+    },
+    {
+      "id": "chunk:docs/CLI.md:0004",
+      "file_path": "docs/CLI.md",
+      "label": "`dockg build` \u2014 Full pipeline",
+      "references": 0,
+      "semantic_links": 24,
+      "total_links": 24
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260314.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260314.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 23,
+      "total_links": 23
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0030",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "Data Persistence Storage Database",
+      "references": 0,
+      "semantic_links": 23,
+      "total_links": 23
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260503.md:0001",
+      "file_path": "analysis/doc_kg_analysis_20260503.md",
+      "label": "Semantic Coverage",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:docs/CLI.md:0002",
+      "file_path": "docs/CLI.md",
+      "label": "Unified CLI",
+      "references": 0,
+      "semantic_links": 22,
+      "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0000",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "chunk:0001",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 21
+    }
+  ],
+  "issues": [],
+  "vs_previous": null,
+  "vs_baseline": {
+    "nodes": 2091,
+    "edges": 19336,
+    "coverage_delta": 0.09709188979709671,
+    "issues_delta": 0
+  }
+}
