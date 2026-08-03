@@ -89,7 +89,7 @@ Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) 
 
 Search is hybrid by design. A query runs in two phases:
 
-1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) the sqlite-vec index returns the `k` closest chunks by exact cosine similarity.
+1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and the sqlite-vec index returns the `k` closest chunks by exact cosine similarity. (Corpora built with the older LanceDB backend still work; convert them in place with `dockg convert-index` — no re-embedding required.)
 2. **Graph expansion phase** — each seed hit is expanded `hop` BFS steps along typed edges (`CONTAINS`, `REFERENCES`, `SIMILAR_TO`, `NEXT`) so co-cited passages and structurally adjacent sections surface alongside the direct semantic matches.
 
 A **deduplication pass** then suppresses coarser nodes (document, section) from files where finer chunks are already present — the pack contains the most specific evidence available, not redundant summaries of the same content.
@@ -168,4 +168,4 @@ If you use DocKG in research or a project, please cite it:
 
 ---
 
-*Built for writers, researchers, and AI agents that work alongside them — egs · Last updated July 2026*
+*Built for writers, researchers, and AI agents that work alongside them — egs*

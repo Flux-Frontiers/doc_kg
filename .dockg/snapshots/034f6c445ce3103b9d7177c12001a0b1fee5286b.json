@@ -1,7 +1,7 @@
 {
-  "key": "0de5db51888d25c995e5ddd776b9cb9a22307f42",
+  "key": "034f6c445ce3103b9d7177c12001a0b1fee5286b",
   "branch": "claude/fleet-dep-hygiene",
-  "timestamp": "2026-08-03T15:29:36.682057+00:00",
+  "timestamp": "2026-08-03T15:30:03.534688+00:00",
   "version": "0.20.0",
   "metrics": {
     "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
