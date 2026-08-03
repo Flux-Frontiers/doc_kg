@@ -684,7 +684,8 @@ def main(
 
     :param corpus_root: Corpus root path.
     :param db_path: SQLite database path.
-    :param lancedb_path: LanceDB directory path.
+    :param lancedb_path: Legacy LanceDB directory; also anchors the derived
+        sqlite-vec store.
     :param report_path: Markdown report output path.
     :param json_path: JSON output path.
     :param quiet: Suppress Rich summary output.

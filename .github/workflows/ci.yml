@@ -15,10 +15,10 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -29,7 +29,7 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Cache virtualenv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .venv
           key: lint-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
@@ -47,10 +47,10 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -61,7 +61,7 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Cache virtualenv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .venv
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
@@ -77,10 +77,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -91,7 +91,7 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Cache virtualenv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .venv
           key: test-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
@@ -114,14 +114,24 @@ jobs:
     # CI, and every console script dead on `pip install`.
     #
     # This builds the artifact users actually receive, installs it somewhere
-    # with no source tree in sight, and loads every console-script entry point.
-    # entry_point.load() imports the module and resolves the attribute without
-    # calling it -- so an MCP server entry point is verified, not started.
+    # with no source tree in sight, and puts it through three gates:
+    #
+    #   1. every console-script entry point loads on a *core-only* install.
+    #      entry_point.load() imports the module and resolves the attribute
+    #      without calling it -- so an MCP server entry point is verified, not
+    #      started. Core-only is the point: it also guards the lazy-import
+    #      discipline that keeps `dockg viz` from needing streamlit to exist.
+    #   2. an actual corpus builds and answers a query -- still core-only, so
+    #      this is the default `pip install doc-kg` doing real work. Gate 1
+    #      proves the code imports; only this proves it runs. Weights cached.
+    #   3. every packaged submodule imports, with the extras installed last.
+    #      Gates 1 and 2 cannot see a broken module that no entry point and no
+    #      build path reaches -- doc_kg.app is exactly that, and it needs [viz].
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -136,7 +146,7 @@ jobs:
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
 
-      - name: Load every console-script entry point
+      - name: Load every console-script entry point (core-only install)
         run: |
           cd /tmp
           /tmp/smoke/bin/python - <<'PY'
@@ -160,4 +170,70 @@ jobs:
               sys.exit(f"\n{len(failed)} console script(s) unusable when installed: "
                        + ", ".join(failed))
           print(f"\nall {len(eps)} console scripts load from a clean install")
+          PY
+
+      - name: Cache embedding model
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-bge-small-en-v1.5
+
+      - name: Build and query a corpus end to end
+        run: |
+          mkdir -p /tmp/corpus
+          cat > /tmp/corpus/mitochondria.md <<'MD'
+          # Mitochondria
+
+          Mitochondria are the powerhouses of the cell. They generate ATP through
+          oxidative phosphorylation across the inner mitochondrial membrane.
+
+          ## Krebs Cycle
+
+          The Krebs cycle runs in the mitochondrial matrix and feeds electrons
+          into the electron transport chain.
+          MD
+          cat > /tmp/corpus/photosynthesis.md <<'MD'
+          # Photosynthesis
+
+          Green plants convert light energy into chemical energy stored in
+          glucose. Chlorophyll in the chloroplasts absorbs sunlight.
+          MD
+          cd /tmp
+          /tmp/smoke/bin/dockg build --repo /tmp/corpus
+          test -f /tmp/corpus/.dockg/graph.sqlite || { echo "no graph.sqlite"; exit 1; }
+          test -f /tmp/corpus/.dockg/vectors.sqlite || { echo "no vectors.sqlite"; exit 1; }
+          /tmp/smoke/bin/dockg query --repo /tmp/corpus "how do cells produce energy" \
+            | tee /tmp/query.out
+          grep -q "mitochondria" /tmp/query.out \
+            || { echo "query did not retrieve the expected document"; exit 1; }
+          echo "end-to-end build + query OK"
+
+      - name: Install the extras
+        run: /tmp/smoke/bin/pip install --quiet "$(echo dist/*.whl)[all]"
+
+      - name: Import every packaged submodule
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib
+          import pkgutil
+          import sys
+
+          import doc_kg
+
+          names = [m.name for m in pkgutil.walk_packages(doc_kg.__path__, "doc_kg.")]
+          if not names:
+              sys.exit("doc_kg has no submodules -- the wheel is missing its package body")
+
+          failed = []
+          for name in sorted(names):
+              try:
+                  importlib.import_module(name)
+              except Exception as exc:
+                  failed.append(name)
+                  print(f"  FAIL  {name}\n        {type(exc).__name__}: {exc}")
+          if failed:
+              sys.exit(f"\n{len(failed)} of {len(names)} submodule(s) fail to import "
+                       "from the installed wheel: " + ", ".join(failed))
+          print(f"all {len(names)} packaged submodules import from a clean install")
           PY

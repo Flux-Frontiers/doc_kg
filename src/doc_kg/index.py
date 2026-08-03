@@ -2,7 +2,10 @@
 """
 index.py
 
-SemanticIndex — LanceDB vector index for DocKG.
+SemanticIndex — semantic vector index for DocKG.
+
+Backed by a sqlite-vec store since 0.20.0; LanceDB is a legacy, read-only
+backend behind the ``[lancedb]`` extra (see ``make_backend``).
 
 Mirrors PyCodeKG's index.py with the following additions:
 
@@ -180,11 +183,13 @@ def _open_text_auto(path: Path, mode: str) -> TextIO:
 
 
 class SemanticIndex:
-    """LanceDB-backed semantic vector index for DocKG.
+    """Semantic vector index for DocKG.
 
     Reads nodes from a :class:`~doc_kg.store.GraphStore`, embeds them, and
-    stores the vectors in LanceDB.  The index is **derived and disposable** —
-    it can be rebuilt from SQLite at any time without data loss.
+    stores the vectors in a :class:`~kg_utils.vector_backend.VectorBackend` —
+    sqlite-vec by default, LanceDB only when one is passed in.  The index is
+    **derived and disposable** — it can be rebuilt from SQLite at any time
+    without data loss.
 
     After building the vector index, optionally runs a SIMILAR_TO edge
     discovery pass that writes semantic similarity edges back to the store.
@@ -192,16 +197,19 @@ class SemanticIndex:
     Example::
 
         embedder = SentenceTransformerEmbedder()
-        idx = SemanticIndex("./lancedb", embedder=embedder)
+        idx = SemanticIndex("./.dockg/lancedb", embedder=embedder)
         idx.build(store, wipe=True)
 
         hits = idx.search("climate change policy", k=8)
         for h in hits:
             print(h.id, h.distance)
 
-    :param lancedb_dir: Directory for the LanceDB database.
+    :param lancedb_dir: Legacy LanceDB directory.  Also anchors the default
+        sqlite-vec sidecar, which is derived beside it (see
+        :func:`sqlite_vectors_path`) — so this is required even though the
+        default backend writes no LanceDB store.
     :param embedder: Embedding backend.
-    :param table: LanceDB table name.
+    :param table: LanceDB table name (legacy backend only; ignored by sqlite-vec).
     :param index_kinds: Node kinds to embed.
     """
 
@@ -229,7 +237,7 @@ class SemanticIndex:
         self.ann_index_type = str(ann_index_type)
         self.ann_nprobes = int(ann_nprobes)
         self.ann_refine_factor = int(ann_refine_factor)
-        # Vector store backend (LanceDB by default, constructed lazily so the
+        # Vector store backend (sqlite-vec by default, constructed lazily so the
         # embedder's ``dim`` — which may load the model — is only touched on use).
         self._backend: VectorBackend | None = backend
 
@@ -305,7 +313,7 @@ class SemanticIndex:
 
         :param store: Authoritative :class:`~doc_kg.store.GraphStore`.
         :param wipe: If ``True``, delete all existing vectors first.
-        :param batch_size: LanceDB write batch size.
+        :param batch_size: Vector-store write batch size.
         :param encode_batch_size: Nodes fetched per streaming page and fed to
                                    ``model.encode()``.  Attention memory scales
                                    with ``batch x seq^2`` and throughput is flat
@@ -537,7 +545,7 @@ class SemanticIndex:
         }
 
     # ------------------------------------------------------------------
-    # Two-phase build: precompute → cache file → LanceDB
+    # Two-phase build: precompute → cache file → vector index
     # ------------------------------------------------------------------
 
     def _existing_index_ids(self) -> set[str]:
@@ -585,7 +593,7 @@ class SemanticIndex:
     ) -> Path:
         """Embed all index nodes and save to an :class:`~doc_kg.embedder_worker.EmbeddingCache` JSON.
 
-        Pure embedding pass — no LanceDB writes.  Call :meth:`build_from_cache`
+        Pure embedding pass — no vector-store writes.  Call :meth:`build_from_cache`
         afterwards to populate the vector index from the saved file.
 
         :param store: Source :class:`~doc_kg.store.GraphStore`.
@@ -596,7 +604,7 @@ class SemanticIndex:
             resolves via ``KG_EMBED_DEVICE`` then auto-detect.  GPU devices force
             single-process embedding (see :class:`~doc_kg.embedder_worker.CorpusEmbedder`).
         :param only_missing: Incremental embedding — skip nodes whose ``id`` is already
-            present in the LanceDB table, so only new/changed nodes are embedded.
+            present in the vector store, so only new/changed nodes are embedded.
             Pair with ``build_from_cache(wipe=False)`` to upsert. No-op (embeds all)
             when the table doesn't exist yet. Honored on the ``.json`` path only.
         :param quiet: Suppress progress output.
@@ -661,8 +669,8 @@ class SemanticIndex:
         """Read index nodes (optionally dropping already-vectorized ones) as
         aligned ``(texts, metadata)`` ready for embedding.
 
-        :param only_missing: Skip nodes whose ``id`` is already in the LanceDB
-            table (incremental embedding). No-op when the table is absent.
+        :param only_missing: Skip nodes whose ``id`` is already in the vector
+            store (incremental embedding). No-op when the store is absent.
         """
         nodes = self._read_nodes(store)
         if only_missing:
@@ -860,16 +868,16 @@ class SemanticIndex:
         similarity_edge_threshold: float = 0.85,
         similar_max_degree: int = 0,
     ) -> dict:
-        """Build (or rebuild) the LanceDB index from a pre-computed embedding cache.
+        """Build (or rebuild) the vector index from a pre-computed embedding cache.
 
         Skips the model-inference pass entirely — loads float32 vectors from
-        *cache_path* and writes them straight to LanceDB.  The cache must have
+        *cache_path* and writes them straight to the backend.  The cache must have
         been produced by :meth:`precompute_embeddings`.
 
         :param store: :class:`~doc_kg.store.GraphStore` (needed for SIMILAR_TO writes).
         :param cache_path: Path to the :class:`~doc_kg.embedder_worker.EmbeddingCache` JSON.
         :param wipe: If ``True``, delete all existing vectors first.
-        :param batch_size: LanceDB write batch size.
+        :param batch_size: Vector-store write batch size.
         :param quiet: Suppress progress output.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
         :param similar_k: k-nearest neighbours per chunk for SIMILAR_TO discovery.
@@ -1025,7 +1033,7 @@ class SemanticIndex:
         similarity_edge_threshold: float,
         similar_max_degree: int,
     ) -> dict:
-        """Build LanceDB index from streaming JSONL cache without loading all rows in RAM."""
+        """Build the vector index from a streaming JSONL cache, without loading all rows in RAM."""
         import numpy as np  # pylint: disable=import-outside-toplevel
 
         if quiet:
@@ -1455,6 +1463,30 @@ def sqlite_vectors_path(lancedb_dir: str | Path) -> Path:
     return Path(lancedb_dir).parent / "vectors.sqlite"
 
 
+def vector_store_path(
+    vector_backend: str | None,
+    *,
+    lancedb_dir: str | Path,
+    vectors_path: str | Path | None = None,
+) -> Path:
+    """Location of the store :func:`make_backend` would open for these settings.
+
+    Mirrors :func:`make_backend`'s dispatch so callers can *report* the store
+    without constructing a backend (which loads a model to learn ``dim``).
+    Printing ``lancedb_dir`` unconditionally is wrong for the default backend —
+    the vectors land in the sqlite sidecar.
+
+    :param vector_backend: ``"auto"`` / ``None`` / ``"lancedb"`` / ``"sqlite-vec"``.
+    :param lancedb_dir: LanceDB directory (also locates the sqlite sidecar).
+    :param vectors_path: Explicit sqlite path override.
+    :return: ``vectors.sqlite`` under the sqlite-vec backend, else the LanceDB dir.
+    """
+    key = resolve_backend_name(vector_backend, lancedb_dir=lancedb_dir, vectors_path=vectors_path)
+    if key in _SQLITE_ALIASES:
+        return Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
+    return Path(lancedb_dir)
+
+
 def make_backend(
     vector_backend: str,
     *,
@@ -1470,13 +1502,15 @@ def make_backend(
 ) -> VectorBackend:
     """Construct a :class:`~kg_utils.vector_backend.VectorBackend` by name.
 
-    :param vector_backend: ``"lancedb"`` (default) or ``"sqlite-vec"``.
+    :param vector_backend: ``"sqlite-vec"``, ``"lancedb"``, or ``"auto"`` (resolved
+        by :func:`resolve_backend_name`).  Required — callers that want DocKG's
+        default should pass :attr:`~doc_kg.kg.DocKG.vector_backend`, which is
+        ``"sqlite-vec"``.  ``"lancedb"`` needs the ``[lancedb]`` extra.
     :param lancedb_dir: LanceDB directory; also used to derive the sqlite sidecar.
     :param dim: Embedding dimensionality.
     :param table: LanceDB table name (ignored by the sqlite backend).
     :param vectors_path: Explicit ``vectors.sqlite`` path (sqlite only); defaults
         to :func:`sqlite_vectors_path`.
-    :param vector_backend: ``"auto"`` (default), ``"lancedb"``, or ``"sqlite-vec"``.
     :param dtype: ``"float"`` or ``"int8"`` (sqlite only).
     :raises ValueError: On an unknown backend name.
     """
@@ -1644,7 +1678,7 @@ def _build_index_text(n: dict) -> str:
 
 
 def _extract_distance(row: dict, fallback_rank: int) -> float:
-    """Extract a distance value from a LanceDB result row."""
+    """Extract a distance value from a vector-backend result row."""
     for key in ("_distance", "distance"):
         if key in row and row[key] is not None:
             return float(row[key])

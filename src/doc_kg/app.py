@@ -235,7 +235,7 @@ def _render_sidebar() -> dict:
 
     st.sidebar.markdown("---")
     corpus_root = st.sidebar.text_input("Corpus root", value=str(Path.cwd()))
-    lancedb_dir = st.sidebar.text_input("LanceDB dir", value=_DEFAULT_LANCEDB)
+    lancedb_dir = st.sidebar.text_input("Vector store anchor dir", value=_DEFAULT_LANCEDB)
     model = st.sidebar.selectbox(
         "Embedding model",
         [

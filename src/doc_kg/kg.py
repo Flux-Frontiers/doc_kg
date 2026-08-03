@@ -27,7 +27,14 @@ from typing import Any
 
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.graph import DocGraph
-from doc_kg.index import Embedder, SemanticIndex, make_backend, make_embedder
+from doc_kg.index import (
+    Embedder,
+    SemanticIndex,
+    make_backend,
+    make_embedder,
+    resolve_backend_name,
+    vector_store_path,
+)
 from doc_kg.store import DEFAULT_RELS, GraphStore, ProvMeta
 
 # ---------------------------------------------------------------------------
@@ -752,6 +759,36 @@ class DocKG:
         return self._embedder
 
     @property
+    def resolved_vector_backend(self) -> str:
+        """Concrete backend name this instance will use, with ``"auto"`` resolved.
+
+        :return: ``"sqlite-vec"`` or ``"lancedb"``.
+        """
+        return resolve_backend_name(
+            self.vector_backend,
+            lancedb_dir=self.lancedb_dir,
+            vectors_path=self.vectors_path,
+        )
+
+    @property
+    def vector_store_path(self) -> Path:
+        """Filesystem location of the vector store this instance will use.
+
+        Resolves ``vector_backend`` exactly as :attr:`index` does, but without
+        loading the embedding model.  Use this — not :attr:`lancedb_dir` — when
+        reporting where vectors live: under the default sqlite-vec backend they
+        are in ``vectors.sqlite``, and ``lancedb_dir`` is merely the anchor the
+        sidecar path is derived from.
+
+        :return: ``vectors.sqlite`` under sqlite-vec, else the LanceDB directory.
+        """
+        return vector_store_path(
+            self.vector_backend,
+            lancedb_dir=self.lancedb_dir,
+            vectors_path=self.vectors_path,
+        )
+
+    @property
     def index(self) -> SemanticIndex:
         """Semantic vector index (lazy). Backend chosen by ``vector_backend``."""
         if self._index is None:
@@ -890,7 +927,7 @@ class DocKG:
         similar_max_degree: int = 0,
         quiet: bool = False,
     ) -> BuildStats:
-        """Build the LanceDB index from a pre-computed embedding cache.
+        """Build the vector index from a pre-computed embedding cache.
 
         Skips the model inference pass — loads vectors from *cache_path* directly.
         Use :meth:`build_embeddings` to produce the cache.
@@ -937,7 +974,7 @@ class DocKG:
         similarity_edge_threshold: float = 0.85,
         similar_max_degree: int = 0,
     ) -> BuildStats:
-        """SQLite → LanceDB only (graph must already exist).
+        """SQLite → vector index only (graph must already exist).
 
         :param wipe: Delete existing vectors before indexing.
         :param discover_similar: Run SIMILAR_TO edge discovery after indexing.
@@ -995,7 +1032,7 @@ class DocKG:
         has no lexical index (``nodes_fts`` absent on older builds).
 
         When ``file_prefixes``/``node_kinds`` are supplied, both retrieval
-        channels are constrained at source (LanceDB prefilter + FTS5 SQL), so
+        channels are constrained at source (vector prefilter + FTS5 SQL), so
         the seed budget is spent entirely on in-scope nodes.
 
         :param q: Natural-language query.
@@ -1076,7 +1113,7 @@ class DocKG:
         :param max_nodes: Maximum nodes to return.
         :param source_path_prefixes: When given, restrict retrieval to nodes
             whose ``file_path`` starts with one of these prefixes.  Pushed down
-            to both the vector (LanceDB prefilter) and lexical (FTS5) seed
+            to both the vector (backend prefilter) and lexical (FTS5) seed
             channels, and enforced as a final guard so graph expansion cannot
             leak out-of-scope nodes.
         :param node_kinds: When given, restrict results to these node kinds

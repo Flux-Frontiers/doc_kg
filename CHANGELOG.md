@@ -15,6 +15,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.21.1] - 2026-08-03
+
+Truth-in-output pass. The sqlite-vec migration landed in 0.20.0, but the help
+strings, docstrings and console banners were never swept — so the CLI kept
+describing a backend it no longer writes.
+
+### Added
+
+- **`vector_store_path()` and `DocKG.vector_store_path` / `.resolved_vector_backend`.**
+  Report the store that will actually be opened, resolving `auto` the same way
+  `make_backend` does but without loading a model to learn `dim`. Callers that
+  want to *name* the store no longer have to guess from `lancedb_dir`.
+- **Two CI gates on the built wheel.** The `Installed CLI` job now also builds
+  and queries a real corpus from a core-only install, and imports every packaged
+  submodule with the extras on. The entry-point gate alone could not see either
+  failure mode — `doc_kg.app` is reached by no entry point and needs `[viz]`.
+- **Regression guards.** `dockg <cmd> --help` is asserted to never present
+  LanceDB as the default store (whitespace-normalised, since Click rewraps and
+  would otherwise split a qualifier from its mention), and the reporting
+  properties are asserted to agree with the backend that gets constructed.
+
+### Fixed
+
+- **`dockg build` reported the wrong vector store.** The header printed
+  `vector index : <repo>/.dockg/lancedb` unconditionally — a directory the
+  default backend never creates — while the vectors went to
+  `.dockg/vectors.sqlite`. Same bug in `build-index`, `build-index-from-cache`,
+  `build-two-phase` and the MCP server banner. All now report the resolved
+  store, and the LanceDB-only `table` line is printed only when the resolved
+  backend is actually LanceDB.
+- **The MCP banner said `vectors : (derived)`.** A placeholder where the
+  resolved path belongs, leaving the operator to guess which store serves
+  queries. It now prints the path, plus the resolved backend name.
+- **Stale help text and docstrings across the CLI and library.** `build --help`
+  claimed it "indexes it in LanceDB"; `build-index` was "Build only the LanceDB
+  semantic index"; `--table` and `--batch` were described as LanceDB-only
+  concepts without saying so. LanceDB is still named where it is genuinely the
+  subject — `convert-index`, the `[lancedb]` extra, the legacy `--lancedb`
+  anchor — but every such mention is now qualified.
+- **`make_backend`'s docstring documented `vector_backend` twice**, once as
+  defaulting to `"lancedb"` and once to `"auto"`. The parameter has no default.
+
+### Changed
+
+- **`pycode-kg` moved from a core runtime dependency to a Poetry group.** It had
+  been added to `[project].dependencies`, where it made every consumer of
+  `doc-kg` install a package this one imports nowhere. It is genuinely needed —
+  the release workflow rebuilds the PyCodeKG index and `.mcp.json` serves it —
+  but as *maintainer tooling*, not as a dependency of the library. It now lives
+  in `[tool.poetry.group.kg]`, which is locked and installable via
+  `poetry install --with kg` but is not written into the wheel's metadata, so no
+  published extra acquires it (nor the `pandas`/`networkx` it carries, which
+  0.21.0 deliberately removed from this project's dependency set). The core
+  dependency never shipped — it was caught in the working tree before release.
+  Safe to lock as of pycode-kg 0.21.4, which no longer depends on `doc-kg`; the
+  policy note in `pyproject.toml` was updated to record that.
+
 ## [0.21.0] - 2026-08-03
 
 Dependency hygiene pass. The declared dependency set now matches what the code

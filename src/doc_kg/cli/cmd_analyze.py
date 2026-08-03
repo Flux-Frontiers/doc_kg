@@ -27,7 +27,7 @@ from doc_kg.dockg_thorough_analysis import main as run_analysis
     "--lancedb",
     default=None,
     type=click.Path(),
-    help="LanceDB vector index directory (default: <corpus>/.dockg/lancedb).",
+    help="Legacy LanceDB directory; also anchors the derived sqlite-vec store (default: <corpus>/.dockg/lancedb).",
 )
 @click.option(
     "--output",

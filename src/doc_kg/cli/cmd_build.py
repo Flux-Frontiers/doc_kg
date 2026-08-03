@@ -3,12 +3,17 @@ cmd_build.py
 
 Click subcommands for building the DocKG:
 
-    build       — full pipeline: parse corpus → SQLite → LanceDB + SIMILAR_TO edges
+    build       — full pipeline: parse corpus → SQLite → vector index + SIMILAR_TO edges
     build-graph — parse corpus → SQLite only
-    build-index — SQLite → LanceDB + optional SIMILAR_TO edges
+    build-index — SQLite → vector index + optional SIMILAR_TO edges
     build-embeddings — SQLite → embedding cache JSON only
-    build-index-from-cache — embedding cache JSON → LanceDB
-    build-two-phase — SQLite → embedding cache → LanceDB (stable pipeline)
+    build-index-from-cache — embedding cache JSON → vector index
+    build-two-phase — SQLite → embedding cache → vector index (stable pipeline)
+    convert-index — legacy LanceDB store → sqlite-vec store (no re-embedding)
+
+The vector index is a sqlite-vec store at ``<repo>/.dockg/vectors.sqlite``.  The
+``--lancedb``/``--table`` options address the pre-0.20.0 LanceDB store, which is
+read-only legacy and needs the ``[lancedb]`` extra; see ``--vector-backend``.
 
 Author: Eric G. Suchanek, PhD
 """
@@ -65,7 +70,7 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @click.option(
     "--chunk-size",
@@ -248,8 +253,9 @@ def build(
     """Build the DocKG from a corpus directory.
 
     Parses all .md and .txt files under CORPUS_ROOT, builds the structural
-    and semantic graph, persists it to SQLite, and indexes it in LanceDB.
-    Also discovers SIMILAR_TO edges between semantically related chunks.
+    and semantic graph, persists it to SQLite, and indexes it in the vector
+    store (sqlite-vec by default; see --vector-backend).  Also discovers
+    SIMILAR_TO edges between semantically related chunks.
     """
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
@@ -304,7 +310,7 @@ def build(
     _console.print(f"  corpus   : {repo_root}")
     _console.print(f"  model    : {model}")
     _console.print(f"  graph store  : {db_path}")
-    _console.print(f"  vector index : {lancedb_dir}")
+    _console.print(f"  vector index : {kg.vector_store_path}")
     _console.print(f"  ext      : {', '.join(sorted(extensions))}")
     _console.print(f"  exclude  : {', '.join(sorted(exclude)) if exclude else '(none)'}")
     _console.print(f"  features : {features}")
@@ -317,12 +323,12 @@ def build(
     _console.print(f"  {'─' * 19}")
     _console.print(f"  {'nodes':<12} {graph_stats.total_nodes:>6}  edges {graph_stats.total_edges}")
 
-    # Step 2a: SQLite → JSON embedding cache (embedding only, no LanceDB writes)
+    # Step 2a: SQLite → JSON embedding cache (embedding only, no vector-store writes)
     cache_path = kg.db_path.parent / "embeddings.json"
     _console.print("\n[bold][2/3][/bold] Embedding nodes \u2192 JSON cache \u2026")
     kg.build_embeddings(out=cache_path, quiet=False)
 
-    # Step 2b: JSON cache → LanceDB + SIMILAR_TO (no embedder in memory)
+    # Step 2b: JSON cache → vector index + SIMILAR_TO (no embedder in memory)
     _console.print("\n[bold][3/3][/bold] JSON cache \u2192 vector index \u2026")
     idx_stats = kg.build_index_from_cache(
         cache_path=cache_path,
@@ -547,7 +553,7 @@ def build_graph(
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @click.option(
     "--update",
@@ -566,7 +572,7 @@ def build_graph(
     type=int,
     default=8192,
     show_default=True,
-    help="LanceDB write batch size (rows per add/fragment).",
+    help="Vector-store write batch size (rows per insert).",
 )
 @click.option(
     "--encode-batch",
@@ -604,7 +610,7 @@ def build_index(
     index_kinds: tuple[str, ...],
     vectors_path: str | None,
 ) -> None:
-    """Build only the LanceDB semantic index from an existing SQLite graph."""
+    """Build only the semantic vector index from an existing SQLite graph."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
     lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
@@ -624,8 +630,9 @@ def build_index(
 
     _console.print(Rule(f"DocKG build-index — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
-    _console.print(f"  vector index : {lancedb_dir}")
-    _console.print(f"  table        : {table}")
+    _console.print(f"  vector index : {kg.vector_store_path}")
+    if kg.resolved_vector_backend == "lancedb":
+        _console.print(f"  table        : {table}")
     if index_kinds:
         _console.print(f"  kinds        : {', '.join(index_kinds)}")
 
@@ -733,7 +740,7 @@ def build_embeddings(
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @click.option(
     "--cache",
@@ -769,7 +776,7 @@ def build_index_from_cache(
     no_similar: bool,
     vectors_path: str | None,
 ) -> None:
-    """Build LanceDB index from an embedding cache JSON (no model inference)."""
+    """Build the vector index from an embedding cache JSON (no model inference)."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
     lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
@@ -787,8 +794,9 @@ def build_index_from_cache(
 
     _console.print(Rule(f"DocKG build-index-from-cache — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
-    _console.print(f"  vector index : {lancedb_dir}")
-    _console.print(f"  table        : {table}")
+    _console.print(f"  vector index : {kg.vector_store_path}")
+    if kg.resolved_vector_backend == "lancedb":
+        _console.print(f"  table        : {table}")
     _console.print(f"  cache        : {cache}")
 
     stats = kg.build_index_from_cache(
@@ -813,7 +821,7 @@ def build_index_from_cache(
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @click.option(
     "--cache",
@@ -909,8 +917,9 @@ def build_two_phase(
 
     _console.print(Rule(f"DocKG build-two-phase — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
-    _console.print(f"  vector index : {lancedb_dir}")
-    _console.print(f"  table        : {table}")
+    _console.print(f"  vector index : {kg.vector_store_path}")
+    if kg.resolved_vector_backend == "lancedb":
+        _console.print(f"  table        : {table}")
     _console.print(f"  cache        : {cache}")
     if index_kinds:
         _console.print(f"  kinds        : {', '.join(index_kinds)}")
@@ -924,7 +933,7 @@ def build_two_phase(
     )
     _console.print(f"  cache    : {cache_out}")
 
-    _console.print("\n[bold][2/2][/bold] Cache → LanceDB index …")
+    _console.print("\n[bold][2/2][/bold] Cache → vector index …")
     stats = kg.build_index_from_cache(
         cache_out,
         wipe=wipe,
@@ -953,7 +962,7 @@ def reindex_fts(repo: str, sqlite: str) -> None:
     """Backfill the FTS5 lexical (BM25) index on an existing graph.
 
     Rebuilds ``nodes_fts`` from chunk text already in SQLite — no re-embedding,
-    no LanceDB changes.  Use this to add hybrid lexical retrieval to corpora
+    no vector-store changes.  Use this to add hybrid lexical retrieval to corpora
     built before the lexical index existed.
     """
     from doc_kg.store import GraphStore  # pylint: disable=import-outside-toplevel
