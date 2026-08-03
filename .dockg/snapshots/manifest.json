@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-08-03T15:29:04.690070+00:00",
+  "last_update": "2026-08-03T15:29:36.683624+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -3956,11 +3956,11 @@
       }
     },
     {
-      "key": "a3f7ae0516fa67081db1ffdf79bd0f018cc7f00c",
+      "key": "0de5db51888d25c995e5ddd776b9cb9a22307f42",
       "branch": "claude/fleet-dep-hygiene",
-      "timestamp": "2026-08-03T15:29:04.688245+00:00",
+      "timestamp": "2026-08-03T15:29:36.682057+00:00",
       "version": "0.20.0",
-      "file": "a3f7ae0516fa67081db1ffdf79bd0f018cc7f00c.json",
+      "file": "0de5db51888d25c995e5ddd776b9cb9a22307f42.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 4054,
