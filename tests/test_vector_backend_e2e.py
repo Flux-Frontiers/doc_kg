@@ -32,6 +32,7 @@ from doc_kg.index import (  # noqa: E402
     make_backend,
     resolve_backend_name,
     sqlite_vectors_path,
+    vector_store_path,
 )
 from doc_kg.kg import DocKG  # noqa: E402
 from doc_kg.store import GraphStore
@@ -181,6 +182,42 @@ def test_resolve_backend_name_auto(tmp_path):
     # explicit names pass through
     assert resolve_backend_name("lancedb", lancedb_dir=lancedb_dir) == "lancedb"
     assert resolve_backend_name("sqlite-vec", lancedb_dir=lancedb_dir) == "sqlite-vec"
+
+
+def test_vector_store_path_tracks_the_backend(tmp_path):
+    """The reported store must be the one make_backend would open.
+
+    Reporting ``lancedb_dir`` unconditionally is wrong under the default
+    backend — it names a directory that is never written.
+    """
+    lancedb_dir = tmp_path / ".dockg" / "lancedb"
+
+    assert vector_store_path("sqlite-vec", lancedb_dir=lancedb_dir) == sqlite_vectors_path(
+        lancedb_dir
+    )
+    assert vector_store_path("lancedb", lancedb_dir=lancedb_dir) == lancedb_dir
+
+    # An explicit override wins over the derived sidecar.
+    custom = tmp_path / "elsewhere.sqlite"
+    assert vector_store_path("sqlite-vec", lancedb_dir=lancedb_dir, vectors_path=custom) == custom
+
+    # "auto" reports whichever store it would resolve to.
+    lancedb_dir.mkdir(parents=True)
+    assert vector_store_path("auto", lancedb_dir=lancedb_dir) == lancedb_dir
+    sqlite_vectors_path(lancedb_dir).write_bytes(b"")
+    assert vector_store_path("auto", lancedb_dir=lancedb_dir) == sqlite_vectors_path(lancedb_dir)
+
+
+def test_dockg_reports_its_own_vector_store(tmp_path):
+    """DocKG's reporting properties agree with the backend it will construct."""
+    kg = DocKG(corpus_root=tmp_path)
+    assert kg.resolved_vector_backend == "sqlite-vec"
+    assert kg.vector_store_path == tmp_path / ".dockg" / "vectors.sqlite"
+    assert kg.vector_store_path != kg.lancedb_dir
+
+    custom = tmp_path / "elsewhere.sqlite"
+    kg2 = DocKG(corpus_root=tmp_path, vectors_path=custom)
+    assert kg2.vector_store_path == custom
 
 
 @requires_lancedb

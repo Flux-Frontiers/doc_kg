@@ -121,7 +121,8 @@ def _parse_args(argv: list | None = None) -> argparse.Namespace:
     p.add_argument(
         "--lancedb",
         default=".dockg/lancedb",
-        help="Path to LanceDB directory (default: .dockg/lancedb)",
+        help="Path to the legacy LanceDB directory (default: .dockg/lancedb). "
+        "Also anchors where the sqlite-vec store is derived from.",
     )
     p.add_argument(
         "--vectors-path",
@@ -162,23 +163,25 @@ def main(argv: list | None = None) -> None:
             file=sys.stderr,
         )
 
-    print(
-        f"DocKG MCP server starting\n"
-        f"  repo     : {repo}\n"
-        f"  db       : {db}\n"
-        f"  lancedb  : {lancedb_dir}\n"
-        f"  vectors  : {vectors_path or '(derived)'}\n"
-        f"  model    : {args.model}\n"
-        f"  transport: {args.transport}",
-        file=sys.stderr,
-    )
-
+    # Constructed before the banner so the banner can report the vector store
+    # that will actually be opened. DocKG.__init__ is lazy — no model is loaded.
     _kg = DocKG(
         corpus_root=repo,
         db_path=db,
         lancedb_dir=lancedb_dir,
         model=args.model,
         vectors_path=vectors_path,
+    )
+
+    print(
+        f"DocKG MCP server starting\n"
+        f"  repo     : {repo}\n"
+        f"  db       : {db}\n"
+        f"  backend  : {_kg.resolved_vector_backend}\n"
+        f"  vectors  : {_kg.vector_store_path}\n"
+        f"  model    : {args.model}\n"
+        f"  transport: {args.transport}",
+        file=sys.stderr,
     )
 
     mcp.run(transport=args.transport)

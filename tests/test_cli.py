@@ -261,7 +261,12 @@ def test_mcp_forwards_vectors_path_through_argv(tmp_path):
 
 
 def _run_mcp_main(argv):
-    """Drive mcp_server.main with the transport and KG stubbed; return stderr."""
+    """Drive mcp_server.main with only the transport stubbed; return stderr.
+
+    ``DocKG`` is deliberately *not* stubbed: the banner reports the vector store
+    the real instance resolves, so a mock would make these assertions vacuous.
+    Construction is lazy — no model is loaded and no store is opened.
+    """
     import io
     import sys as _sys
     from unittest.mock import patch
@@ -269,11 +274,7 @@ def _run_mcp_main(argv):
     import doc_kg.mcp_server as ms
 
     buf = io.StringIO()
-    with (
-        patch.object(ms.mcp, "run"),
-        patch.object(ms, "DocKG"),
-        patch.object(_sys, "stderr", buf),
-    ):
+    with patch.object(ms.mcp, "run"), patch.object(_sys, "stderr", buf):
         ms.main(argv=argv)
     return buf.getvalue()
 
@@ -291,7 +292,7 @@ def test_mcp_banner_uses_real_newlines(tmp_path):
     lines = [ln for ln in out.splitlines() if ln.strip()]
     assert lines[0] == "DocKG MCP server starting"
     # Each field lands on its own line.
-    for field in ("repo", "db", "lancedb", "vectors", "model", "transport"):
+    for field in ("repo", "db", "backend", "vectors", "model", "transport"):
         assert any(ln.strip().startswith(field) for ln in lines), field
 
 
@@ -304,10 +305,87 @@ def test_mcp_missing_db_warning_uses_real_newline(tmp_path):
 
 
 def test_mcp_banner_reports_derived_vectors_path(tmp_path):
-    """With no --vectors-path the banner must say so rather than print None."""
+    """With no --vectors-path the banner must resolve the sidecar, not say "(derived)".
+
+    Printing a placeholder — or the LanceDB directory, which is not written under
+    the default backend — leaves the operator guessing which store is serving
+    queries.
+    """
     db = tmp_path / ".dockg" / "graph.sqlite"
     db.parent.mkdir(parents=True)
     _seed_db(db)
 
     out = _run_mcp_main(["--repo", str(tmp_path), "--db", str(db)])
-    assert "vectors  : (derived)" in out
+    assert "backend  : sqlite-vec" in out
+    assert f"vectors  : {tmp_path / '.dockg' / 'vectors.sqlite'}" in out
+    assert "(derived)" not in out
+
+
+def test_mcp_banner_honours_explicit_vectors_path(tmp_path):
+    """An explicit --vectors-path is what the banner reports."""
+    db = tmp_path / ".dockg" / "graph.sqlite"
+    db.parent.mkdir(parents=True)
+    _seed_db(db)
+    custom = tmp_path / "elsewhere" / "vectors.sqlite"
+
+    out = _run_mcp_main(["--repo", str(tmp_path), "--db", str(db), "--vectors-path", str(custom)])
+    assert f"vectors  : {custom}" in out
+
+
+# ---------------------------------------------------------------------------
+# Help-text accuracy
+# ---------------------------------------------------------------------------
+
+# Wording that makes a LanceDB mention truthful: it marks the mention as the
+# retired backend, a conversion source, or one choice among several.
+_LANCEDB_QUALIFIERS = (
+    "legacy",
+    "pre-0.20.0",
+    "ignored by sqlite-vec",
+    "anchors",
+    "source",
+    "extra",
+    "auto|lancedb|sqlite-vec",
+)
+
+
+def test_help_text_never_presents_lancedb_as_the_default_store():
+    """No command may describe LanceDB as where vectors actually go.
+
+    The 0.20.0 migration moved the default store to sqlite-vec but left the help
+    strings behind, so ``dockg build --help`` advertised a backend the build no
+    longer writes.  LanceDB may still be *mentioned* — it is a real legacy
+    option — so this checks that every mention carries a qualifier rather than
+    banning the word.  Help text is whitespace-normalised first because Click
+    rewraps it, which would otherwise split a qualifier from its mention.
+    """
+    from click.testing import CliRunner
+
+    from doc_kg.cli.main import cli
+
+    runner = CliRunner()
+    offenders = []
+    for name in sorted(cli.commands):
+        # convert-index reads a LanceDB store by definition.
+        if name == "convert-index":
+            continue
+        text = " ".join(runner.invoke(cli, [name, "--help"]).output.split()).lower()
+        start = 0
+        while (hit := text.find("lancedb", start)) != -1:
+            window = text[max(0, hit - 140) : hit + 140]
+            if not any(q in window for q in _LANCEDB_QUALIFIERS):
+                offenders.append(f"{name}: ...{window}...")
+            start = hit + 1
+
+    assert not offenders, "unqualified LanceDB claims in help text:\n" + "\n".join(offenders)
+
+
+def test_build_help_names_the_store_it_writes():
+    """The positive half: build must say what it actually indexes into."""
+    from click.testing import CliRunner
+
+    from doc_kg.cli.main import cli
+
+    text = " ".join(CliRunner().invoke(cli, ["build", "--help"]).output.split()).lower()
+    assert "sqlite-vec" in text
+    assert "indexes it in lancedb" not in text

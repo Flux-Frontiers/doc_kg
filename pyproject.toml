@@ -18,6 +18,7 @@
 #   poetry install --extras "dev"       core + dev tools only
 #   poetry install --extras "viz"       core + Streamlit/Plotly visualizer only
 #   poetry install                      core runtime only
+#   poetry install --with kg            adds the pycodekg CLI (maintainer tooling)
 #
 # First-time setup
 # ----------------
@@ -47,7 +48,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.21.0"
+version = "0.21.1"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -144,11 +145,14 @@ sqlite-vec = []
 # Cross-KG sibling packages (doc-kg, pycode-kg, agent-kg, kg-rag) are NOT
 # declared here. They are never imported by this package, and listing them
 # forces poetry's universal resolution to reconcile the transformers pin of
-# every *published* sibling against this project's own -- a deadlock, since
-# doc-kg and pycode-kg each depend on the other. Install them by hand:
+# every *published* sibling against this project's own -- historically a
+# deadlock, since doc-kg and pycode-kg each depended on the other. Install them
+# by hand:
 #   pip install doc-kg pycode-kg          # both on PyPI
-#   pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
-#   pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
+#
+# pycode-kg is the exception, and it is NOT an extra: it is maintainer tooling
+# in [tool.poetry.group.kg] below, which keeps it out of the published metadata.
+# It is safe to lock as of pycode-kg 0.21.4, which no longer depends on doc-kg.
 all = [
     "detect-secrets>=1.5.0",
     "joblib>=1.4.0",
@@ -165,6 +169,32 @@ all = [
 # NB: [lancedb] is deliberately NOT in [all]. It exists only to read legacy
 # stores, and folding it in here would put the dependency back into the common
 # "install everything" path — the exact weight 0.20.0 removes.
+
+# ---------------------------------------------------------------------------
+# Maintainer tooling (Poetry group, not a PEP 621 extra)
+# ---------------------------------------------------------------------------
+# pycode-kg is a tool this repo *runs*, not a library it imports -- the release
+# workflow rebuilds the PyCodeKG index (.claude/commands/dockg-release.md) and
+# .mcp.json serves it. Nothing under src/ or tests/ imports it.
+#
+# It lives in a Poetry group rather than [project.optional-dependencies] on
+# purpose. Groups are maintainer-facing: they are locked and installable, but
+# they are NOT written into the wheel's metadata, so `pip install doc-kg[dev]`
+# does not acquire pycode-kg -- nor the pandas/networkx it carries, which 0.21.0
+# deliberately removed from this project's own dependency set.
+#
+#   poetry install --with kg      # get the pycodekg CLI into .venv/bin
+#   poetry install                # default: group is optional, skipped
+#
+# See the note above [project.optional-dependencies].all: declaring a sibling as
+# a real dependency is what deadlocks resolution, and pycode-kg dropped its
+# doc-kg dependency as of 0.21.4. Should it ever reacquire one, this group is
+# where the breakage surfaces -- confined to `poetry lock`, not to consumers.
+[tool.poetry.group.kg]
+optional = true
+
+[tool.poetry.group.kg.dependencies]
+pycode-kg = ">=0.21.4"
 
 [project.urls]
 Homepage = "https://github.com/Flux-Frontiers/doc_kg"

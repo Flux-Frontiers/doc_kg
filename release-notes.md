@@ -1,71 +1,82 @@
-# Release Notes — v0.21.0
+# Release Notes — v0.21.1
 
 > Released: 2026-08-03
 
-**`pandas` is no longer a dependency of DocKG — and neither are `markdown-it-py`
-or `einops`.** None of the three was ever imported: not in `src/`, not in
-`tests/`, not in `benchmarks/`. Because they were declared *core*, every install
-of `doc-kg` — and of every package that depends on it — paid for them anyway.
-This release makes the declared dependency set match the code in both
-directions: nothing is declared that is never imported, and nothing is imported
-that is not declared. It is a packaging release; there are no behavioural
-changes to indexing, querying, or the CLI.
+A truth-in-output release. Nothing about how DocKG works changed; what it
+*tells you* about how it works did.
 
-## What changed
+## The CLI was describing a backend it no longer writes
 
-**Three core dependencies removed.** `pandas` is the one that matters — it is
-heavy, it was core, and it propagated to every downstream KG in the fleet.
-`markdown-it-py` was never imported either; it is a hard requirement of `rich`
-(`>=2.2.0`) so it remains installed regardless, and what actually disappears is
-an undocumented floor-raise to `>=3.0.0` on a package we do not use. `einops`
-was added back in 0.9.0 for `nomic-embed-text-v1` and is reachable only when
-`dockg model` is pointed at a `nomic-ai/*` model with `trust_remote_code`; the
-default model is bge-small, so it was dead weight for essentially every install.
+The sqlite-vec migration landed in 0.20.0 and the store moved to
+`.dockg/vectors.sqlite`. The help strings did not follow. `dockg build` printed
 
-**Three imports that were never declared now are.** DocKG imported `tqdm`,
-`joblib` and `torch` directly while relying on other packages to supply them.
-`tqdm` (progress-bar suppression in `index.py`) is now core; `joblib` (K-means
-model persistence in `discover_topics.py` and `dockg.py`) joins `scikit-learn`
-in the `[analysis]` extra. This is the reasoning already written down in
-`pyproject.toml` for `scikit-learn` itself, finally applied consistently.
+```
+  vector index : /your/corpus/.dockg/lancedb
+```
 
-**The semantic stack moved to `kgmodule-utils[semantic]>=0.10.0`.** `numpy`,
-`sentence-transformers`, `sqlite-vec` and `transformers` were pinned both here
-and in KG_utils — two files that could silently drift apart on every bump. They
-now come from the extra, matching what pycode-kg already does. The trade-off is
-recorded in `pyproject.toml`: those packages become a contract of `[semantic]`,
-so a change to its contents changes DocKG's direct imports with it.
+on every run — naming a directory the default backend never creates — while the
+vectors went somewhere else entirely. `build-index`, `build-index-from-cache`,
+`build-two-phase` and the MCP server banner all had the same bug. The banner was
+worse: it reported `vectors : (derived)`, a placeholder standing exactly where
+the resolved path belonged.
 
-**`torch>=2.5.1` is finally constrained**, as a consequence of that move. DocKG
-imports `torch` directly for MPS/CUDA cache eviction but never declared it, so
-resolution was governed by `sentence-transformers`' far looser `torch>=1.11.0`.
-Every sibling that imports torch already declared `>=2.5.1`; doc-kg was the
-outlier. In the same spirit, the `rich` floor rises to `>=14.3.3,<15` from
-`>=13.0.0,<15.0.0` — deliberately above what `[semantic]` carries, because
-doc-kg was the one package in the fleet whose clean install could still resolve
-rich 13.x.
+None of this affected retrieval. All of it affected anyone trying to find, back
+up, or reason about their vector store.
 
-## Upgrading
+Every build header now reports the store that will actually be opened, and the
+LanceDB-only `table` line appears only when the resolved backend is LanceDB.
+The docstrings and `--help` text were swept to match. LanceDB is still named
+where it is genuinely the subject — `convert-index`, the `[lancedb]` extra, the
+legacy `--lancedb` anchor — but every mention is now qualified as such.
 
-For most users this is `pip install --upgrade doc-kg` and nothing else. No
-rebuild, no migration, no configuration change — the graph, the index, and every
-CLI surface are untouched.
+## `pycode-kg` is tooling, not a dependency
 
-The one thing to check: **if your code imported `pandas` and got it for free
-because DocKG declared it, declare it yourself.** That is the only way this
-release can break you, and it is why this is a minor bump rather than a patch.
-The same applies, far less likely, to `markdown-it-py` at `>=3.0.0` and to
-`einops` — if you load a `nomic-ai/*` embedding model, `pip install einops`
-first.
+`pycode-kg` had been added to doc-kg's **core runtime dependencies**, where it
+would have made every consumer of this package install something doc-kg imports
+nowhere — along with the `pandas` and `networkx` it carries, which 0.21.0 had
+just finished removing from this project's dependency set. It was caught in the
+working tree and never shipped.
 
-Downstream KGs in the fleet were checked before the removal and none of them
-break: the only sibling that imports `pandas` without declaring it does so
-inside a Streamlit app, and `streamlit` requires `pandas>=1.4.0,<4` itself.
+It *is* genuinely needed: the release workflow rebuilds the PyCodeKG index and
+`.mcp.json` serves it. But it is needed by the maintainer, not by the library.
+So rather than deleting it outright, it moved to a Poetry group:
 
-Two constraints tightened, so a resolver that previously found a solution could
-now refuse one: `torch>=2.5.1` and `rich>=14.3.3`. Both match what the rest of
-the fleet has required for some time.
+```
+poetry install --with kg      # gets the pycodekg CLI into .venv/bin
+poetry install                # default — group is optional, skipped
+```
 
----
+Groups are locked and installable but are not written into the wheel's metadata,
+so no published extra picks it up. `pip install doc-kg[dev]` is unaffected, and
+the wheel's core dependency list is unchanged at seven packages.
 
-_Full changelog: [CHANGELOG.md](CHANGELOG.md)_
+The old policy note in `pyproject.toml` said siblings must never be declared
+because doc-kg and pycode-kg depend on each other. That is no longer true —
+pycode-kg dropped its doc-kg dependency as of 0.21.4 — so the note was updated
+to say what actually holds now, and why the group is the safe place for it.
+
+## CI now checks the wheel three ways instead of one
+
+0.21.0 added a job that installs the built wheel into a clean venv and loads
+every console-script entry point. That gate is real, but it has blind spots: a
+module no entry point reaches is invisible to it, and loading an entry point
+proves the code imports, not that it runs.
+
+The job now runs three gates against the artifact users actually receive:
+
+1. **Every console script loads on a core-only install.** Unchanged, and
+   core-only is the point — it also guards the lazy-import discipline that keeps
+   `dockg viz` working without streamlit installed.
+2. **A real corpus builds and answers a query**, still core-only, so this is the
+   default `pip install doc-kg` doing actual work. Model weights are cached.
+3. **Every packaged submodule imports** with the extras installed. `doc_kg.app`
+   is exactly the module gates 1 and 2 cannot see: no entry point reaches it and
+   it needs `[viz]`.
+
+Two regression guards went into the test suite alongside: one asserts that no
+command's `--help` presents LanceDB as the default store, the other asserts that
+the new reporting properties agree with the backend that actually gets
+constructed.
+
+The deprecated Node 20 actions (`checkout`, `setup-python`, `cache`) were bumped
+to current majors, clearing the warnings on every run.

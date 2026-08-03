@@ -41,7 +41,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @model_option
 @click.option("--k", type=int, default=8, show_default=True, help="Top-k semantic hits.")
@@ -109,7 +109,7 @@ def query(
     "--table",
     default="dockg_nodes",
     show_default=True,
-    help="LanceDB table name.",
+    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
 )
 @model_option
 @click.option("--k", type=int, default=8, show_default=True, help="Top-k semantic hits.")

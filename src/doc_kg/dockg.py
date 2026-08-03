@@ -143,7 +143,7 @@ SKIP_DIRS = {
     ".venv",  # Python virtual environment (Poetry/pip)
     "venv",  # Python virtual environment (legacy name)
     "__pycache__",  # Python bytecode cache
-    ".dockg",  # DocKG graph artifacts (SQLite, LanceDB, snapshots)
+    ".dockg",  # DocKG graph artifacts (SQLite graph, vector store, snapshots)
     ".mypy_cache",  # mypy type-check cache
     ".pytest_cache",  # pytest cache
     "node_modules",  # JS/Node dependencies

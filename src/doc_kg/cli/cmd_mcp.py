@@ -27,7 +27,7 @@ from doc_kg.dockg import DEFAULT_MODEL
     "--lancedb",
     default=".dockg/lancedb",
     type=click.Path(),
-    help="LanceDB directory path.",
+    help="Legacy LanceDB directory; also anchors the derived sqlite-vec store.",
 )
 @click.option(
     "--vectors-path",

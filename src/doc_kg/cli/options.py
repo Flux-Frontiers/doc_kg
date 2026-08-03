@@ -23,7 +23,7 @@ lancedb_option = click.option(
     default=None,
     show_default=False,
     type=click.Path(),
-    help="Path to LanceDB directory (default: <repo>/.dockg/lancedb).",
+    help="Path to the legacy LanceDB directory (default: <repo>/.dockg/lancedb). Also anchors where the sqlite-vec store is derived from.",
 )
 
 vectors_path_option = click.option(
