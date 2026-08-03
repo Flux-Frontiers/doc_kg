@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-07-31T15:13:54.430377+00:00",
+  "last_update": "2026-08-03T15:29:04.690070+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -3951,6 +3951,49 @@
           "nodes": 2054,
           "edges": 19208,
           "coverage_delta": 0.09727006148762463,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "a3f7ae0516fa67081db1ffdf79bd0f018cc7f00c",
+      "branch": "claude/fleet-dep-hygiene",
+      "timestamp": "2026-08-03T15:29:04.688245+00:00",
+      "version": "0.20.0",
+      "file": "a3f7ae0516fa67081db1ffdf79bd0f018cc7f00c.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 4054,
+        "total_edges": 31024,
+        "node_counts": {
+          "chunk": 868,
+          "document": 45,
+          "entity": 1079,
+          "keyword": 985,
+          "section": 510,
+          "topic": 567
+        },
+        "edge_counts": {
+          "CONTAINS": 1378,
+          "CO_OCCURS_WITH": 19332,
+          "HAS_KEYWORD": 3457,
+          "HAS_TOPIC": 893,
+          "MENTIONS_ENTITY": 3927,
+          "NEXT": 278,
+          "REFERENCES": 25,
+          "SIMILAR_TO": 1734
+        },
+        "meaningful_nodes": 4009,
+        "coverage_score": 0.9819508448540706,
+        "issues_count": 0,
+        "complexity_median": 24.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 2087,
+          "edges": 19335,
+          "coverage_delta": 0.09707111976815996,
           "issues_delta": 0
         }
       }

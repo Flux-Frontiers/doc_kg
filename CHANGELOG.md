@@ -7,11 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Dependency hygiene pass. The declared dependency set now matches what the code
+actually imports — in both directions.
+
 ### Added
+
+- **`tqdm` and `joblib` are declared.** Both were imported directly (`index.py`
+  silences progress bars; `discover_topics.py` and `dockg.py` persist and reload
+  the K-means model) but reached us only as transitives of
+  `sentence-transformers` and `scikit-learn`. `tqdm` is core; `joblib` joins
+  `scikit-learn` in the `[analysis]` extra. This is the same reasoning already
+  written down for `scikit-learn` itself in `pyproject.toml` — now applied
+  consistently.
 
 ### Changed
 
+- **The semantic stack now comes from `kgmodule-utils[semantic]>=0.10.0`.**
+  `numpy`, `sentence-transformers`, `sqlite-vec` and `transformers` were each
+  pinned here *and* in KG_utils, so every bump meant editing two files that
+  could silently drift. They are dropped from this project's core list and
+  inherited from the extra, which matches pycode-kg. A side effect worth
+  stating: **`torch>=2.5.1` is now constrained.** DocKG imports `torch` directly
+  for MPS/CUDA cache eviction, but never declared it, so resolution was governed
+  by `sentence-transformers`' much looser `torch>=1.11.0`.
+- **`rich` floor raised to `>=14.3.3,<15`** (was `>=13.0.0,<15.0.0`),
+  deliberately above the `>=13.0.0` that `kgmodule-utils[semantic]` carries.
+  Every other KG in the fleet was already on `>=14.3.3`; doc-kg was the one
+  package whose clean install could still resolve rich 13.x.
+
 ### Removed
+
+- **`pandas` is no longer a dependency.** It was never imported — not in `src/`,
+  `tests/` or `benchmarks/`. Because it was declared *core*, every install of
+  doc-kg and of everything depending on it (diary-kg, gutenberg-kg, ftree-kg,
+  ia-kg, metabo-kg, tscode-kg, kg-rag) pulled it in for nothing. **If you relied
+  on pandas arriving via doc-kg, declare it yourself** — that is the one
+  behavioural change here, and the reason this is a minor bump.
+- **`markdown-it-py` is no longer declared.** Also never imported. It is a hard
+  requirement of `rich` (`>=2.2.0`), so it remains installed; what is gone is an
+  undocumented floor-raise to `>=3.0.0` on a package we do not use.
+- **`einops` is no longer a dependency.** Added in 0.9.0 for
+  `nomic-embed-text-v1`, and reachable only when `dockg model` is pointed at a
+  `nomic-ai/*` model with `trust_remote_code` (see `cli/cmd_model.py`). The
+  default model is bge-small, so this was dead weight for essentially everyone.
+  Loading a nomic model now requires `pip install einops` first.
 
 ### Fixed
 

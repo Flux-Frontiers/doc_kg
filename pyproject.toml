@@ -1,7 +1,7 @@
 # pyproject.toml — DocKG package configuration (PEP 621)
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-07-31
+# Last Revision: 2026-08-03
 #
 # Build system : Poetry 2.x with PEP 621 [project] table
 #
@@ -67,8 +67,6 @@ classifiers = [
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
-    "einops>=0.8.2",
-    "markdown-it-py>=3.0.0",
     # Upper-bounded: mcp 2.0 removed the bundled `mcp.server.fastmcp` module
     # (FastMCP was split out into the standalone `fastmcp` package) and rebuilt
     # mcp.server around new submodules. src/doc_kg/mcp_server.py imports FastMCP
@@ -76,17 +74,23 @@ dependencies = [
     # 2.x and break `dockg-mcp` at import time. Lift this only alongside a port
     # to the standalone fastmcp package.
     "mcp>=1.0.0,<2",
-    "numpy>=1.24.0",
-    "pandas>=2.0.0",
     "pyyaml>=6.0.0",
-    "rich>=13.0.0,<15.0.0",
-    "sentence-transformers>=5.4.1",
-    # Core as of 0.20.0: the vector backend is sqlite-vec, not an opt-in
-    # alternative to it. Exact pin — sqlite-vec is pre-1.0 and breaking minors
-    # are possible.
-    "sqlite-vec==0.1.9",
-    "transformers>=5.5.0,<6",
-    "kgmodule-utils>=0.9.0",
+    # Floor deliberately raised above the >=13.0.0 that kgmodule-utils[semantic]
+    # carries, to match the rest of the KG fleet (pycode-kg, diary-kg, memory-kg
+    # and gutenberg-kg are all on >=14.3.3).
+    "rich>=14.3.3,<15",
+    # Imported directly in index.py to silence progress bars. The import is fully
+    # guarded and the behaviour is cosmetic, but it *is* a direct import, so it is
+    # declared rather than inherited by accident from sentence-transformers.
+    "tqdm>=4.60",
+    # The semantic stack — numpy, sentence-transformers, sqlite-vec (the vector
+    # backend, core as of 0.20.0), torch and transformers — arrives through this
+    # extra instead of being re-pinned here, so the fleet bumps it in one place.
+    # See [project.optional-dependencies].semantic in KG_utils/pyproject.toml.
+    # Consequence: those five packages are a contract of the [semantic] extra. If
+    # its contents ever change, this project's direct imports of numpy,
+    # sentence_transformers, transformers and torch change with it.
+    "kgmodule-utils[semantic]>=0.10.0",
     "pymupdf4llm>=0.0.17",
 ]
 
@@ -111,6 +115,10 @@ viz = [
 # sentence-transformers — an accident that would break these five modules if
 # that package ever dropped it.
 analysis = [
+    # joblib is here for the same reason: discover_topics.py and dockg.py import
+    # it directly to persist and reload the K-means model, and it was reaching
+    # them only as a transitive of scikit-learn.
+    "joblib>=1.4.0",
     "scikit-learn>=1.3.0",
 ]
 # Reading a legacy LanceDB store. DocKG builds and queries sqlite-vec only as
@@ -143,6 +151,7 @@ sqlite-vec = []
 #   pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
 all = [
     "detect-secrets>=1.5.0",
+    "joblib>=1.4.0",
     "ty>=0.0.41",
     "pdoc>=14.0.0",
     "pre-commit>=4.5.1",

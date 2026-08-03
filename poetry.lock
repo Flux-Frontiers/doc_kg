@@ -700,18 +700,6 @@ files = [
 ]
 
 [[package]]
-name = "einops"
-version = "0.8.2"
-description = "A new flavour of deep learning operations"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193"},
-    {file = "einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827"},
-]
-
-[[package]]
 name = "executing"
 version = "2.2.1"
 description = "Get the currently executing AST node of a frame, and other information"
@@ -845,7 +833,7 @@ description = "Fast transfer of large files with the Hugging Face Hub."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(sys_platform == \"linux\" or sys_platform == \"win32\") and (platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\") or sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"arm64\") or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\" or platform_machine == \"x86_64\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"win32\") and (platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\") or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"arm64\" or platform_machine == \"aarch64\" or platform_machine == \"x86_64\""
 files = [
     {file = "hf_xet-1.5.2-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:4a5ecb9cda8512ba2aa8ee5d37c87a1422992165892d653098c7b90247481c3b"},
     {file = "hf_xet-1.5.2-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:8764488197c1d7b1378c8438c18d2eea902e150dbca0b0f0d2d32603fb9b5576"},
@@ -1240,18 +1228,27 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.9.0"
+version = "0.10.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 files = [
-    {file = "kgmodule_utils-0.9.0-py3-none-any.whl", hash = "sha256:7f32869af0a8b6028314b84d3c00415ea85f0b66dc3207d8cad17e231cdcadf5"},
-    {file = "kgmodule_utils-0.9.0.tar.gz", hash = "sha256:7fa21007dd70ff0f019863ea6536c957c2973d47448aa07e4c459f6cc9c187c1"},
+    {file = "kgmodule_utils-0.10.0-py3-none-any.whl", hash = "sha256:765279f44cf754cf9256ddeab0eee4bb462f1028af3417eb321f7ef3ad1aa8a0"},
+    {file = "kgmodule_utils-0.10.0.tar.gz", hash = "sha256:b06a36c4674d2c308a776c6246f0519d99804fbd32e1901cd02fa240449baf24"},
 ]
 
+[package.dependencies]
+numpy = {version = ">=1.24.0", optional = true, markers = "extra == \"semantic\""}
+rich = {version = ">=13.0.0,<15.0.0", optional = true, markers = "extra == \"semantic\""}
+sentence-transformers = {version = ">=5.4.1", optional = true, markers = "extra == \"semantic\""}
+sqlite-vec = {version = "0.1.9", optional = true, markers = "extra == \"semantic\""}
+torch = {version = ">=2.5.1", optional = true, markers = "extra == \"semantic\""}
+transformers = {version = ">=5.5.0,<6", optional = true, markers = "extra == \"semantic\""}
+
 [package.extras]
-semantic = ["lancedb (>=0.19.0)", "numpy (>=1.24.0)", "rich (>=13.0.0)", "sentence-transformers (>=5.4.1)", "sqlite-vec (==0.1.9)", "torch (>=2.5.1)", "transformers (>=5.5.0,<6)"]
+lancedb = ["lancedb (>=0.19.0)"]
+semantic = ["numpy (>=1.24.0)", "rich (>=13.0.0,<15.0.0)", "sentence-transformers (>=5.4.1)", "sqlite-vec (==0.1.9)", "torch (>=2.5.1)", "transformers (>=5.5.0,<6)"]
 sqlite-vec = ["sqlite-vec (==0.1.9)"]
 synthesis = ["httpx (>=0.27.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
 synthesis-mflux = ["httpx (>=0.27.0)", "mflux (>=0.9.0)", "openai (>=1.30.0)", "pillow (>=10.0.0)"]
@@ -1998,9 +1995,10 @@ files = [
 name = "pandas"
 version = "3.0.5"
 description = "Powerful data structures for data analysis, time series, and statistics"
-optional = false
+optional = true
 python-versions = ">=3.11"
 groups = ["main"]
+markers = "extra == \"viz\" or extra == \"all\""
 files = [
     {file = "pandas-3.0.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:2946e77e4a53cd248cbde631a12f0e51c8324ce354c3eba4d20147c1ad6f4282"},
     {file = "pandas-3.0.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:71ecc8fb7ed1a7aa4392316b5309a6347e8e7f832f38fd897846b3a1457a9298"},
@@ -2852,9 +2850,10 @@ testing = ["process-tests", "pytest-xdist", "virtualenv"]
 name = "python-dateutil"
 version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
-optional = false
+optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
+markers = "extra == \"viz\" or extra == \"all\" or extra == \"lancedb\""
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
@@ -3605,9 +3604,10 @@ files = [
 name = "six"
 version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
-optional = false
+optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
+markers = "extra == \"viz\" or extra == \"all\" or extra == \"lancedb\""
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
@@ -4121,10 +4121,10 @@ typing-extensions = ">=4.12.0"
 name = "tzdata"
 version = "2026.3"
 description = "Provider of IANA time zone data"
-optional = false
+optional = true
 python-versions = ">=2"
 groups = ["main"]
-markers = "sys_platform == \"win32\" or sys_platform == \"emscripten\""
+markers = "(sys_platform == \"win32\" or sys_platform == \"emscripten\") and (extra == \"viz\" or extra == \"all\")"
 files = [
     {file = "tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931"},
     {file = "tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415"},
@@ -4366,8 +4366,8 @@ files = [
 ]
 
 [extras]
-all = ["detect-secrets", "pdoc", "pre-commit", "pytest", "pytest-cov", "pyvis", "ruff", "scikit-learn", "streamlit", "ty"]
-analysis = ["scikit-learn"]
+all = ["detect-secrets", "joblib", "pdoc", "pre-commit", "pytest", "pytest-cov", "pyvis", "ruff", "scikit-learn", "streamlit", "ty"]
+analysis = ["joblib", "scikit-learn"]
 dev = ["detect-secrets", "pdoc", "pre-commit", "pytest", "pytest-cov", "ruff", "ty"]
 lancedb = ["lancedb"]
 sqlite-vec = []
@@ -4376,4 +4376,4 @@ viz = ["pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "4ba19b7d038299d4126ba7bd6971744be28a64939c806698749fb8944c8376ba"
+content-hash = "e5df9c06d95ee32afe744935dca2473ceddf6a05c61e1683ea198bb8e64d0610"
