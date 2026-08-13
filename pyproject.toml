@@ -91,7 +91,7 @@ dependencies = [
     # Consequence: those five packages are a contract of the [semantic] extra. If
     # its contents ever change, this project's direct imports of numpy,
     # sentence_transformers, transformers and torch change with it.
-    "kgmodule-utils[semantic]>=0.12.0",
+    "kgmodule-utils[semantic]>=0.12.1",
     "pymupdf4llm>=0.0.17",
 ]
 
