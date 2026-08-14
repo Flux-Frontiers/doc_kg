@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-08-03T19:11:50.957223+00:00",
+  "last_update": "2026-08-14T12:29:06.276175+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -4042,11 +4042,11 @@
       }
     },
     {
-      "key": "e5499bbb1f566fd10549e29ad443750d8d8b7694",
-      "branch": "fix/vector-store-help-strings",
-      "timestamp": "2026-08-03T19:11:50.955336+00:00",
+      "key": "c2fec8e06eb030afadbc0e6aed06947ec85646bd",
+      "branch": "fix/runpod-pin-kgmodule-utils",
+      "timestamp": "2026-08-03T21:57:45.448976+00:00",
       "version": "0.21.1",
-      "file": "e5499bbb1f566fd10549e29ad443750d8d8b7694.json",
+      "file": "c2fec8e06eb030afadbc0e6aed06947ec85646bd.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 4101,
@@ -4080,6 +4080,49 @@
           "nodes": 2134,
           "edges": 19555,
           "coverage_delta": 0.09733745236395697,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "9baabaa6deecf772bbc7337babb45cd30da62cf3",
+      "branch": "main",
+      "timestamp": "2026-08-14T12:29:06.274455+00:00",
+      "version": "0.21.1",
+      "file": "9baabaa6deecf772bbc7337babb45cd30da62cf3.json",
+      "metrics": {
+        "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
+        "total_nodes": 4071,
+        "total_edges": 31086,
+        "node_counts": {
+          "chunk": 871,
+          "document": 45,
+          "entity": 1077,
+          "keyword": 997,
+          "section": 512,
+          "topic": 569
+        },
+        "edge_counts": {
+          "CONTAINS": 1383,
+          "CO_OCCURS_WITH": 19372,
+          "HAS_KEYWORD": 3469,
+          "HAS_TOPIC": 896,
+          "MENTIONS_ENTITY": 3927,
+          "NEXT": 274,
+          "REFERENCES": 25,
+          "SIMILAR_TO": 1740
+        },
+        "meaningful_nodes": 4026,
+        "coverage_score": 0.981630309988519,
+        "issues_count": 0,
+        "complexity_median": 24.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 2104,
+          "edges": 19397,
+          "coverage_delta": 0.09675058490260835,
           "issues_delta": 0
         }
       }

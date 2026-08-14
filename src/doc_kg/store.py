@@ -15,7 +15,7 @@ Schema differences from PyCodeKG:
   - DEFAULT_RELS includes SIMILAR_TO and NEXT in addition to CONTAINS/REFERENCES
 
 Author: Eric G. Suchanek, PhD
-Last Revision: 2026-07-28 22:29:44
+Last Revision: 2026-08-03 15:11:33
 License: Elastic 2.0
 """
 

@@ -1,7 +1,7 @@
 # pyproject.toml — DocKG package configuration (PEP 621)
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-08-03
+# Last Revision: 2026-08-14
 #
 # Build system : Poetry 2.x with PEP 621 [project] table
 #
@@ -48,7 +48,7 @@ packages = [{ include = "doc_kg", from = "src" }]
 # ---------------------------------------------------------------------------
 [project]
 name = "doc-kg"
-version = "0.21.1"
+version = "0.21.2"
 description = "A tool to build a semantically searchable knowledge graph from markdown and text documents"
 readme = "README.md"
 license = "Elastic-2.0"

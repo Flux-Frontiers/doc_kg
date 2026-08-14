@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.21.2] - 2026-08-14
+
+Dependency-floor release from the fleet sweep. No code changes — the wheel's
+contents are identical to 0.21.1; only the declared requirements moved.
+
+### Changed
+
+- **`kgmodule-utils[semantic]` floor raised `>=0.10.0` → `>=0.12.1`**, picking
+  up the current shared-SDK line used across the fleet.
+- **`ruff` capped `<0.16`** in the dev group (and the `all` extra) so a future
+  ruff major/minor with new default rules cannot break CI unreviewed.
+- **`pycode-kg` maintainer-tooling group floor raised to `>=0.22.0`.** This is
+  the optional `[tool.poetry.group.kg]` group, not a wheel dependency.
+- `poetry.lock` regenerated for the new floors.
+
+### Fixed
+
+- **`pytest` floor raised `>=8.0.0` → `>=9.0.3`** in the dev group (and the
+  `all` extra) to move past GHSA-6w46-j5rx-g56g.
+
 ## [0.21.1] - 2026-08-03
 
 Truth-in-output pass. The sqlite-vec migration landed in 0.20.0, but the help

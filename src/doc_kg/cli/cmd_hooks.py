@@ -6,7 +6,7 @@ CLI command for installing DocKG git hooks:
   install-hooks — install the pre-commit snapshot hook into .git/hooks/
 
   Author: Eric G. Suchanek, PhD
-  Last Revision: 2026-07-29
+  Last Revision: 2026-07-31
 """
 
 from __future__ import annotations
