@@ -27,11 +27,15 @@ pip install doc-kg
 pip install 'doc-kg[viz]'
 
 # Everything above
-pip install 'doc-kg[all]'
+pip install 'doc-kg[analysis,sqlite-vec,viz]'
 
-# Development (adds pytest, ruff, mypy, pre-commit, pdoc)
-pip install 'doc-kg[dev]'
+# Development (pytest, ruff, ty, pre-commit, pdoc) — Poetry only
+poetry install --with dev
 ```
+
+There is no `doc-kg[dev]` on PyPI. Dev tooling is a Poetry group, not an extra,
+so the maintainer toolchain and its repo-reasoned pins stay out of published
+wheel metadata.
 
 **Cross-KG siblings** (PyCodeKG, KGRAG, AgentKG) are deliberately *not* declared
 as extras of `doc-kg`. Each sibling pins its own `transformers` range, and

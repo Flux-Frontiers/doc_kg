@@ -67,7 +67,6 @@ Custom paths::
         --emb-cache /tmp/.dockg/embeddings.json
 
 Author: Eric G. Suchanek, PhD
-Last Revision: 2026-04-07
 """
 
 from __future__ import annotations

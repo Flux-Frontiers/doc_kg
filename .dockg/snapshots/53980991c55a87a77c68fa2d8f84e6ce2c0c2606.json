@@ -1,8 +1,8 @@
 {
-  "key": "9baabaa6deecf772bbc7337babb45cd30da62cf3",
+  "key": "53980991c55a87a77c68fa2d8f84e6ce2c0c2606",
   "branch": "main",
-  "timestamp": "2026-08-14T12:29:06.274455+00:00",
-  "version": "0.21.1",
+  "timestamp": "2026-08-15T05:20:26.804737+00:00",
+  "version": "0.21.2",
   "metrics": {
     "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
     "total_nodes": 4071,
@@ -113,7 +113,12 @@
     }
   ],
   "issues": [],
-  "vs_previous": null,
+  "vs_previous": {
+    "nodes": -30,
+    "edges": -158,
+    "coverage_delta": -0.0005868674613486169,
+    "issues_delta": 0
+  },
   "vs_baseline": {
     "nodes": 2104,
     "edges": 19397,
