@@ -70,7 +70,11 @@ dependencies = [
     # Carries the semantic stack: numpy, sentence-transformers, sqlite-vec,
     # torch, transformers. We import four of those directly, so the [semantic]
     # extra's contents are a contract -- see KG_utils/pyproject.toml.
-    "kgmodule-utils[semantic]>=0.13.1",
+    #
+    # 0.13.2, not 0.13.1: that release made SnapshotManager's `repo_root` a
+    # read-only property, which breaks every subclass that assigns it. Nothing
+    # in the fleet declares a floor that can resolve to it.
+    "kgmodule-utils[semantic]>=0.13.2",
     "pymupdf4llm>=0.0.17",
 ]
 
