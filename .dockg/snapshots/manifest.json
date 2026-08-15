@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-08-15T14:31:59.373827+00:00",
+  "last_update": "2026-08-15T14:37:13.425457+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -4133,11 +4133,11 @@
       }
     },
     {
-      "key": "7f85427ad504acc63696d289c58478f1c87f490a",
+      "key": "68b53f8bbe15abc58e2414e48105e8c1f6909425",
       "branch": "main",
-      "timestamp": "2026-08-15T14:31:59.372418+00:00",
+      "timestamp": "2026-08-15T14:37:13.423566+00:00",
       "version": "0.21.2",
-      "file": "7f85427ad504acc63696d289c58478f1c87f490a.json",
+      "file": "68b53f8bbe15abc58e2414e48105e8c1f6909425.json",
       "metrics": {
         "db_path": ".dockg/graph.sqlite",
         "total_nodes": 4075,

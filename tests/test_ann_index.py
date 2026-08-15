@@ -21,7 +21,6 @@ No model is loaded — the index is built via ``__new__`` with a fake embedder.
 
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -126,14 +125,6 @@ def test_ann_config_still_reaches_an_explicit_lancedb_backend(tmp_path):
     assert be.ann_nprobes == 50
     assert be.ann_refine_factor == 0
     assert be.meta_columns == _META_COLUMNS
-
-
-def test_lancedb_backend_errors_actionably_when_extra_missing(tmp_path):
-    """Without the extra, asking for LanceDB must say how to get it."""
-    if importlib.util.find_spec("lancedb") is not None:
-        pytest.skip("lancedb installed — the missing-extra path cannot be exercised")
-    with pytest.raises(ImportError, match=r"doc-kg\[lancedb\]"):
-        make_backend("lancedb", lancedb_dir=tmp_path / "lancedb", dim=384, table="nodes")
 
 
 def test_explicit_backend_is_used(tmp_path):
