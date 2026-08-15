@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-08-15T16:47:39.777759+00:00",
+  "last_update": "2026-08-15T21:44:33.884138+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -4176,11 +4176,11 @@
       }
     },
     {
-      "key": "66910279cced8105d56f7a529b8208583413ff63",
-      "branch": "chore/docs-and-tooling-currency",
-      "timestamp": "2026-08-15T16:47:39.776211+00:00",
+      "key": "592b2ed6693e2b8f900dcfe85671f4d95af2bc51",
+      "branch": "chore/floors-0.13.2",
+      "timestamp": "2026-08-15T21:44:33.882582+00:00",
       "version": "0.21.2",
-      "file": "66910279cced8105d56f7a529b8208583413ff63.json",
+      "file": "592b2ed6693e2b8f900dcfe85671f4d95af2bc51.json",
       "metrics": {
         "db_path": ".dockg/graph.sqlite",
         "total_nodes": 3871,

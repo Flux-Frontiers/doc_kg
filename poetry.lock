@@ -1295,14 +1295,14 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kgmodule-utils"
-version = "0.13.1"
+version = "0.13.2"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["main", "kg"]
 files = [
-    {file = "kgmodule_utils-0.13.1-py3-none-any.whl", hash = "sha256:890eae1b0adb1b930ba41d6d33111d786487bdf07ec3e3061cdaecd023b507a9"},
-    {file = "kgmodule_utils-0.13.1.tar.gz", hash = "sha256:e82623f44015a6dcfbb3de7ca44cde1002e304d4432a5492341dd871fe81dac7"},
+    {file = "kgmodule_utils-0.13.2-py3-none-any.whl", hash = "sha256:379f6a6f47ed3523375a53895fb310830272b6782e057492c4b2b089f5464890"},
+    {file = "kgmodule_utils-0.13.2.tar.gz", hash = "sha256:43d6797f7dec305ee841cd997f4ea0e55de7d04546e15ae6199865bbdf58ea86"},
 ]
 
 [package.dependencies]
@@ -4416,4 +4416,4 @@ viz = ["pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "2508821803992763cfd5ce9d281a8448e4c467a1017d8e2aebbff60165ff479e"
+content-hash = "b6799a955d15ab4f4cdd4492d5e58921430c3de685e695ee612ea04e2357999e"
