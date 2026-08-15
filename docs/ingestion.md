@@ -93,7 +93,7 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + sqlite-vec k
 | `parse_corpus()` | `dockg.py` | Deterministic extraction: files → nodes + edges |
 | `TextChunker` | `chunker.py` | Semantic text segmentation (embedding-based boundaries) |
 | `GraphStore` | `store.py` | SQLite persistence layer |
-| `SemanticIndex` | `index.py` | LanceDB vector index + SIMILAR_TO discovery |
+| `SemanticIndex` | `index.py` | sqlite-vec vector index + SIMILAR_TO discovery |
 | `TopicExtractor` | `topics.py` | Supervised keyword-based topic classification |
 | `extract_entities()` | `relations.py` | Deterministic entity extraction (titlecase/acronym) |
 
@@ -129,7 +129,7 @@ dockg build docs
 
 # Granular steps
 dockg build-graph docs            # Step 1: parse → SQLite only (wipes by default)
-dockg build-index                 # Step 2: SQLite → LanceDB + SIMILAR_TO (wipes by default)
+dockg build-index                 # Step 2: SQLite → vectors + SIMILAR_TO (wipes by default)
 
 # Incremental update — keep existing data, upsert changes only
 dockg build docs --update
@@ -445,7 +445,7 @@ The core build pipeline is always needed for MCP server, `query`, and `pack`. Th
 ```
 .dockg/
 ├── graph.sqlite           # Core build: SQLite knowledge graph
-├── lancedb/               # Core build: LanceDB vector index
+├── vectors.sqlite         # Core build: sqlite-vec vector index
 ├── snapshots/             # Temporal snapshots (JSON)
 │   ├── manifest.json
 │   └── <version>.json

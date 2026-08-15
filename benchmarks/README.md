@@ -4,7 +4,7 @@
 > using DocKG's persistent knowledge graph instead of the reference MemPal
 > ChromaDB pipeline. Unlike `longmemeval_bench.py`, which rebuilds per question,
 > the DocKG harness writes every unique haystack session to
-> `benchmarks/data/longmemeval_corpus/` once, builds a single SQLite + LanceDB
+> `benchmarks/data/longmemeval_corpus/` once, builds a single SQLite + sqlite-vec
 > graph (document / section / chunk hierarchy + SIMILAR_TO / HAS_TOPIC /
 > MENTIONS_ENTITY / HAS_KEYWORD / CO_OCCURS_WITH edges), and then runs 500
 > queries against it — matching the `gutenberg_kg` ingest-once-query-many
@@ -12,7 +12,7 @@
 >
 > Retrieval is **pure DocKG — no inference, no keyword rerank, no LLM rerank**.
 > Each question is run through `DocKG.query(q, k, hop, rels, max_nodes)`
-> (same path `pack_docs` uses): semantic seeds over LanceDB, then graph
+> (same path `pack_docs` uses): semantic seeds over sqlite-vec, then graph
 > expansion across the edge set. The ranked nodes are collapsed to sessions
 > via `file_path` and post-filtered to the question's `haystack_session_ids`.
 >

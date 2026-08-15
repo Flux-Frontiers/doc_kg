@@ -9,13 +9,13 @@ Goal: maximum session-level recall using pure graph retrieval — no LLM, no inf
 
 Every unique haystack session across all 500 questions is written once as
 `<session_id>.md` under `benchmarks/data/longmemeval_corpus/`. A single DocKG
-is built from that corpus (SQLite graph + LanceDB vector index), then all 500
+is built from that corpus (SQLite graph + sqlite-vec vector index), then all 500
 queries run against it — ingest once, query many.
 
 Retrieval path: `DocKG.query(q, k, hop, rels, max_nodes)` — the same
 semantic-seed + graph-expansion path that `pack_docs` uses:
 
-1. LanceDB ANN search → top-k semantic seed nodes
+1. sqlite-vec ANN search → top-k semantic seed nodes
 2. Graph expansion across edge types (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC,
    MENTIONS_ENTITY, HAS_KEYWORD, CO_OCCURS_WITH, REFERENCES)
 3. Ranked nodes collapsed to session IDs via `file_path`
@@ -118,7 +118,7 @@ python benchmarks/longmemeval_dockg.py all \
 |---|---|---|
 | `--download` | off | Download dataset from HuggingFace if not present |
 | `--wipe` | off | Rewrite corpus files and rebuild KG from scratch |
-| `--k` | 50 | Semantic seed count (LanceDB top-K before graph expansion) |
+| `--k` | 50 | Semantic seed count (vector top-K before graph expansion) |
 | `--hop` | 2 | Graph expansion hops from each seed |
 | `--max-nodes` | 1000 | Cap on ranked nodes returned by `DocKG.query` |
 | `--rels` | all | Comma-separated edge types to traverse |
@@ -160,5 +160,5 @@ graph expansion recovers sessions that pure embedding search misses.
 | Dataset | `/tmp/longmemeval-data/longmemeval_s_cleaned.json` |
 | Corpus (Markdown sessions) | `benchmarks/data/longmemeval_corpus/` |
 | DocKG SQLite graph | `benchmarks/data/.dockg/graph.sqlite` |
-| DocKG LanceDB index | `benchmarks/data/.dockg/lancedb/` |
+| DocKG vector index | `benchmarks/data/.dockg/vectors.sqlite` |
 | Results JSONL | `benchmarks/results_dockg.jsonl` (if `--out` used) |

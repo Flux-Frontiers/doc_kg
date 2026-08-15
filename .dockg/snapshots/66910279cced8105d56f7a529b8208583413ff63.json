@@ -1,34 +1,34 @@
 {
-  "key": "fc4823b16d6dcb2da7438eb1b2eedc4dea63b064",
-  "branch": "feat/assets-lock",
-  "timestamp": "2026-07-26T23:55:13.393603+00:00",
-  "version": "0.16.0",
+  "key": "66910279cced8105d56f7a529b8208583413ff63",
+  "branch": "chore/docs-and-tooling-currency",
+  "timestamp": "2026-08-15T16:47:39.776211+00:00",
+  "version": "0.21.2",
   "metrics": {
     "db_path": ".dockg/graph.sqlite",
-    "total_nodes": 3869,
-    "total_edges": 29832,
+    "total_nodes": 3871,
+    "total_edges": 28772,
     "node_counts": {
-      "chunk": 816,
-      "document": 45,
-      "entity": 1050,
-      "keyword": 936,
-      "section": 506,
-      "topic": 516
+      "chunk": 830,
+      "document": 42,
+      "entity": 1025,
+      "keyword": 962,
+      "section": 473,
+      "topic": 539
     },
     "edge_counts": {
-      "CONTAINS": 1322,
-      "CO_OCCURS_WITH": 18680,
-      "HAS_KEYWORD": 3249,
-      "HAS_TOPIC": 841,
-      "MENTIONS_ENTITY": 3780,
-      "NEXT": 240,
-      "REFERENCES": 25,
-      "SIMILAR_TO": 1695
+      "CONTAINS": 1303,
+      "CO_OCCURS_WITH": 17642,
+      "HAS_KEYWORD": 3307,
+      "HAS_TOPIC": 852,
+      "MENTIONS_ENTITY": 3664,
+      "NEXT": 269,
+      "REFERENCES": 21,
+      "SIMILAR_TO": 1714
     },
-    "meaningful_nodes": 3824,
-    "coverage_score": 0.9820261437908497,
+    "meaningful_nodes": 3829,
+    "coverage_score": 0.9827309236947791,
     "issues_count": 0,
-    "complexity_median": 24.0
+    "complexity_median": 23.0
   },
   "hotspots": [
     {
@@ -36,21 +36,13 @@
       "file_path": "docs/ingestion.md",
       "label": "Pipeline Overview",
       "references": 0,
-      "semantic_links": 31,
-      "total_links": 31
+      "semantic_links": 32,
+      "total_links": 32
     },
     {
       "id": "chunk:SQLITE_VEC_MIGRATION_PLAN.md:0000",
       "file_path": "SQLITE_VEC_MIGRATION_PLAN.md",
       "label": "sqlite-vec Migration Plan \u2014 LanceDB \u2192 SQLite across the KG fleet",
-      "references": 0,
-      "semantic_links": 27,
-      "total_links": 27
-    },
-    {
-      "id": "chunk:docs/CLI.md:0004",
-      "file_path": "docs/CLI.md",
-      "label": "`dockg build` \u2014 Full pipeline",
       "references": 0,
       "semantic_links": 27,
       "total_links": 27
@@ -67,14 +59,6 @@
       "id": "chunk:analysis/doc_kg_analysis_20260420.md:0032",
       "file_path": "analysis/doc_kg_analysis_20260420.md",
       "label": "Graph Traversal Node Edge",
-      "references": 0,
-      "semantic_links": 24,
-      "total_links": 25
-    },
-    {
-      "id": "chunk:docs/CLI.md:0015",
-      "file_path": "docs/CLI.md",
-      "label": "`dockg mcp` \u2014 MCP server",
       "references": 0,
       "semantic_links": 24,
       "total_links": 25
@@ -110,14 +94,30 @@
       "references": 0,
       "semantic_links": 22,
       "total_links": 22
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260420.md:0000",
+      "file_path": "analysis/doc_kg_analysis_20260420.md",
+      "label": "chunk:0001",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 21
+    },
+    {
+      "id": "chunk:analysis/doc_kg_analysis_20260423.md:0002",
+      "file_path": "analysis/doc_kg_analysis_20260423.md",
+      "label": "Top Documents By Chunk Count",
+      "references": 0,
+      "semantic_links": 21,
+      "total_links": 21
     }
   ],
   "issues": [],
   "vs_previous": null,
   "vs_baseline": {
-    "nodes": 1902,
-    "edges": 18143,
-    "coverage_delta": 0.09714641870493912,
+    "nodes": 1904,
+    "edges": 17083,
+    "coverage_delta": 0.09785119860886848,
     "issues_delta": 0
   }
 }

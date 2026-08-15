@@ -23,7 +23,7 @@ That's the recommended path for most users. The core runtime includes the graph 
 # Core only (CLI + MCP, no visualizer)
 pip install doc-kg
 
-# With Streamlit / Plotly / PyVis visualizer
+# With Streamlit / PyVis visualizer
 pip install 'doc-kg[viz]'
 
 # Everything above
@@ -61,9 +61,13 @@ pip install git+https://github.com/Flux-Frontiers/agent_kg.git
 ```bash
 poetry add doc-kg                            # core
 poetry add 'doc-kg[viz]'                     # core + visualizer
+poetry add 'doc-kg[analysis]'                # core + topic clustering / manifold
 poetry add pycode-kg                         # KG integrations, added separately
-poetry add --group dev 'doc-kg[dev]'         # dev tools
 ```
+
+Dev tooling is not available this way — it is a Poetry group of *this* repo, not
+an extra of the published package. Clone the repo and run `poetry install --with
+dev` (see [Editable install](#editable-install-contributor)).
 
 ---
 
@@ -72,7 +76,7 @@ poetry add --group dev 'doc-kg[dev]'         # dev tools
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install 'doc-kg[dev]'
+pip install doc-kg
 
 # Index your corpus
 dockg build .
@@ -88,12 +92,15 @@ dockg query "your topic"
 ```bash
 git clone https://github.com/Flux-Frontiers/doc_kg.git
 cd doc_kg
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
-pre-commit install
-pytest
+poetry install --extras "analysis viz" --with dev,kg
+poetry run pre-commit install
+poetry run pytest
 ```
+
+Dev setups are Poetry-only across the KG fleet — there is no `pip install -e
+'.[dev]'` path, because the toolchain is a Poetry group rather than a published
+extra. `--with kg` adds the `pycodekg` CLI that `.mcp.json` and the release
+workflow invoke; drop it if you do not need them.
 
 ---
 

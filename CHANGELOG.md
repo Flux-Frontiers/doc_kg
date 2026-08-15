@@ -7,13 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Documentation and repo-tooling currency pass. No source changes — nothing in
+the wheel moves.
+
 ### Added
 
 ### Changed
 
+- **Docs now describe sqlite-vec as the vector backend.** The migration landed
+  in 0.20.0, but seven documents still presented LanceDB as the live store:
+  `docs/ingestion.md`, `docs/pipeline_visual.md`, `docs/query_path_visual.md`,
+  `docs/verse_workflow.md`, both `benchmarks/` docs, and the dockg-action
+  README. Includes the embedded image-generation prompts, which would otherwise
+  keep producing diagrams labelled with the wrong store. The deliberate
+  legacy references — `docs/CLI.md`'s `--lancedb` rows, `docs/design-ann-index.md`,
+  and the `convert-index` section of `docs/INSTALLATION.md` — are unchanged.
+- **`docs/pipeline_visual.md` corrected to the real embedding model.** It
+  claimed `all-mpnet-base-v2` at 768-dim; the default is
+  `BAAI/bge-small-en-v1.5` at 384-dim.
+- **`pyproject.toml` header rewritten and its comments condensed.** The header
+  advertised `[dev]` and `[all]` extras that no longer exist, omitted
+  `analysis`/`lancedb`/`sqlite-vec`, and pointed at a `pytest.ini` this repo
+  does not have.
+- **`.claude/commands/pycodekg-rebuild.md`** updated to `--vectors` /
+  `vectors.sqlite`, matching the current pycodekg CLI.
+
 ### Removed
 
+- **`announcements/`.** All three files were CodeKG v0.5.2 launch copy — about
+  Python AST parsing, not documents — carried over from the fork. `pycode_kg`
+  already holds its own, newer versions.
+- **Local `pycodekg`, `pycodekg-thorough-analysis`, `kgrag` and `kgrag-usage`
+  skills**, plus the `setup-mcp` and `pycodekg` commands. All are superseded by
+  the global copies in `~/.claude/skills`; the local ones still documented
+  `pycodekg build-lancedb` and a `.codekg/` artifact directory, neither of
+  which exists.
+
 ### Fixed
+
+- **`docs/INSTALLATION.md` no longer contradicts itself.** It stated that
+  `doc-kg[dev]` does not exist while instructing readers to install it in three
+  places; the contributor path is now Poetry, matching the rest of the fleet.
+- **`[mcp]` extra removed from the DocKG skill's install instructions** — `mcp`
+  is a core dependency, and the MCP config examples no longer pass `--db` /
+  `--lancedb`, which pointed at a directory that is no longer created.
+- **`docs/deployment.md`**: `poetry install --no-dev` (removed in Poetry 1.2)
+  and a Python 3.11 CI pin below this project's `requires-python` floor.
+- **Absolute paths purged from 90 stored snapshots.** `metrics.db_path` held
+  `/Users/egs/repos/doc_kg/.dockg/graph.sqlite`, leaking a local home directory
+  into a public repo and making the files non-portable. Now relative, matching
+  what the writer already emits.
 
 ## [0.21.2] - 2026-08-14
 

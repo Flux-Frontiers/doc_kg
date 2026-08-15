@@ -4,30 +4,22 @@
 #
 # Build system : Poetry 2.x with PEP 621 [project] table
 #
-# Quick install (pip)
-# -------------------
-#   pip install -e ".[dev]"             core + dev tools (pytest, ruff, ty, etc.)
-#   pip install -e ".[viz]"             core + Streamlit/Plotly/PyVis visualizer
-#   pip install -e ".[all]"             everything above
-#   pip install -e "."                  core runtime only
+# Install — extras are package features, groups are repo tooling (Poetry-only)
+# ----------------------------------------------------------------------------
+#   pip install -e "."                   core runtime only
+#   pip install -e ".[analysis,viz]"     + clustering/manifold, Streamlit/PyVis
+#   pip install -e ".[lancedb]"          + legacy reader, for convert-index only
 #
-# Quick install (poetry)
-# ----------------------
-#   poetry install --all-extras         everything
-#   poetry install --extras "dev"       core + dev tools only
-#   poetry install --extras "viz"       core + Streamlit/Plotly visualizer only
-#   poetry install                      core runtime only
-#   poetry install --with kg            adds the pycodekg CLI (maintainer tooling)
+#   poetry install --with dev            + pytest, ruff, ty, pre-commit, pdoc
+#   poetry install --with kg             + the pycodekg CLI
+#   poetry install --extras "analysis viz" --with dev,kg    full maintainer env
 #
-# First-time setup
-# ----------------
-#   python -m venv .venv
-#   source .venv/bin/activate       # Windows: .venv\Scripts\activate
-#   pip install -e ".[dev]"
+# No [dev] and no [all] extra -- see the notes below. [sqlite-vec] is a no-op
+# alias kept for sister packages that still pin it.
 #
 # Run tests
 # ---------
-#   pytest                          uses pytest.ini (testpaths = tests/)
+#   pytest                          config is [tool.pytest.ini_options] below
 #   pytest -m "not slow"            skip slow tests
 #   pytest --cov=doc_kg             with coverage
 #
@@ -67,29 +59,17 @@ classifiers = [
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
-    # Upper-bounded: mcp 2.0 removed the bundled `mcp.server.fastmcp` module
-    # (FastMCP was split out into the standalone `fastmcp` package) and rebuilt
-    # mcp.server around new submodules. src/doc_kg/mcp_server.py imports FastMCP
-    # from mcp at module scope, so an unbounded floor lets a clean install pull
-    # 2.x and break `dockg-mcp` at import time. Lift this only alongside a port
-    # to the standalone fastmcp package.
+    # Capped: mcp 2.0 split FastMCP into its own package, and mcp_server.py
+    # imports it from `mcp` at module scope. Lift only alongside that port.
     "mcp>=1.0.0,<2",
     "pyyaml>=6.0.0",
-    # Floor deliberately raised above the >=13.0.0 that kgmodule-utils[semantic]
-    # carries, to match the rest of the KG fleet (pycode-kg, diary-kg, memory-kg
-    # and gutenberg-kg are all on >=14.3.3).
+    # Above the >=13.0.0 kgmodule-utils[semantic] carries, to match the fleet.
     "rich>=14.3.3,<15",
-    # Imported directly in index.py to silence progress bars. The import is fully
-    # guarded and the behaviour is cosmetic, but it *is* a direct import, so it is
-    # declared rather than inherited by accident from sentence-transformers.
+    # Direct (guarded) import in index.py, so declared rather than inherited.
     "tqdm>=4.60",
-    # The semantic stack — numpy, sentence-transformers, sqlite-vec (the vector
-    # backend, core as of 0.20.0), torch and transformers — arrives through this
-    # extra instead of being re-pinned here, so the fleet bumps it in one place.
-    # See [project.optional-dependencies].semantic in KG_utils/pyproject.toml.
-    # Consequence: those five packages are a contract of the [semantic] extra. If
-    # its contents ever change, this project's direct imports of numpy,
-    # sentence_transformers, transformers and torch change with it.
+    # Carries the semantic stack: numpy, sentence-transformers, sqlite-vec,
+    # torch, transformers. We import four of those directly, so the [semantic]
+    # extra's contents are a contract -- see KG_utils/pyproject.toml.
     "kgmodule-utils[semantic]>=0.13.1",
     "pymupdf4llm>=0.0.17",
 ]
@@ -99,80 +79,54 @@ viz = [
     "pyvis>=0.3.2",
     "streamlit>=1.35.0",
 ]
-# Unsupervised topic clustering, cluster-stratified sampling and manifold
-# analysis.  Every call site guards the import and raises with install
-# instructions, so the base install stays lean.  Declared explicitly because it
-# was previously satisfied only as a transitive dependency of
-# sentence-transformers — an accident that would break these five modules if
-# that package ever dropped it.
+# Topic clustering, stratified sampling and manifold analysis. Every call site
+# guards the import, so the base install stays lean. Both are declared because
+# both are imported directly -- they were only reaching us as transitives of
+# sentence-transformers (scikit-learn) and scikit-learn (joblib).
 analysis = [
-    # joblib is here for the same reason: discover_topics.py and dockg.py import
-    # it directly to persist and reload the K-means model, and it was reaching
-    # them only as a transitive of scikit-learn.
     "joblib>=1.4.0",
     "scikit-learn>=1.3.0",
 ]
-# Reading a legacy LanceDB store. DocKG builds and queries sqlite-vec only as
-# of 0.20.0, and `lancedb` is no longer a core dependency — it is not installed
-# unless you ask for it here.
-#
-# You need this extra for exactly one thing: `dockg convert-index`, which reads
-# vectors straight out of a pre-0.20.0 LanceDB store and writes them to
-# vectors.sqlite (no re-embedding). Install it, convert, and you never need it
-# again. `--vector-backend lancedb` also remains available behind it.
+# Reads a legacy pre-0.20.0 LanceDB store. Needed for exactly one thing --
+# `dockg convert-index`, which copies vectors into vectors.sqlite without
+# re-embedding. Install it, convert, and you are done with it.
 #
 #   pip install 'doc-kg[lancedb]'
 #   dockg convert-index --repo . --delete-lancedb
 lancedb = [
     "lancedb>=0.29.0",
 ]
-# Retained as a no-op alias: sqlite-vec is core as of 0.20.0, so
-# `pip install doc-kg[sqlite-vec]` still resolves rather than erroring on an
-# unknown extra. Sister packages pin it that way (diary-kg >=0.94.0 requires
-# `doc-kg[sqlite-vec]`), and removing it would break their installs.
+# No-op alias: sqlite-vec is core as of 0.20.0, but sister packages still pin
+# `doc-kg[sqlite-vec]` (diary-kg >=0.94.0), so removing it breaks their installs.
 sqlite-vec = []
 
-# Cross-KG sibling packages (doc-kg, pycode-kg, agent-kg, kg-rag) are NOT
-# declared here. They are never imported by this package, and listing them
-# forces poetry's universal resolution to reconcile the transformers pin of
-# every *published* sibling against this project's own -- historically a
-# deadlock, since doc-kg and pycode-kg each depended on the other. Install them
-# by hand:
-#   pip install doc-kg pycode-kg          # both on PyPI
+# Two deliberate absences here:
 #
-# pycode-kg is the exception, and it is NOT an extra: it is maintainer tooling
-# in [tool.poetry.group.kg] below, which keeps it out of the published metadata.
-# It is safe to lock as of pycode-kg 0.21.4, which no longer depends on doc-kg.
-# There is deliberately no `all` aggregate extra. It re-listed every other
-# extra plus the dev toolchain, so `pip install doc-kg[all]` installed pytest,
-# ruff and ty — and an aggregate duplicates each package in the marker space,
-# which is what sends `poetry lock` into resolution restarts. Use
-# `poetry install --all-extras`, or name the extras explicitly for pip.
+# 1. Cross-KG siblings (pycode-kg, agent-kg, kg-rag). Never imported, and
+#    declaring them makes the resolver reconcile every sibling's transformers
+#    pin against ours -- historically a deadlock, since doc-kg and pycode-kg
+#    each depended on the other. Install by hand: `pip install pycode-kg`.
+# 2. An `all` aggregate. It pulled in the dev toolchain, and duplicating every
+#    package across the marker space is what sends `poetry lock` into
+#    resolution restarts. Use `--all-extras`, or name extras explicitly.
 #
-# NB: [lancedb] stays out of any "install everything" path regardless. It
-# exists only to read legacy stores, and folding it in restores the exact
-# weight 0.20.0 removed.
+# NB: [lancedb] stays out of any "install everything" path regardless -- it
+# only reads legacy stores, and folding it in restores the weight 0.20.0 shed.
 
 # ---------------------------------------------------------------------------
 # Maintainer tooling (Poetry group, not a PEP 621 extra)
 # ---------------------------------------------------------------------------
-# pycode-kg is a tool this repo *runs*, not a library it imports -- the release
-# workflow rebuilds the PyCodeKG index (.claude/commands/dockg-release.md) and
-# .mcp.json serves it. Nothing under src/ or tests/ imports it.
+# pycode-kg is a tool this repo *runs*, not a library it imports: the release
+# workflow rebuilds the PyCodeKG index and .mcp.json serves it. Nothing under
+# src/ or tests/ imports it.
 #
-# It lives in a Poetry group rather than [project.optional-dependencies] on
-# purpose. Groups are maintainer-facing: they are locked and installable, but
-# they are NOT written into the wheel's metadata, so `pip install doc-kg[dev]`
-# does not acquire pycode-kg -- nor the pandas/networkx it carries, which 0.21.0
-# deliberately removed from this project's own dependency set.
+# A group, not an extra, because groups stay out of the wheel's metadata -- so
+# consumers never acquire pycode-kg or the pandas/networkx it carries, which
+# 0.21.0 deliberately dropped. Safe to lock as of pycode-kg 0.21.4, which no
+# longer depends on doc-kg; should it reacquire one, the breakage surfaces here
+# in `poetry lock` rather than downstream.
 #
-#   poetry install --with kg      # get the pycodekg CLI into .venv/bin
-#   poetry install                # default: group is optional, skipped
-#
-# See the note above [project.optional-dependencies].all: declaring a sibling as
-# a real dependency is what deadlocks resolution, and pycode-kg dropped its
-# doc-kg dependency as of 0.21.4. Should it ever reacquire one, this group is
-# where the breakage surfaces -- confined to `poetry lock`, not to consumers.
+#   poetry install --with kg      # pycodekg CLI into .venv/bin
 [tool.poetry.group.kg]
 optional = true
 
@@ -183,14 +137,11 @@ pycode-kg = ">=0.23.1"
 # Dev tooling (Poetry group, not a PEP 621 extra)
 # ---------------------------------------------------------------------------
 # An extra is a feature of the *package*; dev tooling is a property of the
-# *repo*. As a published extra, `doc-kg[dev]` offered every consumer the
-# maintainer toolchain and its repo-reasoned pins (ruff<0.16). Optional, so a
-# bare `poetry install` stays core runtime only.
+# *repo*. As `doc-kg[dev]` it handed every consumer our repo-reasoned pins
+# (ruff<0.16). No pip path on purpose -- dev setups are Poetry-only across the
+# fleet (kgrag_priv/docs/FLEET_STANDARDS.md).
 #
 #   poetry install --with dev
-#
-# There is no pip path for this on purpose — dev setups are Poetry-only across
-# the fleet. See kgrag_priv/docs/FLEET_STANDARDS.md.
 [tool.poetry.group.dev]
 optional = true
 
@@ -226,9 +177,9 @@ dockg-viz         = "doc_kg.cli.cmd_viz:viz"
 [tool.ruff]
 line-length    = 100
 target-version = "py312"
-# ruff >=0.14 formats Python code blocks embedded in Markdown. Prose docs use
-# illustrative, deliberately-formatted snippets, and .kgcache holds a vendored
-# HuggingFace model card we do not own, so keep both out of ruff's reach.
+# ruff >=0.14 formats Python inside Markdown. Our prose snippets are
+# deliberately formatted, and .kgcache holds a vendored model card we do not
+# own -- keep both out of reach.
 exclude = [".claude", ".kgcache", "*.md"]
 
 [tool.ruff.lint]
@@ -242,13 +193,10 @@ root = ["src"]
 [tool.ty.rules]
 # Be lenient about third-party stubs (mirrors mypy's ignore_missing_imports).
 unresolved-import = "ignore"
-# Whether a `ty: ignore` is *needed* now depends on which optional extras are
-# installed. `lancedb` became an opt-in extra in 0.20.0, so in a default env ty
-# cannot resolve LanceDB types at all: the diagnostics they suppress never fire,
-# and every such suppression reports as unused. Installing `[lancedb]` makes the
-# very same comments load-bearing again. Deleting them to satisfy a default
-# install would just break `ty` for anyone working on the converter, so the
-# unused-suppression check is off rather than the suppressions removed.
+# Whether a `ty: ignore` is needed depends on which extras are installed: with
+# [lancedb] absent (the default since 0.20.0) ty cannot resolve LanceDB types,
+# so those suppressions look unused -- yet deleting them breaks ty for anyone
+# working on the converter. Silence the check, keep the suppressions.
 unused-ignore-comment = "ignore"
 
 [tool.pytest.ini_options]

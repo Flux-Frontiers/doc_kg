@@ -1,6 +1,6 @@
 ---
 name: dockg
-description: Expert knowledge for installing, configuring, and using DocKG — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or LanceDB knowledge graph from documents, running the multipass analysis pipeline (dockg pipeline run/embed/manifold), configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg semantic-analyze, dockg pipeline, dockg viz, dockg mcp, dockg snapshot), using the graph_stats / query_docs / pack_docs / get_node MCP tools, or troubleshooting DocKG errors.
+description: Expert knowledge for installing, configuring, and using DocKG — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or sqlite-vec knowledge graph from documents, running the multipass analysis pipeline (dockg pipeline run/embed/manifold), configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg semantic-analyze, dockg pipeline, dockg viz, dockg mcp, dockg snapshot), using the graph_stats / query_docs / pack_docs / get_node MCP tools, or troubleshooting DocKG errors.
 ---
 
 # DocKG Skill
@@ -9,23 +9,26 @@ description: Expert knowledge for installing, configuring, and using DocKG — a
 >
 > Text search finds strings. DocKG understands documents. It knows which sections contain which chunks, how topics and entities cross-reference across files, and surfaces the most semantically relevant excerpts in a single query. One `pack_docs` call replaces five rounds of search-and-read and gives the agent real structural insight into the corpus — not just keyword matches.
 
-DocKG indexes `.md` and `.txt` document corpora into a hybrid knowledge graph (SQLite + LanceDB) and exposes it as MCP tools for AI agents. It also provides a **multipass analysis pipeline** (diary_kg-style) for deep NLP transformation with diversity sampling, hybrid topic classification, corpus embedding, and manifold analysis.
+DocKG indexes `.md` and `.txt` document corpora into a hybrid knowledge graph (SQLite + sqlite-vec) and exposes it as MCP tools for AI agents. It also provides a **multipass analysis pipeline** (diary_kg-style) for deep NLP transformation with diversity sampling, hybrid topic classification, corpus embedding, and manifold analysis.
 
 ## Installation (Poetry)
 
 ```bash
-# With MCP server support
-poetry add "doc-kg[mcp] @ git+https://github.com/Flux-Frontiers/doc_kg.git"
+# Core runtime — includes the CLI and the MCP server
+poetry add doc-kg
 ```
 
 Adds to `pyproject.toml`:
 ```toml
-doc-kg = { git = "https://github.com/Flux-Frontiers/doc_kg.git", extras = ["mcp"] }
+doc-kg = "^0.21.2"
 ```
+
+There is no `[mcp]` extra: the `mcp` package is a core dependency, so
+`dockg mcp` works off a plain install.
 
 ## Build the Knowledge Graph
 
-DocKG uses a **single build command** that runs corpus parsing, SQLite persistence, and LanceDB vector indexing in one step:
+DocKG uses a **single build command** that runs corpus parsing, SQLite persistence, and sqlite-vec vector indexing in one step:
 
 ```bash
 # Full rebuild from scratch (default — wipes existing data)
@@ -51,7 +54,7 @@ dockg build-graph docs
 # Step 1 incremental — keep existing SQLite, upsert changes
 dockg build-graph docs --update
 
-# Step 2 — build LanceDB vector index from existing SQLite (full rebuild by default)
+# Step 2 — build the vector index from existing SQLite (full rebuild by default)
 dockg build-index
 
 # Step 2 incremental — keep existing vectors, upsert changes
@@ -86,13 +89,13 @@ The knowledge graph is a snapshot of the corpus at build time. It does **not** u
 | Minor edits within existing documents | `dockg build --update` is usually sufficient |
 | New file added | `dockg build --update` is sufficient |
 
-> **Why full rebuild matters:** Deleted or renamed documents remain as phantom entries in `--update` mode. The default full rebuild clears orphan nodes from both SQLite and LanceDB automatically.
+> **Why full rebuild matters:** Deleted or renamed documents remain as phantom entries in `--update` mode. The default full rebuild clears orphan nodes from both the graph and the vector index automatically.
 
 ## Additional CLI Commands
 
 | Command | Purpose |
 |---|---|
-| `dockg build-index` | Rebuild LanceDB index from existing SQLite (wipes by default; use `--update` to keep) |
+| `dockg build-index` | Rebuild the vector index from existing SQLite (wipes by default; use `--update` to keep) |
 | `dockg build-index --no-similar` | Skip SIMILAR_TO edge discovery |
 | `dockg build-index --encode-batch N` | Embedding batch size (default: 1024; lower to reduce RAM on large corpora) |
 | `dockg query <QUERY>` | Hybrid semantic + graph query, prints ranked result summary |
@@ -123,7 +126,7 @@ dockg build-graph /path/to/corpus \
     --chunk-strategy verse \
     --kmeans-model /path/to/corpus/discovered_topics.kmeans.joblib
 
-# Phase 4 — build LanceDB index (wipes by default)
+# Phase 4 — build the vector index (wipes by default)
 dockg build-index --repo /path/to/corpus
 
 # Phase 5 — query
@@ -228,9 +231,7 @@ Both Claude Code and Kilo Code read per-repo config from `.mcp.json` in the proj
       "command": "/absolute/path/to/repo/.venv/bin/dockg",
       "args": [
         "mcp",
-        "--repo",   "/absolute/path/to/repo",
-        "--db",     "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--lancedb","/absolute/path/to/repo/.dockg/lancedb"
+        "--repo",   "/absolute/path/to/repo"
       ]
     }
   }
@@ -253,9 +254,7 @@ GitHub Copilot requires `"servers"` key and `"type": "stdio"`:
       "command": "/absolute/path/to/repo/.venv/bin/dockg",
       "args": [
         "mcp",
-        "--repo",    "/absolute/path/to/repo",
-        "--db",      "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--lancedb", "/absolute/path/to/repo/.dockg/lancedb"
+        "--repo",    "/absolute/path/to/repo"
       ]
     }
   }
@@ -283,9 +282,7 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
       "command": "/path/to/venv/bin/dockg",
       "args": [
         "mcp",
-        "--repo",    "/abs/path",
-        "--db",      "/abs/path/.dockg/graph.sqlite",
-        "--lancedb", "/abs/path/.dockg/lancedb"
+        "--repo",    "/abs/path"
       ]
     }
   }
@@ -381,7 +378,7 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 - `k=8, hop=1, rels="CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"`
 - `max_chars=2000` (pack_docs), `max_nodes=15` (pack_docs), `max_nodes=25` (query_docs)
 - Embedding model (all pipelines): `BAAI/bge-small-en-v1.5` (384-d)
-- Storage: `.dockg/graph.sqlite` (SQLite) + `.dockg/lancedb/` (LanceDB)
+- Storage: `.dockg/graph.sqlite` (SQLite) + `.dockg/vectors.sqlite` (sqlite-vec)
 - Pipeline output: `.dockg/pipeline/` (`.psv` runs, `embeddings.json` cache)
 - Feature cache: `.dockg/cache/` (pickle, per-file with SHA-256 invalidation)
 - Transport: `stdio` (Claude Code/Desktop), `sse` (HTTP clients)
@@ -392,7 +389,7 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 .dockg/
 ```
 
-The `.dockg/` directory holds the SQLite graph, LanceDB vector index, snapshots, pipeline outputs, feature caches, and embedding caches. All are local reproducible artifacts. Add this to `.gitignore` when installing DocKG in a new repo.
+The `.dockg/` directory holds the SQLite graph, sqlite-vec vector index, snapshots, pipeline outputs, feature caches, and embedding caches. All are local reproducible artifacts. Add this to `.gitignore` when installing DocKG in a new repo.
 
 ## Offline Setup
 
@@ -412,10 +409,10 @@ export DOCKG_MODEL_DIR=/path/to/shared/models
 | Error | Fix |
 |---|---|
 | `WARNING: SQLite database not found` | Run `dockg build <corpus_root>` first |
-| `mcp package not found` | `poetry install` (ensure `[mcp]` extra is included) |
+| `mcp package not found` | `poetry install` — `mcp` is a core dependency, no extra needed |
 | No tools visible in MCP client | Use absolute paths in config; restart the client |
 | Empty query results | Run `dockg build <corpus_root>` (full rebuild, no flags needed) |
-| Wrong corpus queried | Verify `--repo`, `--db`, and `--lancedb` all point to the same repo |
+| Wrong corpus queried | Verify `--repo` points to the intended repo; artifacts default to its `.dockg/` |
 | Stale nodes after deleting files | Run `dockg build` without `--update` — default is a full wipe-and-rebuild |
 
 ## Full Reference

@@ -1,6 +1,6 @@
 # PyCodeKG Rebuild
 
-Wipe and rebuild the PyCodeKG SQLite knowledge graph and LanceDB semantic index for a repository. Execute the following steps in sequence.
+Wipe and rebuild the PyCodeKG SQLite knowledge graph and sqlite-vec semantic index for a repository. Execute the following steps in sequence.
 
 ## Command Argument Handling
 
@@ -22,11 +22,11 @@ Wipe and rebuild the PyCodeKG SQLite knowledge graph and LanceDB semantic index 
    ```
 3. If no Python files are found, stop and report the issue.
 
-All artifact paths default to `$REPO_ROOT/.pycodekg/` — do not pass `--db` or `--lancedb` flags.
+All artifact paths default to `$REPO_ROOT/.pycodekg/` — do not pass `--db` or `--vectors` flags.
 
 ---
 
-## Step 1: Rebuild the Knowledge Graph (SQLite + LanceDB)
+## Step 1: Rebuild the Knowledge Graph (SQLite + sqlite-vec)
 
 `pycodekg build` always wipes and rebuilds from scratch — no flag needed:
 
@@ -70,7 +70,7 @@ Present a summary:
 ```
 ✓ Repository:    <REPO_ROOT>
 ✓ SQLite graph:  <REPO_ROOT>/.pycodekg/graph.sqlite  (<N> nodes, <M> edges)
-✓ LanceDB index: <REPO_ROOT>/.pycodekg/lancedb  (<V> vectors)
+✓ Vector index:  <REPO_ROOT>/.pycodekg/vectors.sqlite  (<V> vectors)
 
 Node breakdown:  module=X  class=X  function=X  method=X  symbol=X
 Edge breakdown:  CONTAINS=X  CALLS=X  IMPORTS=X  INHERITS=X  ATTR_ACCESS=X
