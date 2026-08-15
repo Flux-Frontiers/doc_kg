@@ -32,7 +32,6 @@ Usage
 
 Author: Eric G. Suchanek, PhD
 License: Elastic-2.0
-Last Revision: 2026-06-24
 """
 
 from __future__ import annotations

@@ -35,7 +35,7 @@ jobs:
           key: lint-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dev dependencies
-        run: poetry install --no-interaction --extras dev
+        run: poetry install --no-interaction --with dev
 
       - name: Check formatting
         run: poetry run ruff format --check .
@@ -67,7 +67,7 @@ jobs:
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction --extras dev
+        run: poetry install --no-interaction --with dev
 
       - name: Run ty
         run: poetry run ty check src/
@@ -98,7 +98,7 @@ jobs:
 
       - name: Install dependencies
         # sqlite-vec extra so the SqliteVecBackend tests run (not skipped).
-        run: poetry install --no-interaction --extras dev --extras sqlite-vec
+        run: poetry install --no-interaction --with dev --extras sqlite-vec
 
       - name: Run tests
         run: poetry run pytest
@@ -209,7 +209,7 @@ jobs:
           echo "end-to-end build + query OK"
 
       - name: Install the extras
-        run: /tmp/smoke/bin/pip install --quiet "$(echo dist/*.whl)[all]"
+        run: /tmp/smoke/bin/pip install --quiet "$(echo dist/*.whl)[analysis,sqlite-vec,viz]"
 
       - name: Import every packaged submodule
         run: |

@@ -40,7 +40,6 @@
 #   8. Prints a final summary
 #
 # Author: Eric G. Suchanek, PhD
-# Last Revision: 2026-04-24
 # License: Elastic 2.0
 # =============================================================================
 

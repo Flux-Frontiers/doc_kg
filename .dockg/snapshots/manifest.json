@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-08-14T12:29:06.276175+00:00",
+  "last_update": "2026-08-15T14:40:32.303476+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -4085,11 +4085,11 @@
       }
     },
     {
-      "key": "9baabaa6deecf772bbc7337babb45cd30da62cf3",
+      "key": "53980991c55a87a77c68fa2d8f84e6ce2c0c2606",
       "branch": "main",
-      "timestamp": "2026-08-14T12:29:06.274455+00:00",
-      "version": "0.21.1",
-      "file": "9baabaa6deecf772bbc7337babb45cd30da62cf3.json",
+      "timestamp": "2026-08-15T05:20:26.804737+00:00",
+      "version": "0.21.2",
+      "file": "53980991c55a87a77c68fa2d8f84e6ce2c0c2606.json",
       "metrics": {
         "db_path": "/Users/egs/repos/doc_kg/.dockg/graph.sqlite",
         "total_nodes": 4071,
@@ -4118,11 +4118,59 @@
         "complexity_median": 24.0
       },
       "deltas": {
-        "vs_previous": null,
+        "vs_previous": {
+          "nodes": -30,
+          "edges": -158,
+          "coverage_delta": -0.0005868674613486169,
+          "issues_delta": 0
+        },
         "vs_baseline": {
           "nodes": 2104,
           "edges": 19397,
           "coverage_delta": 0.09675058490260835,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "f0d7768eec7484285b39acfe9d2eb2f6470e14dd",
+      "branch": "main",
+      "timestamp": "2026-08-15T14:40:32.302003+00:00",
+      "version": "0.21.2",
+      "file": "f0d7768eec7484285b39acfe9d2eb2f6470e14dd.json",
+      "metrics": {
+        "db_path": ".dockg/graph.sqlite",
+        "total_nodes": 4075,
+        "total_edges": 31131,
+        "node_counts": {
+          "chunk": 872,
+          "document": 45,
+          "entity": 1078,
+          "keyword": 998,
+          "section": 512,
+          "topic": 570
+        },
+        "edge_counts": {
+          "CONTAINS": 1384,
+          "CO_OCCURS_WITH": 19402,
+          "HAS_KEYWORD": 3473,
+          "HAS_TOPIC": 897,
+          "MENTIONS_ENTITY": 3930,
+          "NEXT": 275,
+          "REFERENCES": 25,
+          "SIMILAR_TO": 1745
+        },
+        "meaningful_nodes": 4030,
+        "coverage_score": 0.981651376146789,
+        "issues_count": 0,
+        "complexity_median": 24.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 2108,
+          "edges": 19442,
+          "coverage_delta": 0.09677165106087837,
           "issues_delta": 0
         }
       }

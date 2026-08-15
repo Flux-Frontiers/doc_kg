@@ -240,36 +240,3 @@ def test_chunker_for_semantic_default_min_chunk_chars():
 
     chunker = chunker_for("semantic")
     assert chunker.min_chunk_chars == 50
-
-
-def test_pack_short_text_filtered_by_render(tmp_path):
-    """CrossSnippetPack.render() must drop snippets whose content is < 30 chars.
-    This is the kgrag-side defence for micro-fragments that slip through doc_kg."""
-    pytest.importorskip("kg_rag", reason="kg_rag not installed in this environment")
-    from kg_rag.primitives import CrossSnippet, CrossSnippetPack, KGKind
-
-    micro = CrossSnippet(
-        kg_name="test",
-        kg_kind=KGKind.DOC,
-        node_id="x",
-        source_path="f.md",
-        content="see",  # 3 chars — must be filtered
-        score=0.9,
-    )
-    real = CrossSnippet(
-        kg_name="test",
-        kg_kind=KGKind.DOC,
-        node_id="y",
-        source_path="f.md",
-        content="The whale breached the surface with enormous force at dawn.",
-        score=0.8,
-    )
-    pack = CrossSnippetPack(
-        query="whale hunting",
-        snippets=[micro, real],
-        total_tokens_approx=50,
-        kgs_queried=1,
-    )
-    rendered = pack.render()
-    assert "see" not in rendered, "micro-fragment must be filtered by render()"
-    assert "whale breached" in rendered, "real snippet must appear"

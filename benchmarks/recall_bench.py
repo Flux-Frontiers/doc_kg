@@ -46,7 +46,6 @@ Sweep synthetic base distances on the gold set only::
 
 Author: Eric G. Suchanek, PhD
 License: Elastic-2.0
-Last Revision: 2026-06-10
 """
 
 from __future__ import annotations
