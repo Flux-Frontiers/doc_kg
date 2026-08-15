@@ -8,7 +8,7 @@ The action:
 
 1. Installs `doc-kg` from PyPI.
 2. Builds a SQLite knowledge graph from the corpus (`dockg-build-graph`).
-3. Builds a LanceDB semantic index using a SentenceTransformer model (`dockg-build-index`).
+3. Builds a sqlite-vec semantic index using a SentenceTransformer model (`dockg-build-index`).
 4. Runs `dockg-analyze` to produce a Markdown report and JSON snapshot.
 5. Caches the `.dockg/` directory keyed on a hash of all `*.md` and `*.txt` files.
 6. Uploads the report and JSON as workflow artifacts.
@@ -89,7 +89,7 @@ jobs:
 
 ## Caching
 
-The action caches the `.dockg/` directory (SQLite graph + LanceDB index) using
+The action caches the `.dockg/` directory (SQLite graph + sqlite-vec index) using
 `actions/cache@v4`. The cache key is:
 
 ```
@@ -241,7 +241,7 @@ The action runs these CLI tools from the `doc-kg` package in order:
 | Step | CLI | Purpose |
 |------|-----|---------|
 | 1 | `dockg-build-graph` | Walk corpus, chunk documents, write nodes and edges to SQLite |
-| 2 | `dockg-build-index` | Embed chunks with SentenceTransformer, write vectors to LanceDB |
+| 2 | `dockg-build-index` | Embed chunks with SentenceTransformer, write vectors to `vectors.sqlite` |
 | 3 | `dockg-analyze` | Run multi-phase corpus analysis, write Markdown + JSON |
 
 Steps 1 and 2 are skipped on cache hit. Step 3 always runs.

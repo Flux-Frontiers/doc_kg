@@ -2,7 +2,7 @@
 
 ## One-sentence summary
 
-**A DocKG query fans out into two parallel seed channels — dense vector search (LanceDB) and lexical BM25 search (SQLite FTS5) — fuses them with reciprocal rank fusion, expands the fused seeds through the structural graph, then ranks, guards, and trims the result set into a scored context pack.**
+**A DocKG query fans out into two parallel seed channels — dense vector search (sqlite-vec) and lexical BM25 search (SQLite FTS5) — fuses them with reciprocal rank fusion, expands the fused seeds through the structural graph, then ranks, guards, and trims the result set into a scored context pack.**
 
 > Pipeline version: v0.15.7+ (hybrid seeding, scope pushdown, dual-distance lexical seeds)
 
@@ -10,7 +10,7 @@
 
 ## Image Generation Prompt (text-to-image / illustration brief)
 
-> A clean, high-contrast technical flow diagram on a dark navy background, oriented top to bottom. At the top center, a rounded input box containing a quoted natural-language query string ("what did Pepys say about the great fire?") with a small magnifying-glass icon. The query splits into two parallel vertical channel columns connected by downward arrows. The left column, labeled "Dense Channel," shows three stacked boxes: "Embed query — bge-small-en-v1.5 (384-d)," "LanceDB ANN search — cosine, oversample k×3," and a small gate icon labeled "scope prefilter: starts_with(file_path)." The right column, labeled "Lexical Channel," shows three stacked boxes: "Tokenize — _fts_terms (bare alphanumerics)," "SQLite FTS5 BM25 — exact phrase first, OR-of-terms fallback," and a matching gate icon labeled "scope pushdown: parameterised SQL." Both gate icons are rendered as identical funnel-shaped valves to emphasize symmetric filtering. Between the two columns, a shared horizontal strip labeled "content-type filter" with crossed-out file icons marked "front_matter" and "reference.md." The two channels converge into a central mixing funnel labeled "Reciprocal Rank Fusion — score += 1/(60 + rank)," emitting a row of eight seed circles. Two of the seed circles are visually distinct (teal ring) and carry a split badge showing two numbers: "self_dist ≈ best dense + ε" on the upper half and "neighbour dist = 0.45" on the lower half, with a tiny caption "lexical-only seeds carry two distances." The seed row flows downward into a force-directed graph web labeled "Graph Expansion — hop 1, batched SQL," with nodes connected by thin labeled edges (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC, MENTIONS_ENTITY) and provenance arrows showing each expanded node inheriting the distance of the seed that reached it. Below the web, a vertical ranking ladder labeled "Rank — base_dist → hop → boosts → kind," with chunk nodes sorted top to bottom and small "+boost" chips on short chunks. Beneath the ladder, two final gate icons in sequence: "scope guard — _node_in_scope()" and "content filter — drop front_matter/reference," followed by a cutoff bar labeled "max_nodes = 15." At the bottom, an output panel split in two: left half a JSON card labeled "QueryResult — nodes + edges + relevance{score, dist, hop}," right half a document stack labeled "TextPack — ranked excerpts for LLM context." In the lower-right corner, a small inset benchmark panel with two bars: "exact-phrase recall@15: 0.37 → 0.67 (hybrid)" in green and "labeled gold set: −1 pp" in muted gray. Color coding: dense channel and embeddings in amber, lexical channel and FTS5 in teal, fusion and ranking in violet, guards and filters in red-orange, output layer in green. Style: flat design, sans-serif labels, IBM Plex Mono for code names, minimal drop shadows, thin white connector arrows.
+> A clean, high-contrast technical flow diagram on a dark navy background, oriented top to bottom. At the top center, a rounded input box containing a quoted natural-language query string ("what did Pepys say about the great fire?") with a small magnifying-glass icon. The query splits into two parallel vertical channel columns connected by downward arrows. The left column, labeled "Dense Channel," shows three stacked boxes: "Embed query — bge-small-en-v1.5 (384-d)," "sqlite-vec ANN search — cosine, oversample k×3," and a small gate icon labeled "scope prefilter: starts_with(file_path)." The right column, labeled "Lexical Channel," shows three stacked boxes: "Tokenize — _fts_terms (bare alphanumerics)," "SQLite FTS5 BM25 — exact phrase first, OR-of-terms fallback," and a matching gate icon labeled "scope pushdown: parameterised SQL." Both gate icons are rendered as identical funnel-shaped valves to emphasize symmetric filtering. Between the two columns, a shared horizontal strip labeled "content-type filter" with crossed-out file icons marked "front_matter" and "reference.md." The two channels converge into a central mixing funnel labeled "Reciprocal Rank Fusion — score += 1/(60 + rank)," emitting a row of eight seed circles. Two of the seed circles are visually distinct (teal ring) and carry a split badge showing two numbers: "self_dist ≈ best dense + ε" on the upper half and "neighbour dist = 0.45" on the lower half, with a tiny caption "lexical-only seeds carry two distances." The seed row flows downward into a force-directed graph web labeled "Graph Expansion — hop 1, batched SQL," with nodes connected by thin labeled edges (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC, MENTIONS_ENTITY) and provenance arrows showing each expanded node inheriting the distance of the seed that reached it. Below the web, a vertical ranking ladder labeled "Rank — base_dist → hop → boosts → kind," with chunk nodes sorted top to bottom and small "+boost" chips on short chunks. Beneath the ladder, two final gate icons in sequence: "scope guard — _node_in_scope()" and "content filter — drop front_matter/reference," followed by a cutoff bar labeled "max_nodes = 15." At the bottom, an output panel split in two: left half a JSON card labeled "QueryResult — nodes + edges + relevance{score, dist, hop}," right half a document stack labeled "TextPack — ranked excerpts for LLM context." In the lower-right corner, a small inset benchmark panel with two bars: "exact-phrase recall@15: 0.37 → 0.67 (hybrid)" in green and "labeled gold set: −1 pp" in muted gray. Color coding: dense channel and embeddings in amber, lexical channel and FTS5 in teal, fusion and ranking in violet, guards and filters in red-orange, output layer in green. Style: flat design, sans-serif labels, IBM Plex Mono for code names, minimal drop shadows, thin white connector arrows.
 
 ---
 
@@ -37,10 +37,11 @@ via the same `_fused_seeds()` path.
 #### Dense channel (`SemanticIndex.search`)
 
 1. Embed the query with `BAAI/bge-small-en-v1.5` (384-d, L2-normalised)
-2. LanceDB ANN search, cosine metric, oversampled to `k × 3` to survive downstream filtering
+2. sqlite-vec ANN search, cosine metric, oversampled to `k × 3` to survive downstream filtering
 3. **Scope pushdown:** optional `starts_with(file_path, …)` / `kind IN (…)` prefilter
-   (`_lance_where()`) applied *inside* the vector search, so the seed budget is spent
-   entirely on in-scope nodes — wildcard-free, literal-prefix semantics
+   (`_lance_where()` — a historical name, now shared by both backends) applied *inside*
+   the vector search, so the seed budget is spent entirely on in-scope nodes —
+   wildcard-free, literal-prefix semantics
 
 #### Lexical channel (`GraphStore.search_lexical`)
 
@@ -141,7 +142,7 @@ itself (flat 0.45: hybrid *lost* to dense on phrases, 0.32 vs 0.37).
                        └──────────────┬──────────────┘
               ┌───────────────────────┴───────────────────────┐
               ▼                                               ▼
-   DENSE CHANNEL (LanceDB)                        LEXICAL CHANNEL (FTS5)
+   DENSE CHANNEL (sqlite-vec)                     LEXICAL CHANNEL (FTS5)
    embed: bge-small (384-d)                       tokenize: _fts_terms
    ANN cosine, oversample k×3                     BM25: phrase → OR fallback
    scope: starts_with prefilter                   scope: parameterised SQL
