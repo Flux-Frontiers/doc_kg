@@ -1,7 +1,7 @@
 {
-  "key": "592b2ed6693e2b8f900dcfe85671f4d95af2bc51",
-  "branch": "chore/floors-0.13.2",
-  "timestamp": "2026-08-15T21:44:33.882582+00:00",
+  "key": "9c9fc10f9ddba80530143b0db0de2df8f8610087",
+  "branch": "main",
+  "timestamp": "2026-08-18T19:43:04.600302+00:00",
   "version": "0.21.2",
   "metrics": {
     "db_path": ".dockg/graph.sqlite",

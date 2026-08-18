@@ -39,9 +39,23 @@ _PRE_COMMIT_HOOK = """\
 #     Building afterwards keeps KG artifacts entirely outside that window.
 #   * A full index rebuild is slow. There is no reason to pay it for a commit
 #     that ruff/ty/pytest is about to reject.
+#
+# Snapshots are opt-in and OFF by default (2026-08-18):
+#
+#   DOCKG_SNAPSHOT=1 git commit ...        opt in to a per-commit snapshot
+#   DOCKG_SKIP_SNAPSHOT=1 git commit ...   force snapshots off (wins)
+#
+# DOCKG_SKIP_SNAPSHOT no longer skips the quality checks. It used to
+# short-circuit the whole hook, so a variable named "skip snapshot" also
+# silently skipped ruff, ty and pytest. It now gates only what it names.
+#
+# A per-commit snapshot records `git write-tree` and is then staged into that
+# same commit, so the recorded hash can never equal the tree it names — an
+# audit of 605 fleet snapshots found only 63 (10.4%) keyed to a real commit
+# tree. The fix is to snapshot at release, keyed on the tag; until that lands
+# this hook runs quality checks only.
+# See kgrag_priv/docs/SNAPSHOT_STRATEGY.md.
 set -euo pipefail
-
-[ "${DOCKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
@@ -58,9 +72,16 @@ elif command -v pre-commit &>/dev/null; then
     pre-commit run || exit 1
 fi
 
-# Capture the tree hash now that the checks have passed and nothing further
-# will modify the working tree — this keys the snapshot to the content that is
-# actually about to be committed.
+# ---------------------------------------------------------------------------
+# Opt-in index rebuild + snapshot. Everything below is skipped unless
+# DOCKG_SNAPSHOT=1 is set, and is skipped regardless if DOCKG_SKIP_SNAPSHOT=1.
+# ---------------------------------------------------------------------------
+[ "${DOCKG_SNAPSHOT:-0}" = "1" ] || exit 0
+[ "${DOCKG_SKIP_SNAPSHOT:-0}" = "1" ] && exit 0
+
+# Captured after the checks so nothing further modifies the working tree. Note
+# the caveat above: this still cannot match the committed tree, because the
+# `git add` below changes the index after this point.
 TREE_HASH=$(git write-tree)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
