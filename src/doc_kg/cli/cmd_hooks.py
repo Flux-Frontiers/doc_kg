@@ -152,5 +152,8 @@ def install_hooks(repo: str, force: bool) -> None:
     hook_path.chmod(mode)
 
     click.echo(f"OK Installed pre-commit hook: {hook_path}")
-    click.echo("  Snapshots will be captured automatically before each commit.")
+    click.echo("  Quality checks run on every commit.")
+    click.echo("  Snapshots are OFF by default - see kgrag_priv/docs/SNAPSHOT_STRATEGY.md.")
+    click.echo("  Opt in with:  DOCKG_SNAPSHOT=1 git commit ...")
+    click.echo("  Force off:    DOCKG_SKIP_SNAPSHOT=1 git commit ...")
     click.echo("  Run 'dockg build' first if you haven't built the graph yet.")
