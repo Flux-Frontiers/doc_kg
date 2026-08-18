@@ -4,7 +4,7 @@
   "timestamp": "2026-07-12T04:32:24.914767+00:00",
   "version": "0.19.3",
   "metrics": {
-    "db_path": "/Users/egs/repos/doc_kg/.pycodekg/graph.sqlite",
+    "db_path": ".pycodekg/graph.sqlite",
     "total_nodes": 5284,
     "meaningful_nodes": 356,
     "total_edges": 4926,
