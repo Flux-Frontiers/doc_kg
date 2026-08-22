@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`DocNode.metadata`, persisted — DocKG nodes can now carry domain extension
+  data, and the temporal contract with it.** `DocNode` gained an optional
+  `metadata` mapping, `nodes` gained a `metadata TEXT` column holding it as
+  JSON, and every node read path returns it decoded.
+
+  This is what lets a DocKG-backed KG answer a time-scoped federated query.
+  The dated corpora in the fleet — DiaryKG, MemoryKG, GutenbergKG — all build
+  on this store, so without a column here the `kg_utils.temporal` keys had
+  nowhere to live and `QueryScope(time_range=...)` in kg-rag could never match
+  anything from any of them.
+
+  Existing databases are migrated on open, by adding `metadata` to the same
+  additive `ALTER TABLE` loop the verse columns already use — so a DocKG
+  database built before this change keeps opening instead of raising
+  "no such column: metadata" on its next query.
+
+  A blob that fails to parse, or that decodes to something other than an
+  object, reads as `{}` rather than raising: extension data is not worth
+  making a node unreadable over.
+
+  Requires `kgmodule-utils>=0.18.0` for producers that build the metadata with
+  `kg_utils.temporal.temporal_metadata()`; the column itself is agnostic and
+  will hold anything JSON-serialisable.
+
+- **One column list now drives every node read.** `node()`, `nodes_batch()`,
+  `query_nodes()` and `iter_nodes()` each named the node columns by hand, so
+  a column could reach some read paths and not others — which is exactly how
+  `metadata` reached three of the four and was missed on `nodes_batch()`
+  until a test caught it. `_NODE_COLUMNS` is now the single source of truth:
+  every SELECT interpolates it, and `_row_to_node` unpacks it with
+  `zip(strict=True)`, so the two cannot disagree by construction. Guarded by
+  tests asserting all four read paths return identical keys and that
+  `metadata` carries its value through each of them.
+
 Documentation and repo-tooling currency pass. No source changes — nothing in
 the wheel moves.
 
@@ -42,6 +78,23 @@ the wheel moves.
   the global copies in `~/.claude/skills`; the local ones still documented
   `pycodekg build-lancedb` and a `.codekg/` artifact directory, neither of
   which exists.
+
+### Changed
+
+- **Floors `kgmodule-utils>=0.18.0`, as a fleet floor rather than a code
+  requirement.** Nothing here imports `kg_utils.temporal` — DocKG keeps its own
+  store, and this release's `metadata` column is self-contained, so on its own
+  merits `>=0.13.2` would still be correct.
+
+  The KG packages move as a deliberate set, not individually. One package
+  floored at five different versions across the fleet is exactly the drift the
+  pin standard exists to stop, and a reader comparing two repos should not have
+  to work out which floor is the real one.
+
+  Consequence: `poetry.lock` still resolves 0.13.2 and cannot follow until
+  0.18.0 is on PyPI, so a clean install is blocked until then — the same state
+  diary_kg, agent_kg, ftree_kg and gutenberg_kg are in. One `poetry lock` after
+  the release clears it.
 
 ### Fixed
 

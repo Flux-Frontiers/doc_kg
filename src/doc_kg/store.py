@@ -36,6 +36,36 @@ from doc_kg.dockg import DocEdge, DocNode
 # Schema
 # ---------------------------------------------------------------------------
 
+#: The node columns, in the order every read path selects them and
+#: :func:`_row_to_node` unpacks them. One tuple drives both, so a column can
+#: never reach some reads and not others -- the failure that put an
+#: unselected `metadata` column into one of doc_kg's read paths (and three of
+#: ftree_kg's), where a missing key reads as "undated" rather than raising.
+_NODE_COLUMNS: tuple[str, ...] = (
+    "id",
+    "kind",
+    "name",
+    "title",
+    "file_path",
+    "char_start",
+    "char_end",
+    "heading_level",
+    "text",
+    "content_type",
+    "book",
+    "chapter",
+    "verse_start",
+    "verse_end",
+    "metadata",
+)
+
+#: ``"id, kind, name, ..."`` -- interpolated into every node SELECT.
+_NODE_COLUMN_SQL = ", ".join(_NODE_COLUMNS)
+
+#: ``"n.id, n.kind, n.name, ..."`` -- for SELECTs that join `nodes` against
+#: another table, where a bare column name would be ambiguous.
+_NODE_COLUMN_SQL_N = ", ".join(f"n.{c}" for c in _NODE_COLUMNS)
+
 _SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
@@ -54,7 +84,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   book          TEXT,
   chapter       INTEGER,
   verse_start   INTEGER,
-  verse_end     INTEGER
+  verse_end     INTEGER,
+  metadata      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -168,6 +199,7 @@ class GraphStore:
                 ("chapter", "INTEGER"),
                 ("verse_start", "INTEGER"),
                 ("verse_end", "INTEGER"),
+                ("metadata", "TEXT"),
             ]:
                 try:
                     self._con.execute(f"ALTER TABLE nodes ADD COLUMN {col} {typ}")
@@ -284,8 +316,8 @@ class GraphStore:
                     """
                     INSERT INTO nodes
                       (id, kind, name, title, file_path, char_start, char_end, heading_level,
-                       text, content_type, book, chapter, verse_start, verse_end)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       text, content_type, book, chapter, verse_start, verse_end, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                       kind=excluded.kind,
                       name=excluded.name,
@@ -299,7 +331,8 @@ class GraphStore:
                       book=excluded.book,
                       chapter=excluded.chapter,
                       verse_start=excluded.verse_start,
-                      verse_end=excluded.verse_end
+                      verse_end=excluded.verse_end,
+                      metadata=excluded.metadata
                     """,
                     [
                         (
@@ -317,6 +350,7 @@ class GraphStore:
                             n.chapter,
                             n.verse_start,
                             n.verse_end,
+                            (json.dumps(n.metadata, ensure_ascii=False) if n.metadata else None),
                         )
                         for n in batch
                     ],
@@ -400,9 +434,8 @@ class GraphStore:
         :return: Node dict or ``None`` if not found.
         """
         row = self.con.execute(
-            """
-            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+            f"""
+            SELECT {_NODE_COLUMN_SQL}
             FROM nodes WHERE id = ?
             """,
             (node_id,),
@@ -420,10 +453,8 @@ class GraphStore:
         self.con.execute("DROP TABLE IF EXISTS _tmp_nids;")
         self.con.execute("CREATE TEMP TABLE _tmp_nids (id TEXT PRIMARY KEY);")
         self.con.executemany("INSERT INTO _tmp_nids (id) VALUES (?)", [(i,) for i in node_ids])
-        rows = self.con.execute("""
-            SELECT n.id, n.kind, n.name, n.title, n.file_path,
-                   n.char_start, n.char_end, n.heading_level, n.text,
-                   n.content_type, n.book, n.chapter, n.verse_start, n.verse_end
+        rows = self.con.execute(f"""
+            SELECT {_NODE_COLUMN_SQL_N}
             FROM nodes n
             JOIN _tmp_nids t ON t.id = n.id
             """).fetchall()
@@ -484,8 +515,7 @@ class GraphStore:
 
         rows = self.con.execute(
             f"""
-            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+            SELECT {_NODE_COLUMN_SQL}
             FROM nodes {where}
             ORDER BY file_path, char_start
             {page}
@@ -517,8 +547,7 @@ class GraphStore:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         cursor = self.con.execute(
             f"""
-            SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+            SELECT {_NODE_COLUMN_SQL}
             FROM nodes {where}
             ORDER BY file_path, char_start
             """,
@@ -836,23 +865,37 @@ def _fts_terms(query: str) -> list[str]:
 
 
 def _row_to_node(row: tuple) -> dict:
-    """Convert a raw SQLite row into a node dict."""
-    d = {
-        "id": row[0],
-        "kind": row[1],
-        "name": row[2],
-        "title": row[3],
-        "file_path": row[4],
-        "char_start": row[5],
-        "char_end": row[6],
-        "heading_level": row[7],
-        "text": row[8],
-    }
-    # Verse metadata columns (present in schema v2+; None for older rows)
-    if len(row) > 9:
-        d["content_type"] = row[9]
-        d["book"] = row[10]
-        d["chapter"] = row[11]
-        d["verse_start"] = row[12]
-        d["verse_end"] = row[13]
-    return d
+    """Convert a raw SQLite row into a node dict.
+
+    Built from :data:`_NODE_COLUMNS`, the same tuple every SELECT
+    interpolates, so the mapper cannot fall out of step with what was
+    actually selected. The migration in :attr:`GraphStore.con` adds every
+    column in :data:`_NODE_COLUMNS` on connection open, before any SELECT
+    runs, so a row is always exactly this wide -- there is no older-schema
+    case left to tolerate.
+
+    :param row: A row in ``_NODE_COLUMNS`` order.
+    :return: Node dict keyed by column name, with ``metadata`` decoded.
+    """
+    node = dict(zip(_NODE_COLUMNS, row, strict=True))
+    node["metadata"] = _load_metadata(node.get("metadata"))
+    return node
+
+
+def _load_metadata(raw: str | None) -> dict:
+    """Decode a stored metadata blob, tolerating anything unreadable.
+
+    A corrupt or hand-edited blob yields an empty dict rather than raising:
+    metadata is extension data, and losing it must not make the node itself
+    unreadable.
+
+    :param raw: The stored JSON text, or ``None``.
+    :return: The decoded mapping, or ``{}``.
+    """
+    if not raw:
+        return {}
+    try:
+        loaded = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}

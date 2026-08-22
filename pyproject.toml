@@ -74,7 +74,15 @@ dependencies = [
     # 0.13.2, not 0.13.1: that release made SnapshotManager's `repo_root` a
     # read-only property, which breaks every subclass that assigns it. Nothing
     # in the fleet declares a floor that can resolve to it.
-    "kgmodule-utils[semantic]>=0.13.2",
+    #
+    # 0.18.0 is a *fleet* floor rather than a code requirement. Nothing here
+    # imports `kg_utils.temporal` -- DocKG keeps its own store, and this
+    # release's `metadata` column is self-contained. But the KG packages move
+    # as a deliberate set, not individually, and one package floored at five
+    # different versions across the fleet is precisely the drift the pin
+    # standard exists to stop. A reader comparing two repos should not have to
+    # work out which floor is real.
+    "kgmodule-utils[semantic]>=0.18.0",
     "pymupdf4llm>=0.0.17",
 ]
 

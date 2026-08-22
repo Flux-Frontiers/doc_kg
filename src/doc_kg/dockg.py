@@ -39,6 +39,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 # ============================================================================
 # Configuration
@@ -81,6 +82,11 @@ class DocNode:
     :param chapter: Chapter number for verse content.
     :param verse_start: First verse number in this chunk.
     :param verse_end: Last verse number in this chunk.
+    :param metadata: Domain extension data, stored as JSON. Carries the
+                     :mod:`kg_utils.temporal` contract keys
+                     (``occurred_start`` / ``occurred_end`` / ``recorded_at``)
+                     for dated corpora, which is what lets a federated query
+                     scope a DocKG-backed KG by time.
     """
 
     id: str
@@ -97,6 +103,7 @@ class DocNode:
     chapter: int | None = None
     verse_start: int | None = None
     verse_end: int | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
