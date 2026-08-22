@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `kg_utils.temporal.temporal_metadata()`; the column itself is agnostic and
   will hold anything JSON-serialisable.
 
+- **One column list now drives every node read.** `node()`, `nodes_batch()`,
+  `query_nodes()` and `iter_nodes()` each named the node columns by hand, so
+  a column could reach some read paths and not others — which is exactly how
+  `metadata` reached three of the four and was missed on `nodes_batch()`
+  until a test caught it. `_NODE_COLUMNS` is now the single source of truth:
+  every SELECT interpolates it, and `_row_to_node` unpacks it with
+  `zip(strict=True)`, so the two cannot disagree by construction. Guarded by
+  tests asserting all four read paths return identical keys and that
+  `metadata` carries its value through each of them.
+
 Documentation and repo-tooling currency pass. No source changes — nothing in
 the wheel moves.
 

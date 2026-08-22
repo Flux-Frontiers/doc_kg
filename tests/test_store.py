@@ -305,3 +305,75 @@ def test_legacy_db_without_metadata_column_is_migrated(tmp_path):
 
     store.write([_dated_node(metadata={"occurred_start": "1666-09-02"})], [])
     assert store.node("chunk:diary.md:0000")["metadata"]["occurred_start"] == "1666-09-02"
+
+
+# ---------------------------------------------------------------------------
+# Read paths agree — drift guard
+# ---------------------------------------------------------------------------
+#
+# The failure this guards against is silent by construction: a SELECT that
+# omits a column yields a node dict missing that key, and a missing
+# `metadata` key reads as "this node is undated" rather than raising. It is
+# how an unselected `metadata` column reached one of doc_kg's four node read
+# paths (`nodes_batch`) before a test caught it. `_NODE_COLUMNS` now drives
+# every SELECT and `_row_to_node`, so the paths cannot disagree by
+# construction — these pin that they don't, because a future hand-written
+# query would not be covered by the constant.
+
+
+class TestReadPathsAgree:
+    def _store_with_node(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write(
+            [_dated_node(metadata={"occurred_start": "1666-09-02"})],
+            [],
+            wipe=True,
+        )
+        return store
+
+    def test_node_and_query_nodes_return_the_same_keys(self, tmp_path):
+        store = self._store_with_node(tmp_path)
+        single = store.node("chunk:diary.md:0000")
+        listed = store.query_nodes()
+        store.close()
+        assert listed
+        assert set(single) == set(listed[0])
+
+    def test_nodes_batch_agrees_too(self, tmp_path):
+        """The one path that actually missed `metadata` before this refactor."""
+        store = self._store_with_node(tmp_path)
+        single = store.node("chunk:diary.md:0000")
+        batch = store.nodes_batch({"chunk:diary.md:0000"})
+        store.close()
+        assert set(single) == set(batch["chunk:diary.md:0000"])
+
+    def test_iter_nodes_agrees_too(self, tmp_path):
+        """`iter_nodes` streams `list[dict]` batches, not bare dicts."""
+        store = self._store_with_node(tmp_path)
+        single = store.node("chunk:diary.md:0000")
+        flattened = [n for batch in store.iter_nodes() for n in batch]
+        store.close()
+        assert flattened
+        assert set(single) == set(flattened[0])
+
+    def test_every_declared_column_is_a_key(self, tmp_path):
+        """The mapper must expose every column the SELECTs ask for."""
+        from doc_kg.store import _NODE_COLUMNS
+
+        store = self._store_with_node(tmp_path)
+        node = store.node("chunk:diary.md:0000")
+        store.close()
+        assert set(node) == set(_NODE_COLUMNS)
+
+    def test_metadata_survives_every_path(self, tmp_path):
+        """The key existing is not enough — it must carry the value."""
+        store = self._store_with_node(tmp_path)
+        paths = {
+            "node": store.node("chunk:diary.md:0000"),
+            "nodes_batch": store.nodes_batch({"chunk:diary.md:0000"})["chunk:diary.md:0000"],
+            "query_nodes": store.query_nodes()[0],
+            "iter_nodes": next(iter(store.iter_nodes()))[0],
+        }
+        store.close()
+        for name, node in paths.items():
+            assert node["metadata"] == {"occurred_start": "1666-09-02"}, name
