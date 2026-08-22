@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   book          TEXT,
   chapter       INTEGER,
   verse_start   INTEGER,
-  verse_end     INTEGER
+  verse_end     INTEGER,
+  metadata      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -168,6 +169,7 @@ class GraphStore:
                 ("chapter", "INTEGER"),
                 ("verse_start", "INTEGER"),
                 ("verse_end", "INTEGER"),
+                ("metadata", "TEXT"),
             ]:
                 try:
                     self._con.execute(f"ALTER TABLE nodes ADD COLUMN {col} {typ}")
@@ -284,8 +286,8 @@ class GraphStore:
                     """
                     INSERT INTO nodes
                       (id, kind, name, title, file_path, char_start, char_end, heading_level,
-                       text, content_type, book, chapter, verse_start, verse_end)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       text, content_type, book, chapter, verse_start, verse_end, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                       kind=excluded.kind,
                       name=excluded.name,
@@ -299,7 +301,8 @@ class GraphStore:
                       book=excluded.book,
                       chapter=excluded.chapter,
                       verse_start=excluded.verse_start,
-                      verse_end=excluded.verse_end
+                      verse_end=excluded.verse_end,
+                      metadata=excluded.metadata
                     """,
                     [
                         (
@@ -317,6 +320,7 @@ class GraphStore:
                             n.chapter,
                             n.verse_start,
                             n.verse_end,
+                            (json.dumps(n.metadata, ensure_ascii=False) if n.metadata else None),
                         )
                         for n in batch
                     ],
@@ -402,7 +406,7 @@ class GraphStore:
         row = self.con.execute(
             """
             SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+                   content_type, book, chapter, verse_start, verse_end, metadata
             FROM nodes WHERE id = ?
             """,
             (node_id,),
@@ -423,7 +427,8 @@ class GraphStore:
         rows = self.con.execute("""
             SELECT n.id, n.kind, n.name, n.title, n.file_path,
                    n.char_start, n.char_end, n.heading_level, n.text,
-                   n.content_type, n.book, n.chapter, n.verse_start, n.verse_end
+                   n.content_type, n.book, n.chapter, n.verse_start, n.verse_end,
+                   n.metadata
             FROM nodes n
             JOIN _tmp_nids t ON t.id = n.id
             """).fetchall()
@@ -485,7 +490,7 @@ class GraphStore:
         rows = self.con.execute(
             f"""
             SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+                   content_type, book, chapter, verse_start, verse_end, metadata
             FROM nodes {where}
             ORDER BY file_path, char_start
             {page}
@@ -518,7 +523,7 @@ class GraphStore:
         cursor = self.con.execute(
             f"""
             SELECT id, kind, name, title, file_path, char_start, char_end, heading_level, text,
-                   content_type, book, chapter, verse_start, verse_end
+                   content_type, book, chapter, verse_start, verse_end, metadata
             FROM nodes {where}
             ORDER BY file_path, char_start
             """,
@@ -855,4 +860,26 @@ def _row_to_node(row: tuple) -> dict:
         d["chapter"] = row[11]
         d["verse_start"] = row[12]
         d["verse_end"] = row[13]
+    # Domain extension data, including the kg_utils.temporal contract keys.
+    # Absent on rows written before the column existed, hence the length guard.
+    d["metadata"] = _load_metadata(row[14]) if len(row) > 14 else {}
     return d
+
+
+def _load_metadata(raw: str | None) -> dict:
+    """Decode a stored metadata blob, tolerating anything unreadable.
+
+    A corrupt or hand-edited blob yields an empty dict rather than raising:
+    metadata is extension data, and losing it must not make the node itself
+    unreadable.
+
+    :param raw: The stored JSON text, or ``None``.
+    :return: The decoded mapping, or ``{}``.
+    """
+    if not raw:
+        return {}
+    try:
+        loaded = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}

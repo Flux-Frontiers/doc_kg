@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`DocNode.metadata`, persisted — DocKG nodes can now carry domain extension
+  data, and the temporal contract with it.** `DocNode` gained an optional
+  `metadata` mapping, `nodes` gained a `metadata TEXT` column holding it as
+  JSON, and every node read path returns it decoded.
+
+  This is what lets a DocKG-backed KG answer a time-scoped federated query.
+  The dated corpora in the fleet — DiaryKG, MemoryKG, GutenbergKG — all build
+  on this store, so without a column here the `kg_utils.temporal` keys had
+  nowhere to live and `QueryScope(time_range=...)` in kg-rag could never match
+  anything from any of them.
+
+  Existing databases are migrated on open, by adding `metadata` to the same
+  additive `ALTER TABLE` loop the verse columns already use — so a DocKG
+  database built before this change keeps opening instead of raising
+  "no such column: metadata" on its next query.
+
+  A blob that fails to parse, or that decodes to something other than an
+  object, reads as `{}` rather than raising: extension data is not worth
+  making a node unreadable over.
+
+  Requires `kgmodule-utils>=0.18.0` for producers that build the metadata with
+  `kg_utils.temporal.temporal_metadata()`; the column itself is agnostic and
+  will hold anything JSON-serialisable.
+
 Documentation and repo-tooling currency pass. No source changes — nothing in
 the wheel moves.
 

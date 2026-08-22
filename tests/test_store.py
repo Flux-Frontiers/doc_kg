@@ -201,3 +201,107 @@ def test_fts_rebuild_is_idempotent(tmp_path):
     assert store.rebuild_fts(quiet=True) == 2  # drop + rebuild, no duplicates
     assert store.search_lexical("first chunk") == ["chunk:notes.md:0000"]
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# Node metadata persistence + additive migration
+# ---------------------------------------------------------------------------
+
+
+def _dated_node(node_id="chunk:diary.md:0000", metadata=None):
+    return DocNode(
+        id=node_id,
+        kind="chunk",
+        name="chunk:0000",
+        title=None,
+        file_path="diary.md",
+        char_start=0,
+        char_end=100,
+        heading_level=None,
+        text="Up betimes, and to the office.",
+        metadata=metadata,
+    )
+
+
+def test_node_metadata_round_trips(tmp_path):
+    """Dated corpora live on this store, so it has to carry the temporal keys."""
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node(metadata={"occurred_start": "1666-09-02"})], [], wipe=True)
+    assert store.node("chunk:diary.md:0000")["metadata"] == {"occurred_start": "1666-09-02"}
+
+
+def test_node_without_metadata_reads_as_empty_dict(tmp_path):
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node()], [], wipe=True)
+    assert store.node("chunk:diary.md:0000")["metadata"] == {}
+
+
+def test_metadata_survives_query_nodes(tmp_path):
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node(metadata={"occurred_start": "1666-09-02"})], [], wipe=True)
+    nodes = store.query_nodes(kinds=["chunk"])
+    assert nodes[0]["metadata"]["occurred_start"] == "1666-09-02"
+
+
+def test_metadata_survives_nodes_batch(tmp_path):
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node(metadata={"recorded_at": "1666-09-03"})], [], wipe=True)
+    batch = store.nodes_batch({"chunk:diary.md:0000"})
+    assert batch["chunk:diary.md:0000"]["metadata"] == {"recorded_at": "1666-09-03"}
+
+
+def test_metadata_updated_on_upsert(tmp_path):
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node(metadata={"occurred_start": "1666-09-02"})], [], wipe=True)
+    store.write([_dated_node(metadata={"occurred_start": "1666-09-05"})], [])
+    assert store.node("chunk:diary.md:0000")["metadata"]["occurred_start"] == "1666-09-05"
+
+
+def test_corrupt_metadata_does_not_break_the_node(tmp_path):
+    store = GraphStore(tmp_path / "t.sqlite")
+    store.write([_dated_node()], [], wipe=True)
+    store.con.execute("UPDATE nodes SET metadata=? WHERE id=?", ("{bad", "chunk:diary.md:0000"))
+    store.con.commit()
+    node = store.node("chunk:diary.md:0000")
+    assert node["metadata"] == {}
+    assert node["kind"] == "chunk"
+
+
+def test_legacy_db_without_metadata_column_is_migrated(tmp_path):
+    """A pre-existing DocKG database must open, not raise 'no such column'.
+
+    The verse columns set this precedent; metadata follows the same additive
+    path. Every DocKG-backed KG in the fleet is an existing database.
+    """
+    import sqlite3
+
+    db = tmp_path / "legacy.sqlite"
+    con = sqlite3.connect(str(db))
+    con.executescript(
+        """
+        CREATE TABLE nodes (
+          id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL, title TEXT,
+          file_path TEXT, char_start INTEGER, char_end INTEGER, heading_level INTEGER,
+          text TEXT
+        );
+        CREATE TABLE edges (
+          src TEXT NOT NULL, rel TEXT NOT NULL, dst TEXT NOT NULL, evidence TEXT,
+          PRIMARY KEY (src, rel, dst)
+        );
+        """
+    )
+    con.execute(
+        "INSERT INTO nodes (id, kind, name, file_path) VALUES (?,?,?,?)",
+        ("chunk:old.md:0000", "chunk", "old", "old.md"),
+    )
+    con.commit()
+    con.close()
+
+    store = GraphStore(db)
+    node = store.node("chunk:old.md:0000")
+    assert node is not None
+    assert node["name"] == "old"
+    assert node["metadata"] == {}
+
+    store.write([_dated_node(metadata={"occurred_start": "1666-09-02"})], [])
+    assert store.node("chunk:diary.md:0000")["metadata"]["occurred_start"] == "1666-09-02"
