@@ -69,6 +69,23 @@ the wheel moves.
   `pycodekg build-lancedb` and a `.codekg/` artifact directory, neither of
   which exists.
 
+### Changed
+
+- **Floors `kgmodule-utils>=0.18.0`, as a fleet floor rather than a code
+  requirement.** Nothing here imports `kg_utils.temporal` — DocKG keeps its own
+  store, and this release's `metadata` column is self-contained, so on its own
+  merits `>=0.13.2` would still be correct.
+
+  The KG packages move as a deliberate set, not individually. One package
+  floored at five different versions across the fleet is exactly the drift the
+  pin standard exists to stop, and a reader comparing two repos should not have
+  to work out which floor is the real one.
+
+  Consequence: `poetry.lock` still resolves 0.13.2 and cannot follow until
+  0.18.0 is on PyPI, so a clean install is blocked until then — the same state
+  diary_kg, agent_kg, ftree_kg and gutenberg_kg are in. One `poetry lock` after
+  the release clears it.
+
 ### Fixed
 
 - **`docs/INSTALLATION.md` no longer contradicts itself.** It stated that
