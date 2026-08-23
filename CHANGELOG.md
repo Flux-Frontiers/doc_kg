@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-22
+
+A feature landing alongside a documentation and repo-tooling currency pass:
+`DocNode.metadata` and the node-read refactor are real source changes; the
+rest of this release brings docs and tooling back in line with the sqlite-vec
+migration and the current pycodekg CLI.
+
 ### Added
 
 - **`DocNode.metadata`, persisted — DocKG nodes can now carry domain extension
@@ -43,11 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tests asserting all four read paths return identical keys and that
   `metadata` carries its value through each of them.
 
-Documentation and repo-tooling currency pass. No source changes — nothing in
-the wheel moves.
-
-### Added
-
 ### Changed
 
 - **Docs now describe sqlite-vec as the vector backend.** The migration landed
@@ -67,20 +69,6 @@ the wheel moves.
   does not have.
 - **`.claude/commands/pycodekg-rebuild.md`** updated to `--vectors` /
   `vectors.sqlite`, matching the current pycodekg CLI.
-
-### Removed
-
-- **`announcements/`.** All three files were CodeKG v0.5.2 launch copy — about
-  Python AST parsing, not documents — carried over from the fork. `pycode_kg`
-  already holds its own, newer versions.
-- **Local `pycodekg`, `pycodekg-thorough-analysis`, `kgrag` and `kgrag-usage`
-  skills**, plus the `setup-mcp` and `pycodekg` commands. All are superseded by
-  the global copies in `~/.claude/skills`; the local ones still documented
-  `pycodekg build-lancedb` and a `.codekg/` artifact directory, neither of
-  which exists.
-
-### Changed
-
 - **Floors `kgmodule-utils>=0.18.0`, as a fleet floor rather than a code
   requirement.** Nothing here imports `kg_utils.temporal` — DocKG keeps its own
   store, and this release's `metadata` column is self-contained, so on its own
@@ -95,6 +83,17 @@ the wheel moves.
   0.18.0 is on PyPI, so a clean install is blocked until then — the same state
   diary_kg, agent_kg, ftree_kg and gutenberg_kg are in. One `poetry lock` after
   the release clears it.
+
+### Removed
+
+- **`announcements/`.** All three files were CodeKG v0.5.2 launch copy — about
+  Python AST parsing, not documents — carried over from the fork. `pycode_kg`
+  already holds its own, newer versions.
+- **Local `pycodekg`, `pycodekg-thorough-analysis`, `kgrag` and `kgrag-usage`
+  skills**, plus the `setup-mcp` and `pycodekg` commands. All are superseded by
+  the global copies in `~/.claude/skills`; the local ones still documented
+  `pycodekg build-lancedb` and a `.codekg/` artifact directory, neither of
+  which exists.
 
 ### Fixed
 

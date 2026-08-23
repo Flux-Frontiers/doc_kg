@@ -73,19 +73,21 @@ tree normally.
 ## Then: Tag, Push, and Publish (generic Steps 7–8, amended)
 
 Push the branch, then tag and push per the generic workflow. `.github/workflows/release.yml`
-fires on `push: tags: ['v*']` and runs `poetry build` → `gh release create` with
-`--notes-file release-notes.md` read out of the tagged commit.
+fires on `push: tags: ['v*']` and runs `poetry build` → `gh release create` (notes from
+`release-notes.md` in the tagged commit) → a `publish` job that pushes to PyPI via
+**OIDC trusted publishing** (`pypa/gh-action-pypi-publish`).
 
-**That workflow does not publish to PyPI.** It only attaches the wheel and sdist to the GitHub
-Release. The index is a separate manual step and is easy to forget — 0.20.0 shipped a tag, a
-green run, and a GitHub Release while PyPI still served 0.19.1:
-
-```bash
-poetry publish --build
-```
+**As of the v0.22.0 release (2026-08-22) this workflow DOES publish to PyPI on its own —
+no manual `poetry publish` needed.** This corrects prior guidance here: 0.20.0 shipped a
+tag, a green run, and a GitHub Release while PyPI still served 0.19.1, because at that time
+the workflow only attached wheel/sdist to the Release and stopped. A `publish` job with
+OIDC trusted publishing was added since. Re-check `.github/workflows/release.yml` at release
+time rather than trusting this note indefinitely — this is exactly the kind of drift it
+already caught the release skill out on once.
 
 Verify it landed rather than assuming:
 ```bash
+gh run watch --exit-status
 curl -s https://pypi.org/pypi/doc-kg/json | python3 -c \
   "import sys,json; print(json.load(sys.stdin)['info']['version'])"
 ```
@@ -95,5 +97,5 @@ Completion summary should additionally note:
 ✓ PyCodeKG rebuilt + snapshot saved and staged (.pycodekg/snapshots/)
 ✓ DocKG index + snapshot refreshed by commit hook
 ✓ commit.txt written for the user to commit
-✓ Published to PyPI (or: NOT on PyPI yet — poetry publish --build still required)
+✓ Published to PyPI (verify against pypi.org/pypi/doc-kg/json after the tag-push run finishes)
 ```

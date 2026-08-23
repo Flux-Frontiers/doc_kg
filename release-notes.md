@@ -1,38 +1,54 @@
-# Release Notes — v0.21.2
+# Release Notes — v0.22.0
 
-> Released: 2026-08-14
+> Released: 2026-08-22
 
-A dependency-floor release from the fleet-wide sweep. No code changed — the
-wheel's contents are identical to 0.21.1 — but the requirements it declares
-moved to match what the fleet actually runs against today.
+DocKG nodes can now carry domain-specific metadata, and the node-read paths
+that expose it got a consistency fix. Alongside that feature, the docs and
+repo tooling caught up with changes that had already landed in prior
+releases but were never swept through.
 
 ## What changed
 
-**The shared SDK floor caught up with the fleet.** doc-kg now requires
-`kgmodule-utils[semantic]>=0.12.1`, up from `>=0.10.0`. The old floor was
-honest when it was written, but every sibling in the fleet has since moved to
-the 0.12.x line, and letting resolvers pick a two-minor-old SDK invited
-combinations nobody tests. Nothing in doc-kg's own code needed updating —
-the floor now simply states the environment the test suite actually exercises.
+**Nodes gained a `metadata` field.** `DocNode` now carries an optional
+`metadata` mapping, backed by a new `metadata TEXT` column that stores it as
+JSON. This is what lets time-scoped corpora in the fleet — DiaryKG,
+MemoryKG, GutenbergKG — attach the `kg_utils.temporal` keys a federated
+`QueryScope(time_range=...)` query needs; without a column here, those keys
+had nowhere to live. Existing `.dockg/` databases pick up the column
+automatically the next time they're opened, and a metadata blob that fails
+to parse reads back as `{}` rather than raising.
 
-**pytest moved past a security advisory.** The dev group's floor rose from
-`>=8.0.0` to `>=9.0.3`, clearing GHSA-6w46-j5rx-g56g. This is test tooling
-only; it does not affect what `pip install doc-kg` brings in.
+**Every node-read path now agrees on its columns.** `node()`,
+`nodes_batch()`, `query_nodes()`, and `iter_nodes()` used to name the node
+columns independently, which is how `metadata` reached three of the four
+read paths and was missed on the fourth until a test caught it. A single
+`_NODE_COLUMNS` list now drives every SELECT, so the columns can't drift
+apart again.
 
-**ruff is capped below 0.16.** Ruff minors routinely enable new default rules,
-and an uncapped floor meant a fresh `poetry install` could start failing lint
-on code that was green yesterday. The cap makes ruff upgrades a deliberate,
-reviewed change rather than something CI discovers on its own.
+**Docs now describe sqlite-vec, not LanceDB.** The vector-store migration
+landed in 0.20.0, but seven documents — including both benchmark writeups
+and the dockg-action README — still described the old LanceDB backend, down
+to the embedded image-generation prompts. They're corrected, along with a
+stale embedding-model dimension in `docs/pipeline_visual.md` and a couple of
+self-contradicting installation instructions.
 
-**Maintainer tooling floors moved too.** The optional `kg` Poetry group now
-asks for `pycode-kg>=0.22.0`. As before, groups never reach the wheel's
-metadata, so consumers see none of this.
+**Repo tooling caught up too.** `pyproject.toml`'s header now lists the
+extras that actually exist, the `pycodekg-rebuild` command matches the
+current PyCodeKG CLI flags, and `kgmodule-utils` is floored at `>=0.18.0` to
+match where the rest of the fleet already sits — consequently `poetry.lock`
+still resolves the older line until that version is on PyPI.
+
+**Stored snapshots no longer leak a local path.** Ninety historical
+`.pycodekg` snapshots had `metrics.db_path` recorded as an absolute
+`/Users/...` path; it's now relative, matching what the snapshot writer
+emits going forward.
 
 ## Upgrading
 
-Nothing to do. No API, CLI, or index-format change; existing `.dockg/` stores
-keep working as-is. A `poetry update kgmodule-utils` (or a plain
-`pip install -U doc-kg`) picks up the new SDK line.
+No API or CLI changes. Existing `.dockg/` databases migrate the new
+`metadata` column automatically on next open — no manual step required.
+Producers that want to populate it with `kg_utils.temporal.temporal_metadata()`
+need `kgmodule-utils>=0.18.0`.
 
 ---
 
