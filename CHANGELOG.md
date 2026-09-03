@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Section nodes recorded the offsets of their last chunk, not their own
+  span.** The reuse guard in `parse_corpus` tested `sec_id` for membership in
+  `section_nodes`, a dict keyed by `slug`, so it never fired: every chunk in a
+  section rebuilt that section's node and the last one won. A section's
+  `char_start` therefore pointed at its closing paragraph.
+
+  Anything reconstructing a chapter as "the chunks between this section's
+  `char_start` and the next section's" read the wrong range -- most of the
+  chapter that follows, rather than the chapter asked for. A document held in
+  a single section returned only its final paragraph, since no next section
+  bounded the range. Retrieval was unaffected: chunk offsets were always
+  correct.
+
+  Sections are now created once, at their first chunk, and `char_end` extends
+  as later chunks are added, so a section spans exactly the chunks it
+  contains. Existing graphs keep the old offsets until rebuilt.
+
+- **A heading repeated within one file collapsed into a single section node.**
+  Section ids were built from the slug alone, so a book whose volumes each
+  restart at `Chapter I`, or one carrying several `Preface` sections, gave
+  every occurrence the same id. The last one overwrote the others, and its
+  span stretched from the first occurrence's opening to the last one's close,
+  so a reader asked for one chapter got everything in between.
+
+  Each occurrence is now its own node. The first keeps the bare
+  `sec:<file_path>:<slug>` id, so ids are unchanged for documents without
+  repeated headings; later occurrences take a `~<n>` suffix. `slugify` strips
+  `~`, so the suffix cannot collide with an id a heading could produce.
+
 ## [0.22.0] - 2026-08-22
 
 A feature landing alongside a documentation and repo-tooling currency pass:

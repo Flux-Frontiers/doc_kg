@@ -116,7 +116,7 @@ Build structured `EntryChunk` objects containing:
 | Kind | ID Pattern | Role in Graph |
 |------|-----------|---------------|
 | `document` | `doc:<file_path>` | One node per source file |
-| `section` | `sec:<file_path>:<slug>` | Markdown heading block |
+| `section` | `sec:<file_path>:<slug>` | Markdown heading block. A heading repeated in one file gets a `~<n>` suffix from the second occurrence onward |
 | `chunk` | `chunk:<file_path>:<0000>` | Semantic text block (~512 chars) |
 | `topic` | `topic:<slug>` | Classified topic label |
 | `entity` | `entity:<slug>` | Named entity (titlecase / acronym) |

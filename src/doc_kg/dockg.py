@@ -37,7 +37,7 @@ from __future__ import annotations
 import contextlib
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -257,14 +257,23 @@ def doc_node_id(file_path: str) -> str:
     return f"doc:{file_path}"
 
 
-def section_node_id(file_path: str, section_slug: str) -> str:
+def section_node_id(file_path: str, section_slug: str, occurrence: int = 1) -> str:
     """Build a stable section node id.
+
+    A document may repeat a heading -- a per-volume ``Chapter I``, several
+    ``Preface`` sections -- and each occurrence is a section in its own right.
+    The first keeps the bare id so ids stay stable for the ordinary case;
+    later ones take a ``~<n>`` suffix. :func:`slugify` strips ``~``, so the
+    suffix can never collide with a slug a heading could produce.
 
     :param file_path: Corpus-relative file path.
     :param section_slug: Slugified section title.
-    :return: Node id of the form ``sec:<file_path>:<slug>``.
+    :param occurrence: 1-based count of this heading within the file.
+    :return: Node id of the form ``sec:<file_path>:<slug>``, or
+             ``sec:<file_path>:<slug>~<occurrence>`` after the first.
     """
-    return f"sec:{file_path}:{section_slug}"
+    suffix = "" if occurrence <= 1 else f"~{occurrence}"
+    return f"sec:{file_path}:{section_slug}{suffix}"
 
 
 def chunk_node_id(file_path: str, chunk_index: int) -> str:
@@ -562,7 +571,7 @@ def parse_corpus(
             prev_chunk_id: str | None = None
             prev_section_slug: str | None = None
             global_chunk_idx = 0
-            section_nodes: dict[str, str] = {}  # slug → section_node_id
+            section_occurrences: dict[str, int] = {}  # slug → times seen in this file
 
             for _ci, chunk_info in enumerate(chunks):
                 section_title = chunk_info.get("section_title")
@@ -590,9 +599,14 @@ def parse_corpus(
                 # Create/reuse section node
                 if section_title:
                     slug = slugify(section_title)
-                    sec_id = section_node_id(file_path, slug)
-                    if sec_id not in section_nodes:
-                        section_nodes[slug] = sec_id
+                    # Chunkers emit a section's chunks contiguously and in
+                    # document order, so the heading changing means a new
+                    # section -- including a repeat of an earlier heading,
+                    # which gets its own node rather than merging into it.
+                    if slug != prev_section_slug:
+                        section_occurrences[slug] = section_occurrences.get(slug, 0) + 1
+                    sec_id = section_node_id(file_path, slug, section_occurrences[slug])
+                    if sec_id not in nodes:
                         nodes[sec_id] = DocNode(
                             id=sec_id,
                             kind="section",
@@ -608,6 +622,10 @@ def parse_corpus(
                         edges[(doc_id, "CONTAINS", sec_id)] = DocEdge(
                             src=doc_id, rel="CONTAINS", dst=sec_id
                         )
+                    else:
+                        # The section spans every chunk under it, so its start
+                        # stays at the first chunk and its end follows the last.
+                        nodes[sec_id] = replace(nodes[sec_id], char_end=char_end)
                     parent_id = sec_id
                 else:
                     parent_id = doc_id
