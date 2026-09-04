@@ -16,6 +16,12 @@ def test_doc_node_id():
 
 def test_section_node_id():
     assert section_node_id("notes/journal.md", "intro") == "sec:notes/journal.md:intro"
+    # The first occurrence keeps the bare id, so ids stay stable for the
+    # ordinary case of a heading appearing once.
+    assert section_node_id("notes/journal.md", "intro", 1) == "sec:notes/journal.md:intro"
+    assert section_node_id("notes/journal.md", "intro", 2) == "sec:notes/journal.md:intro~2"
+    # The suffix cannot collide with a heading: slugify strips "~".
+    assert "~" not in slugify("Intro ~2")
 
 
 def test_chunk_node_id():
@@ -155,3 +161,93 @@ def test_parse_corpus_empty_dir(tmp_path):
     nodes, edges = parse_corpus(tmp_path)
     assert nodes == []
     assert edges == []
+
+
+def test_section_spans_all_its_chunks(tmp_path):
+    """A multi-chunk section starts at its first chunk and ends at its last.
+
+    Regression: the reuse guard tested ``sec_id`` against a dict keyed by
+    ``slug``, so it never fired and every chunk rebuilt the section node.
+    The last chunk won, leaving ``char_start`` at the section's final
+    paragraph -- which made Browse show a chapter's successor instead of
+    the chapter, and nothing at all for a book held in a single section.
+    """
+    # Distinct sentences: repeating one collapses every chunk onto one offset.
+    body = " ".join(f"Paragraph number {i} of the section body." for i in range(60))
+    (tmp_path / "long.md").write_text(f"# Section\n\n{body}\n")
+    nodes, edges = parse_corpus(tmp_path, chunk_size=100)
+
+    section = next(n for n in nodes if n.kind == "section")
+    chunks = [n for n in nodes if n.kind == "chunk"]
+    assert len(chunks) > 1, "the fixture must span several chunks to be meaningful"
+
+    assert section.char_start == min(c.char_start for c in chunks)
+    assert section.char_end == max(c.char_end for c in chunks)
+
+
+def test_repeated_heading_gets_its_own_section(tmp_path):
+    """A heading repeated within one file yields one section per occurrence.
+
+    Regression: section ids were built from the slug alone, so a book whose
+    volumes each restart at ``Chapter I`` collapsed both onto a single node.
+    Its span then ran from the first volume's opening to the second volume's
+    close, and Browse rendered everything in between as one giant chapter.
+
+    The assertions below mirror what a reader-style consumer actually does:
+    take a section's ``char_start``, run to the next section's, and collect
+    the chunks in between.
+    """
+
+    def body(label):
+        # Distinct sentences: repeating one collapses chunks onto one offset.
+        return " ".join(f"{label} sentence number {i}." for i in range(40))
+
+    (tmp_path / "book.md").write_text(
+        f"# Chapter I\n\n{body('First')}\n\n"
+        f"# Chapter II\n\n{body('Second')}\n\n"
+        f"# Chapter I\n\n{body('Third')}\n"
+    )
+    nodes, edges = parse_corpus(tmp_path, chunk_size=100)
+
+    sections = sorted((n for n in nodes if n.kind == "section"), key=lambda n: n.char_start)
+    chunks = sorted((n for n in nodes if n.kind == "chunk"), key=lambda c: c.char_start)
+
+    # Both "Chapter I" headings survive as separate nodes; the first keeps the
+    # bare id so ids stay stable for documents without repeated headings.
+    assert [s.id for s in sections] == [
+        "sec:book.md:chapter-i",
+        "sec:book.md:chapter-ii",
+        "sec:book.md:chapter-i~2",
+    ]
+
+    owned = {s.id: [] for s in sections}
+    for e in edges:
+        if e.rel == "CONTAINS" and e.src in owned:
+            owned[e.src].append(next(c for c in chunks if c.id == e.dst))
+    assert all(len(v) > 1 for v in owned.values()), (
+        "each chapter must span several chunks for this test to be meaningful"
+    )
+
+    for section in sections:
+        mine = owned[section.id]
+        assert section.char_start == min(c.char_start for c in mine)
+        assert section.char_end == max(c.char_end for c in mine)
+
+    # Spans are disjoint and in document order -- the third chapter must not
+    # reach back to the first, which is what the merged node used to do.
+    for earlier, later in zip(sections, sections[1:]):
+        assert earlier.char_end <= later.char_start
+
+    # The consumer's reconstruction returns each chapter, and only it.
+    for i, section in enumerate(sections):
+        end = sections[i + 1].char_start if i + 1 < len(sections) else None
+        rebuilt = [
+            c
+            for c in chunks
+            if c.char_start >= section.char_start and (end is None or c.char_start < end)
+        ]
+        assert rebuilt == owned[section.id]
+
+    # Content check: no chapter bleeds into its neighbour.
+    for section, label in zip(sections, ("First", "Second", "Third")):
+        assert all(label in c.text for c in owned[section.id])

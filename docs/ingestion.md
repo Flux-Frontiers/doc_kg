@@ -102,7 +102,7 @@ The standard ingestion path. Parses a corpus into a hybrid SQLite + sqlite-vec k
 | Kind | ID Pattern | Description |
 |------|-----------|-------------|
 | `document` | `doc:<file_path>` | One per `.md`/`.txt`/`.rst`/`.pdf` file |
-| `section` | `sec:<file_path>:<slug>` | Markdown heading block |
+| `section` | `sec:<file_path>:<slug>` | Markdown heading block. A heading repeated in one file gets a `~<n>` suffix from the second occurrence onward |
 | `chunk` | `chunk:<file_path>:<0000>` | Semantic text block (~512 chars) |
 | `topic` | `topic:<slug>` | Classified topic label |
 | `entity` | `entity:<slug>` | Named entity (titlecase/acronym) |
