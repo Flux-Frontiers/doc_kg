@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repeated headings; later occurrences take a `~<n>` suffix. `slugify` strips
   `~`, so the suffix cannot collide with an id a heading could produce.
 
+- **Documented section and document node IDs used prefixes the code does not
+  emit.** `docs/SCHEMA.md` and `docs/CHEATSHEET.md` gave section IDs as
+  `section:<path>:<slug>`, and the cheatsheet gave document IDs as
+  `document:<file>`; `section_node_id` and `doc_node_id` emit `sec:` and
+  `doc:`. Anyone copying an ID out of either document got a `get_node` miss.
+  Both now match the code, and the node ID tables across `SCHEMA.md`,
+  `CHEATSHEET.md`, `ingestion.md`, and `pipeline_visual.md` record the `~<n>`
+  suffix for a repeated heading.
+
 ## [0.22.0] - 2026-08-22
 
 A feature landing alongside a documentation and repo-tooling currency pass:

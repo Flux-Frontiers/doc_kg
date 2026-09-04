@@ -172,8 +172,8 @@ Fetch a single node by its stable ID. Node IDs appear in `query_docs` and `pack_
 ```
 <kind>:<path_or_slug>
 
-document:docs/authentication.md
-section:docs/authentication.md:oauth2-flow
+doc:docs/authentication.md
+sec:docs/authentication.md:oauth2-flow
 chunk:docs/authentication.md:0042
 topic:authentication
 entity:oauth2
@@ -183,7 +183,7 @@ keyword:jwt-token
 ### Fetch a document
 
 ```python
-get_node("document:docs/api-reference.md")
+get_node("doc:docs/api-reference.md")
 ```
 
 Returns file path, sections, full text content.
@@ -191,7 +191,7 @@ Returns file path, sections, full text content.
 ### Fetch a section
 
 ```python
-get_node("section:docs/api-reference.md:rest-endpoints")
+get_node("sec:docs/api-reference.md:rest-endpoints")
 ```
 
 ### Fetch a chunk
@@ -217,8 +217,8 @@ get_node("entity:postgresql")
 
 | Kind | ID prefix | Description |
 |---|---|---|
-| `document` | `document:<file>` | Top-level document (one per `.md`, `.txt`, `.rst`, or `.pdf` file) |
-| `section` | `section:<file>:<slug>` | Markdown heading block or text division |
+| `document` | `doc:<file>` | Top-level document (one per `.md`, `.txt`, `.rst`, or `.pdf` file) |
+| `section` | `sec:<file>:<slug>` | Markdown heading block or text division. A heading repeated in one file gets a `~<n>` suffix from the second occurrence onward |
 | `chunk` | `chunk:<file>:<index>` | Text fragment (≈512 chars, overlapping) |
 | `topic` | `topic:<slug>` | Inferred topic category (e.g., `topic:api`) |
 | `entity` | `entity:<slug>` | Named entity extracted from text |

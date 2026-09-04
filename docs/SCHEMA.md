@@ -54,10 +54,14 @@ Node IDs are stable across rebuilds for the same corpus:
 | Kind | Format |
 |---|---|
 | `document` | `doc:<relative_path>` |
-| `section` | `section:<relative_path>:<heading_slug>` |
+| `section` | `sec:<relative_path>:<heading_slug>` |
 | `chunk` | `chunk:<relative_path>:<zero_padded_index>` |
 | `topic` | `topic:<slug>` |
 | `entity` | `entity:<slug>` |
 | `keyword` | `keyword:<slug>` |
+
+A heading repeated within one file gets a `~<n>` suffix from the second
+occurrence onward, so each occurrence is a distinct section. `slugify` strips
+`~`, so the suffix cannot collide with an ID a heading could produce.
 
 Use node IDs with `dockg-mcp`'s `get_node` tool or the Python API's `DocKG.get_node()` for direct retrieval.
