@@ -3,18 +3,31 @@
 Release doc-kg the same way as the generic `/release`, **plus** one thing the generic flow and
 the commit hook both miss: the **PyCodeKG** rebuild + snapshot.
 
-**What the commit hook already handles (don't repeat it):** the native `.git/hooks/pre-commit`
-(from `dockg install-hooks`) runs `dockg build` → `dockg snapshot save` → stages
-`.dockg/snapshots/` on every commit. So the DocKG index and its snapshot refresh
-automatically when you commit — you do **not** build/snapshot DocKG by hand. It never touches
-PyCodeKG, and `.pycodekg/snapshots/` moves only in release commits — that gap is why this
-command exists.
+**What the commit hook does, and what it deliberately no longer does.** The native
+`.git/hooks/pre-commit` (from `dockg install-hooks`) runs the quality checks from
+`.pre-commit-config.yaml` and, by default, nothing else. Since 2026-08-18 the index rebuild
+and snapshot below them are opt-in:
+
+```bash
+[ "${DOCKG_SNAPSHOT:-0}" = "1" ] || exit 0
+```
+
+**Do not set `DOCKG_SNAPSHOT=1` to "restore" the old behaviour.** A per-commit snapshot
+records `git write-tree` and is then staged into that same commit, so the recorded hash can
+never equal the tree it names. An audit of 605 fleet snapshots found only 63 (10.4%) keyed to
+a real commit tree. The opt-out exists to stop that; opting back in reintroduces the defect.
+See `kgrag_priv/docs/SNAPSHOT_STRATEGY.md`.
+
+The consequence for this workflow: **no snapshot belongs in the release commit** -- not
+DocKG's, not PyCodeKG's. The release commit carries version machinery only. PyCodeKG is
+snapshotted after the tag, in a follow-up commit (last section); DocKG is not snapshotted at
+all until its keying is fixed. Both follow the settled decision in that document.
 
 **Follow the generic `~/.claude/commands/release.md` workflow for all the version machinery**
 (detect project → bump → promote CHANGELOG → sync the version string across every file →
-write prose `release-notes.md`). Insert the step below **after the version bump** and **before
-the commit** (so the snapshot lands in the release commit). Then hand off the commit and
-tag/push per the generic Steps 6–8, with the two doc-kg amendments at the bottom of this file.
+write prose `release-notes.md`). Hand off the commit and tag/push per the generic Steps 6-8,
+with the doc-kg amendments below, then run the PyCodeKG snapshot step **after the tag is
+pushed**.
 
 **Before bumping, check whether the last release actually shipped.** A prepared-but-unshipped
 release looks exactly like a finished one from the changelog alone. v0.20.0 sat in this state:
@@ -32,30 +45,6 @@ curl -s https://pypi.org/pypi/doc-kg/json | python3 -c \
 
 ---
 
-## Insert: Rebuild PyCodeKG
-
-Do this once the new version is written into `pyproject.toml` and `src/doc_kg/__init__.py`.
-
-```bash
-.venv/bin/pycodekg build --repo .
-.venv/bin/pycodekg snapshot save --repo .
-```
-
-**Both commands are required.** `build` refreshes the graph store and vector index but does
-**not** write a snapshot — snapshots are keyed by commit SHA and only `snapshot save` creates
-one. Running `build` alone leaves `.pycodekg/snapshots/` untouched and the release commit
-carries no snapshot at all, silently.
-
-`snapshot save` runs the 15-phase analysis and writes `<sha>.json` plus a manifest entry.
-Stage it — the vector/sqlite payloads are gitignored, only the snapshot is tracked:
-```bash
-git add .pycodekg/snapshots/
-```
-Note the snapshot is keyed to the *current* HEAD, i.e. the release commit's parent. That is
-the same behaviour as the DocKG pre-commit hook and is expected, not a bug.
-
----
-
 ## Then: Hand Off the Commit (generic Step 6, amended)
 
 **Do not run `git commit` yourself.** Stop after staging and write a *detailed* commit message
@@ -64,9 +53,10 @@ commit.txt`. Title plus a full body: version sync, release notes, header refresh
 artifacts with measured numbers, and the post-commit push/tag/publish commands. A bare
 `chore(release): vX.Y.Z release notes` is too brief.
 
-When the user does commit, do **not** suggest `git commit -o <paths>` — it bypasses the hook's
-`git add` and leaves the fresh `.dockg/snapshots/` churn uncommitted; let the commit stage the
-tree normally.
+The release commit contains version machinery only: no `.dockg/snapshots/` or
+`.pycodekg/snapshots/` churn, because nothing generates it at commit time any more. If either
+appears in `git status` here, something re-enabled a per-commit snapshot -- find it rather than
+committing it.
 
 ---
 
@@ -92,10 +82,44 @@ curl -s https://pypi.org/pypi/doc-kg/json | python3 -c \
   "import sys,json; print(json.load(sys.stdin)['info']['version'])"
 ```
 
+---
+
+## Finally: Snapshot PyCodeKG (follow-up commit, after the tag)
+
+Run this **after the tag is pushed**, on the release branch, as its own commit. This is the
+one thing the generic `/release` does not do, and the reason this command exists.
+
+```bash
+.venv/bin/pycodekg build --repo .
+.venv/bin/pycodekg snapshot save --repo .
+git add .pycodekg/snapshots/
+```
+
+**Both commands are required.** `build` refreshes the graph store and vector index but does
+not write a snapshot; only `snapshot save` creates one. Running `build` alone leaves
+`.pycodekg/snapshots/` untouched, silently.
+
+**Why after the tag, not before the commit.** The snapshot's key is `git write-tree`. Taken
+before the release commit and staged into it, the key names a tree that the commit then
+changes -- it can never resolve, which is how 90% of the fleet's snapshots became garbage.
+Taken after the tag and committed separately, the key names the tagged commit's tree, which
+is real and resolvable. The cost is that `git show vX.Y.Z:.pycodekg/snapshots/` will not find
+the snapshot describing that tag: it lives one commit later, on the branch. That is the
+accepted trade in `kgrag_priv/docs/SNAPSHOT_STRATEGY.md`, not an oversight.
+
+**Still keyed on the tree, not the tag.** Phase 3 of that plan re-keys snapshots on the
+version string, but it has not landed -- `src/doc_kg/snapshots.py` still hardcodes
+`"key": self.tree_hash`, as do `pycode_kg`, `memory_kg` and `Metabo_kg`. The follow-up-commit
+ordering above is what makes a tree key valid in the meantime. When Phase 3 lands, pass the
+version explicitly and revisit this section.
+
+DocKG's own snapshot is **not** taken here. Its keying has the same gap and no release step
+is wired for it yet; leaving it out is better than writing another unresolvable key.
+
 Completion summary should additionally note:
 ```
-✓ PyCodeKG rebuilt + snapshot saved and staged (.pycodekg/snapshots/)
-✓ DocKG index + snapshot refreshed by commit hook
 ✓ commit.txt written for the user to commit
+✓ Release commit carries version machinery only (no snapshot churn)
+✓ PyCodeKG rebuilt + snapshot saved in a follow-up commit AFTER the tag
 ✓ Published to PyPI (verify against pypi.org/pypi/doc-kg/json after the tag-push run finishes)
 ```
