@@ -50,7 +50,13 @@ def snapshot() -> None:
     "--tree-hash",
     default=None,
     type=str,
-    help="Git tree hash; auto-detected if not provided.",
+    help="Git tree hash, recorded as provenance; auto-detected if not provided.",
+)
+@click.option(
+    "--subject",
+    default="",
+    type=str,
+    help="What was measured, e.g. 'repo:doc-kg' or 'corpus:pepys'.",
 )
 @click.option(
     "--branch",
@@ -65,10 +71,20 @@ def save_snapshot(
     sqlite: str,
     snapshots_dir: str | None,
     tree_hash: str | None,
+    subject: str,
     branch: str | None,
     vectors_path: str | None,
 ) -> None:
-    """Capture current DocKG metrics and save as a temporal snapshot."""
+    """Capture current DocKG metrics and save as a temporal snapshot.
+
+    The snapshot is keyed on VERSION. **Pass it explicitly at release time.**
+    An omitted VERSION is auto-detected from the installed doc-kg package,
+    which names the measuring tool rather than the corpus being measured, so it
+    is recorded but never used as the key; omitting it keys on a UTC timestamp
+    instead, which is the right answer for a corpus. The git tree hash is
+    recorded as provenance and is not the key -- it is read before `git add`
+    stages the snapshot, so it names a tree that is never committed.
+    """
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
     snapshots_path = (
@@ -115,6 +131,10 @@ def save_snapshot(
     snapshot_obj = mgr.capture(
         version=version,
         tree_hash=tree_hash or "",
+        # An explicit VERSION is a release tag and becomes the key. An
+        # auto-detected one is the measuring tool's version and must not be.
+        key=version or "",
+        subject=subject,
         branch=branch,
         graph_stats_dict=stats,
         coverage_score=coverage_score,
