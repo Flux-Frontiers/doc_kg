@@ -232,8 +232,18 @@ def test_snapshot_from_dict_drops_legacy_commit_field() -> None:
         "vs_baseline": None,
     }
     snap = Snapshot.from_dict(snap_dict)
-    assert snap.tree_hash == "newhash123"
     assert snap.key == "newhash123"
+    # Not a 40-char hex string, so it is not recorded as a tree hash. Under the
+    # old scheme key and tree_hash were the same field; they are not any more.
+    assert snap.tree_hash == ""
+
+
+def test_snapshot_from_dict_keeps_a_real_tree_hash_as_provenance() -> None:
+    """A legacy tree-hash key stays addressable *and* keeps its provenance."""
+    key = "a" * 40
+    snap = Snapshot.from_dict({"key": key, "branch": "main", "timestamp": "", "metrics": {}})
+    assert snap.key == key
+    assert snap.tree_hash == key
 
 
 # ---------------------------------------------------------------------------
@@ -1013,3 +1023,62 @@ def _make_dockg_snapshot(tree_hash: str, timestamp: str, nodes: int = 10) -> Sna
         metrics=_make_metrics(nodes=nodes),
         tree_hash=tree_hash,
     )
+
+
+# ---------------------------------------------------------------------------
+# Key scheme (kgmodule-utils >= 0.19.0)
+# ---------------------------------------------------------------------------
+
+
+def test_capture_does_not_key_on_the_tree_hash(tmp_path: Path) -> None:
+    """The tree hash is provenance, not an identifier.
+
+    It is read before ``git add`` stages the snapshot, so it names a tree that
+    is never committed.
+    """
+    mgr = SnapshotManager(tmp_path / "snaps")
+    snap = mgr.capture(
+        version="0.24.0",
+        branch="main",
+        graph_stats_dict={"total_nodes": 5, "total_edges": 3},
+        tree_hash="b" * 40,
+    )
+    assert snap.key != "b" * 40
+    assert snap.tree_hash == "b" * 40
+
+
+def test_capture_forwards_key_and_subject_past_extra_metrics(tmp_path: Path) -> None:
+    """``key`` and ``subject`` are named parameters, not ``**extra_metrics``.
+
+    This capture() takes ``**extra_metrics``, so an unnamed ``key=`` would be
+    silently recorded as a metric and never reach the base.
+    """
+    mgr = SnapshotManager(tmp_path / "snaps")
+    snap = mgr.capture(
+        version="0.24.0",
+        branch="main",
+        graph_stats_dict={"total_nodes": 5, "total_edges": 3},
+        key="v0.24.0",
+        subject="repo:doc-kg",
+    )
+    assert snap.key == "v0.24.0"
+    assert snap.subject == "repo:doc-kg"
+    assert "key" not in snap.__dict__["metrics"]
+    assert "subject" not in snap.__dict__["metrics"]
+
+
+def test_to_dict_is_not_overridden_and_uses_the_current_key(tmp_path: Path) -> None:
+    """An override here would keep writing tree-hash keys whatever the SDK does."""
+    assert "to_dict" not in Snapshot.__dict__
+
+    mgr = SnapshotManager(tmp_path / "snaps")
+    snap = mgr.capture(
+        version="0.24.0",
+        branch="main",
+        graph_stats_dict={"total_nodes": 5, "total_edges": 3},
+        coverage_score=0.85,
+        key="v0.24.0",
+    )
+    d = snap.to_dict()
+    assert d["key"] == "v0.24.0"
+    assert d["metrics"]["coverage_score"] == 0.85  # typed property still serializes

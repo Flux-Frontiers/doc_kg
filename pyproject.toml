@@ -82,7 +82,7 @@ dependencies = [
     # different versions across the fleet is precisely the drift the pin
     # standard exists to stop. A reader comparing two repos should not have to
     # work out which floor is real.
-    "kgmodule-utils[semantic]>=0.18.0",
+    "kgmodule-utils[semantic]>=0.19.0",
     "pymupdf4llm>=0.0.17",
 ]
 

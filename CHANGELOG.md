@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Snapshots are keyed on a release tag or timestamp, not a git tree hash.**
+  Requires `kgmodule-utils>=0.19.0`, where the key scheme changed; the floor
+  moves with it. The tree hash was read before `git add` staged the snapshot,
+  so it named a tree that was never committed -- 63 of 605 fleet snapshot keys
+  resolve.
+
+  `dockg snapshot save VERSION` now uses VERSION as the key. Pass it explicitly
+  at release time: an omitted VERSION is auto-detected from the installed
+  doc-kg package, which names the measuring tool rather than the corpus being
+  measured, so it is recorded but never used as a key. Omitting it keys on a
+  UTC timestamp, which is correct for a corpus.
+
+- **`Snapshot.to_dict` is no longer overridden.** The override existed because
+  the base could not serialize this class's typed property views of `metrics`,
+  `vs_previous` and `vs_baseline`; 0.19.0's base reads them out of `__dict__`
+  instead. It also hardcoded `"key": self.tree_hash`, so leaving it in place
+  would have kept writing tree-hash keys regardless of the SDK.
+
+- **`Snapshot.from_dict` no longer copies a non-hash key into `tree_hash`.**
+  Under the old scheme the two were the same field. A stored key that is a real
+  40-character hash is still kept as provenance; a release tag is not.
+
+### Added
+
+- `--subject` on `snapshot save`, and `subject=` on `SnapshotManager.capture()`
+  -- what was measured (`repo:doc-kg`, `corpus:pepys`), recorded separately
+  from the tool that measured it. `key` and `subject` are **named** parameters
+  on `capture()`: it takes `**extra_metrics`, so an unnamed `key=` would have
+  been silently recorded as a metric instead of reaching the base.
+
 ## [0.23.0] - 2026-09-03
 
 ### Fixed
