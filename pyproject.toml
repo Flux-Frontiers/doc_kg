@@ -143,7 +143,7 @@ sqlite-vec = []
 optional = true
 
 [tool.poetry.group.kg.dependencies]
-pycode-kg = ">=0.23.1"
+pycode-kg = ">=0.25.1"
 
 # ---------------------------------------------------------------------------
 # Dev tooling (Poetry group, not a PEP 621 extra)

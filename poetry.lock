@@ -2527,19 +2527,19 @@ files = [
 
 [[package]]
 name = "pycode-kg"
-version = "0.24.1"
+version = "0.25.1"
 description = "A tool to build a searchable knowledge graph from Python repositories"
 optional = false
 python-versions = "<3.14,>=3.12"
 groups = ["kg"]
 files = [
-    {file = "pycode_kg-0.24.1-py3-none-any.whl", hash = "sha256:97180b04e227975bffab33d23a27e135239fa622f84df79dfac963e5afc87901"},
-    {file = "pycode_kg-0.24.1.tar.gz", hash = "sha256:cbf22c22c333756be77bf587917e06be8a48f76c4c3cbc4a2ade14576eb2ee85"},
+    {file = "pycode_kg-0.25.1-py3-none-any.whl", hash = "sha256:9785d097a89a159656d09e41bb17568249031a4b3824da806f8f1c75aab2b2e2"},
+    {file = "pycode_kg-0.25.1.tar.gz", hash = "sha256:ecd1f1d25a707b5625e7cd32bf4e6f6a8adf1c91694400335793582df4f358aa"},
 ]
 
 [package.dependencies]
 click = ">=8.1.0,<9"
-kgmodule-utils = {version = ">=0.18.1", extras = ["semantic", "viz3d"]}
+kgmodule-utils = {version = ">=0.19.0", extras = ["semantic", "viz3d"]}
 mcp = ">=1.0.0,<2"
 networkx = ">=3.0"
 numpy = ">=1.24.0"
@@ -4419,4 +4419,4 @@ viz = ["pyvis", "streamlit"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "d53a6bf4b373f994b638e4dcf40f6caaaad3f3630e2bbd34826732ac38e5180d"
+content-hash = "00fe8c8200e5cac0225d4e3131cd004de8fee52285af96c90b0f09b70634a324"
