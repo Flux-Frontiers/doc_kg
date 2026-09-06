@@ -84,6 +84,40 @@ curl -s https://pypi.org/pypi/doc-kg/json | python3 -c \
 
 ---
 
+## Then: Fix the Zenodo Record Licence (every release)
+
+Zenodo mints a new record for each GitHub Release and copies the licence from
+GitHub's detected licence. GitHub reports Elastic-2.0 as `NOASSERTION`, so Zenodo falls
+back to `cc-by-4.0` on every doc-kg archive. Elastic-2.0 has no id in Zenodo's licence
+vocabulary, so `.zenodo.json` cannot carry it and the correction cannot be made from
+inside the repo. It is a **permanent per-release step**, not a one-time repair.
+
+Wait for the Release run to finish and the archive to appear (`gh release view
+vX.Y.Z` first, then the Zenodo API; it can lag a minute or two), then:
+
+```bash
+.venv/bin/python scripts/zenodo_license.py --check     # report only
+.venv/bin/python scripts/zenodo_license.py             # fix the newest record
+```
+
+The script resolves the concept record (`19742773`) to its newest version, opens an
+InvenioRDM edit draft, replaces `metadata.rights` with a custom rights object for
+Elastic License 2.0, publishes the draft, and reads the record back. Metadata only:
+the DOI, version label, and deposited files do not change. It needs `ZENODO_TOKEN`
+in the environment with the `deposit:write` and `deposit:actions` scopes. Pass a
+record id to target an older version.
+
+Verify through the InvenioRDM representation, not the legacy one. A custom licence
+has no legacy id, so the legacy `metadata.license` reads `null` afterwards; that is
+expected. The script's final line is the check that matters:
+
+```
+record <id>: rights = Elastic License 2.0
+```
+
+Do not add `license: Elastic-2.0` to `CITATION.cff` while here: CFF 1.2.0's enum does
+not include it and the file would fail validation. `license-url` is the correct encoding.
+
 ## Finally: Snapshot PyCodeKG (follow-up commit, after the tag)
 
 Run this **after the tag is pushed**, on the release branch, as its own commit. This is the

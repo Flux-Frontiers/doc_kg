@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-09-05
+
+### Fixed
+
+- **Saved snapshots lost their key, subject and tool provenance.** 0.24.0
+  keyed snapshots on the release tag in memory, but `SnapshotManager.save_snapshot`
+  rebuilt a bare base `Snapshot` before writing and did not copy `snapshot_key`,
+  `subject`, `tool` or `tool_version`. Every file on disk therefore fell back to a
+  tree-hash key with empty provenance, whatever the caller passed, and the CLI's
+  `Key:` line reported a value that was never written. The rebuild now copies all
+  four fields, and a round-trip test reads the file and manifest back. The rebuild
+  itself stays: kgmodule-utils 0.19.0 serialises the snapshot file from `__dict__`
+  but builds the manifest entry from the `metrics` attribute, which on a doc-kg
+  `Snapshot` is a typed view rather than a dict.
+
 ## [0.24.0] - 2026-09-05
 
 ### Changed

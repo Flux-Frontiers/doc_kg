@@ -20,7 +20,7 @@ poetry add doc-kg
 
 Adds to `pyproject.toml`:
 ```toml
-doc-kg = "^0.24.0"
+doc-kg = "^0.24.1"
 ```
 
 There is no `[mcp]` extra: the `mcp` package is a core dependency, so

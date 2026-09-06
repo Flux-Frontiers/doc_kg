@@ -360,6 +360,42 @@ def test_snapshot_manager_manifest_created(snapshot_dir: Path, sample_snapshot: 
     assert "commit" not in manifest_data["snapshots"][0]
 
 
+def test_save_snapshot_persists_key_subject_and_tool(snapshot_dir: Path) -> None:
+    """The key, subject and tool provenance survive the trip to disk.
+
+    ``capture()`` sets them; ``save_snapshot`` used to rebuild a bare base
+    Snapshot without them, so the file fell back to a tree-hash key with
+    empty subject/tool fields no matter what the caller passed.
+    """
+    mgr = SnapshotManager(snapshot_dir)
+    tree_hash = "b" * 40
+    snap = mgr.capture(
+        version="0.24.1",
+        branch="main",
+        graph_stats_dict={"total_nodes": 10, "total_edges": 5, "node_counts": {}},
+        tree_hash=tree_hash,
+        key="0.24.1",
+        subject="repo:doc-kg",
+    )
+    assert snap.key == "0.24.1"
+
+    saved_path = mgr.save_snapshot(snap)
+    assert saved_path.name == "0.24.1.json"
+
+    on_disk = json.loads(saved_path.read_text(encoding="utf-8"))
+    assert on_disk["key"] == "0.24.1"
+    assert on_disk["subject"] == "repo:doc-kg"
+    assert on_disk["tree_hash"] == tree_hash
+    assert on_disk["tool"] == "doc-kg"
+    assert on_disk["tool_version"]
+
+    manifest = json.loads(mgr.manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["snapshots"][0]
+    assert entry["key"] == "0.24.1"
+    assert entry["subject"] == "repo:doc-kg"
+    assert entry["tool"] == "doc-kg"
+
+
 def test_save_snapshot_manifest_has_full_metrics(
     snapshot_dir: Path, sample_snapshot: Snapshot
 ) -> None:

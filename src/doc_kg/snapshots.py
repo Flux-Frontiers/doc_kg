@@ -437,15 +437,17 @@ class SnapshotManager(_BaseSnapshotManager):
     def save_snapshot(self, snapshot: _BaseSnapshot, *, force: bool = False) -> Any:
         """Persist snapshot, normalising any typed-property values to raw dicts.
 
-        The base ``save_snapshot`` inspects ``snapshot.metrics`` (expects a
-        dict) and ``snapshot.vs_previous`` / ``snapshot.vs_baseline`` (expects
-        dicts or None) directly.  If ``snapshot`` is a doc_kg ``Snapshot``
-        the properties return typed dataclasses instead; we substitute a plain
-        ``_BaseSnapshot`` carrying the raw dicts so the base implementation
-        can serialise without modification.
+        The base ``save_snapshot`` serialises the snapshot file through
+        ``to_dict`` (which reads ``__dict__``), but builds the manifest entry
+        from ``snapshot.metrics`` directly and expects a dict there.  If
+        ``snapshot`` is a doc_kg ``Snapshot`` that property returns a typed
+        dataclass, so we substitute a plain ``_BaseSnapshot`` carrying the raw
+        dicts.  Every other field is copied verbatim: the copy used to omit
+        ``snapshot_key``, ``subject``, ``tool`` and ``tool_version``, which
+        made every saved snapshot fall back to a tree-hash key with empty
+        provenance regardless of what the caller passed.
         """
         if isinstance(snapshot, Snapshot):
-            # Build a plain base-Snapshot with raw dicts (no property layer).
             raw = _BaseSnapshot(
                 branch=snapshot.branch,
                 timestamp=snapshot.timestamp,
@@ -456,6 +458,10 @@ class SnapshotManager(_BaseSnapshotManager):
                 vs_previous=snapshot.__dict__["vs_previous"],
                 vs_baseline=snapshot.__dict__["vs_baseline"],
                 tree_hash=snapshot.tree_hash,
+                snapshot_key=snapshot.snapshot_key,
+                subject=snapshot.subject,
+                tool=snapshot.tool,
+                tool_version=snapshot.tool_version,
             )
             return super().save_snapshot(raw, force=force)
         return super().save_snapshot(snapshot, force=force)
