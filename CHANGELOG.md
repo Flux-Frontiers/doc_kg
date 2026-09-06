@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a `diff_snapshots` that adds `timestamp` to each side. Snapshot files,
   manifests and the CLI output are unchanged.
 
+## [0.25.0] - 2026-09-06
+
 ## [0.24.1] - 2026-09-05
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-09-06T03:20:15.751050+00:00",
+  "last_update": "2026-09-06T22:30:25.148407+00:00",
   "snapshots": [
     {
       "key": "82f8a5e4ab8598cc656ce350b2c206524c6a9f43",
@@ -934,6 +934,96 @@
           "nodes": 1072,
           "edges": 858,
           "coverage_delta": 0.019000000000000128,
+          "critical_issues_delta": 2
+        }
+      }
+    },
+    {
+      "key": "0.25.0",
+      "branch": "main",
+      "timestamp": "2026-09-06T22:30:25.144476+00:00",
+      "version": "0.25.0",
+      "subject": "repo:doc-kg",
+      "tool": "pycode-kg",
+      "tool_version": "0.26.0",
+      "file": "0.25.0.json",
+      "metrics": {
+        "db_path": ".pycodekg/graph.sqlite",
+        "total_nodes": 5370,
+        "meaningful_nodes": 352,
+        "total_edges": 4913,
+        "node_counts": {
+          "class": 35,
+          "function": 118,
+          "method": 161,
+          "module": 38,
+          "symbol": 5018
+        },
+        "edge_counts": {
+          "ATTR_ACCESS": 1528,
+          "CALLS": 1909,
+          "CONTAINS": 314,
+          "IMPORTS": 313,
+          "INHERITS": 1,
+          "RESOLVES_TO": 848
+        },
+        "module_count": 38,
+        "class_count": 35,
+        "function_count": 118,
+        "method_count": 161,
+        "docstring_coverage": 0.821,
+        "snapshot_count": 11,
+        "coverage_documented": 289,
+        "coverage_total": 352,
+        "critical_issues": 5,
+        "complexity_median": 5,
+        "module_node_counts": {
+          "src/doc_kg/__init__.py": 3,
+          "src/doc_kg/__main__.py": 1,
+          "src/doc_kg/app.py": 148,
+          "src/doc_kg/chunker.py": 308,
+          "src/doc_kg/cli/__init__.py": 1,
+          "src/doc_kg/cli/cmd_analyze.py": 8,
+          "src/doc_kg/cli/cmd_build.py": 296,
+          "src/doc_kg/cli/cmd_hooks.py": 22,
+          "src/doc_kg/cli/cmd_mcp.py": 13,
+          "src/doc_kg/cli/cmd_model.py": 16,
+          "src/doc_kg/cli/cmd_pipeline.py": 112,
+          "src/doc_kg/cli/cmd_query.py": 66,
+          "src/doc_kg/cli/cmd_semantic_analyze.py": 8,
+          "src/doc_kg/cli/cmd_snapshot.py": 185,
+          "src/doc_kg/cli/cmd_status.py": 52,
+          "src/doc_kg/cli/cmd_viz.py": 21,
+          "src/doc_kg/cli/group.py": 2,
+          "src/doc_kg/cli/main.py": 1,
+          "src/doc_kg/cli/options.py": 13,
+          "src/doc_kg/config.py": 16,
+          "src/doc_kg/discover_topics.py": 107,
+          "src/doc_kg/dockg.py": 216,
+          "src/doc_kg/dockg_semantic_analysis.py": 278,
+          "src/doc_kg/dockg_thorough_analysis.py": 170,
+          "src/doc_kg/embedder_worker.py": 2,
+          "src/doc_kg/entry_chunk.py": 21,
+          "src/doc_kg/graph.py": 76,
+          "src/doc_kg/index.py": 691,
+          "src/doc_kg/kg.py": 544,
+          "src/doc_kg/manifold.py": 143,
+          "src/doc_kg/mcp_server.py": 79,
+          "src/doc_kg/pdf_reader.py": 7,
+          "src/doc_kg/pipeline.py": 187,
+          "src/doc_kg/relations.py": 51,
+          "src/doc_kg/sampler.py": 208,
+          "src/doc_kg/snapshots.py": 80,
+          "src/doc_kg/store.py": 302,
+          "src/doc_kg/topics.py": 127
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 1002,
+          "edges": 741,
+          "coverage_delta": 0.03300000000000003,
           "critical_issues_delta": 2
         }
       }

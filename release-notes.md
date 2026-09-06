@@ -1,35 +1,42 @@
-# Release Notes -- v0.24.1
+# Release Notes — v0.25.0
 
-> Released: 2026-09-05
+> Released: 2026-09-06
 
-A one-defect patch to 0.24.0, released the same day. 0.24.0 said snapshots are keyed on
-the release tag you pass. They were, in memory. The file written to disk still carried a
-tree-hash key and empty subject and tool fields, so the change never reached the
-snapshots directory. This release makes the stored snapshot match what the CLI reports.
+DocKG's snapshot support is rebuilt on the fleet's shared model, closing the
+class of bug that shipped in the 0.24.0/0.24.1 pair.
 
 ## What changed
 
-**Snapshot files now keep their key and provenance.** `SnapshotManager.save_snapshot`
-rebuilds a plain base snapshot before writing, because the shared manager expects the
-metrics as a dict where doc-kg exposes a typed view. That rebuild copied everything except
-`snapshot_key`, `subject`, `tool` and `tool_version`. With no key present, the shared base
-falls back to the tree hash, which is exactly the scheme 0.24.0 set out to retire. All four
-fields are now copied, and a test saves a snapshot through the manager and reads the JSON
-file and the manifest entry back to prove it.
+**The `Snapshot` subclass is gone.** DocKG used to subclass the shared
+`kg_utils.snapshots.Snapshot` to expose `metrics`, `vs_previous`, and
+`vs_baseline` as typed properties instead of plain dicts. That forced a
+hand-written copy of nine manager methods — `capture`, `save_snapshot`,
+`load_snapshot`, `get_previous`, `get_baseline`, `diff_snapshots`,
+`_compute_delta`, `to_dict`, and `from_dict` — and one of those copies is
+what dropped the snapshot key and provenance fields in 0.24.0, patched
+same-day in 0.24.1. Removing the subclass removes the whole class of bug
+instead of the one instance of it.
 
-Nothing else moved. Graph build, query, pack, and the MCP server are untouched.
+A snapshot's `metrics`, `vs_previous`, and `vs_baseline` are now plain
+dicts. `SnapshotMetrics` and `SnapshotDelta` remain available as converters
+for code that wants attribute access. Snapshot files, manifests, CLI
+output, and the MCP tools are unchanged.
+
+**The `kgmodule-utils` 0.19.1 delta-backfill fix now reaches DocKG.**
+Loading a saved snapshot previously reported `coverage_delta` and
+`issues_delta` as absent, even though listing and diffing snapshots
+computed them correctly for the same pair — the exact read path
+`snapshot show` uses was the one giving the wrong answer. With the floor
+resolving to 0.19.1, `snapshot show` now reports the same numbers as every
+other view of a snapshot.
 
 ## Upgrading
 
-Install 0.24.1 and re-take any snapshot you saved with 0.24.0. Those files carry a
-tree-hash key and blank provenance, so a snapshot taken on the tagged tree with
-
-```bash
-dockg snapshot save 0.24.1 --subject repo:doc-kg
-```
-
-replaces them rather than sitting alongside. Snapshots keyed on a tree hash by earlier
-releases still load.
+No action required for normal use — snapshot files, the CLI, and the MCP
+tools are unchanged. If your code accessed `Snapshot.metrics` as an object
+with attributes (`snap.metrics.total_nodes`), switch to dict access
+(`snap.metrics["total_nodes"]`) or call `metrics_from_dict(snap.metrics)`
+for the old style with attribute access.
 
 ---
 
