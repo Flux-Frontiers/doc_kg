@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-05
+
 ### Changed
 
 - **Snapshots are keyed on a release tag or timestamp, not a git tree hash.**
