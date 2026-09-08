@@ -1138,3 +1138,134 @@ def test_snapshot_is_the_shared_class_and_uses_the_current_key(tmp_path: Path) -
     d = snap.to_dict()
     assert d["key"] == "v0.24.0"
     assert d["metrics"]["coverage_score"] == 0.85
+
+
+# ---------------------------------------------------------------------------
+# The deleted overrides: each behaviour now comes from a base extension point
+#
+# 0.26.0 removed __init__, capture, diff_snapshots and _metrics_changed from
+# this module. These tests pin the behaviour those overrides provided, so a
+# regression in the shared SDK surfaces here rather than in a shipped snapshot.
+# ---------------------------------------------------------------------------
+
+
+def test_package_name_comes_from_the_class_attribute(snapshot_dir: Path) -> None:
+    """Replaces the deleted __init__, whose only job was this string."""
+    mgr = SnapshotManager(snapshot_dir)
+    assert mgr.package_name == "doc-kg"
+    assert mgr.capture(graph_stats_dict={"total_nodes": 1}, key="k").tool == "doc-kg"
+
+
+def test_save_and_reload_persists_key_subject_and_tool(snapshot_dir: Path) -> None:
+    """The round trip the 0.24.0 regression would have failed.
+
+    save_snapshot used to rebuild the base Snapshot field by field, dropping
+    key, subject, tool and tool_version on the way to disk. Assert them from
+    the file, not the in-memory object, and again after a reload.
+    """
+    mgr = SnapshotManager(snapshot_dir)
+    snap = mgr.capture(
+        version="9.9.9",
+        branch="main",
+        graph_stats_dict={"total_nodes": 3, "total_edges": 2},
+        tree_hash="e" * 40,
+        key="v9.9.9",
+        subject="repo:doc-kg",
+    )
+    saved = mgr.save_snapshot(snap)
+    assert saved is not None and saved.name == "v9.9.9.json"
+
+    on_disk = json.loads(saved.read_text(encoding="utf-8"))
+    assert on_disk["key"] == "v9.9.9"
+    assert on_disk["subject"] == "repo:doc-kg"
+    assert on_disk["tree_hash"] == "e" * 40
+    assert on_disk["tool"] == "doc-kg"
+    assert on_disk["tool_version"]
+
+    reloaded = mgr.load_snapshot("v9.9.9")
+    assert reloaded is not None
+    assert reloaded.key == "v9.9.9"
+    assert reloaded.subject == "repo:doc-kg"
+    assert reloaded.tool == "doc-kg"
+
+
+def test_capture_signature_is_the_base_signature(snapshot_dir: Path) -> None:
+    """The trap the _domain_metrics hook exists to close."""
+    mgr = SnapshotManager(snapshot_dir)
+    snap = mgr.capture(graph_stats_dict={"total_nodes": 1}, key="v1.2.3", subject="repo:x")
+    assert snap.key == "v1.2.3"
+    assert snap.subject == "repo:x"
+    assert "key" not in snap.metrics
+    assert "subject" not in snap.metrics
+
+
+def test_domain_metrics_derives_meaningful_nodes(snapshot_dir: Path) -> None:
+    """Replaces the derivation the deleted capture() did inline.
+
+    ``meaningful_nodes`` discounts document nodes, which are containers rather
+    than content.
+    """
+    mgr = SnapshotManager(snapshot_dir)
+    snap = mgr.capture(
+        graph_stats_dict={"total_nodes": 100, "node_counts": {"document": 20, "chunk": 80}},
+        key="k",
+    )
+    assert snap.metrics["meaningful_nodes"] == 80
+
+
+def test_domain_metrics_meaningful_nodes_never_negative(snapshot_dir: Path) -> None:
+    """A document count exceeding the total clamps at zero rather than going negative."""
+    mgr = SnapshotManager(snapshot_dir)
+    snap = mgr.capture(graph_stats_dict={"total_nodes": 5, "node_counts": {"document": 9}}, key="k")
+    assert snap.metrics["meaningful_nodes"] == 0
+
+
+def test_domain_metrics_supplies_defaults_a_caller_overrides(snapshot_dir: Path) -> None:
+    """The three DocKG metrics are present even when nobody passes them."""
+    mgr = SnapshotManager(snapshot_dir)
+    bare = mgr.capture(graph_stats_dict={"total_nodes": 1}, key="k")
+    assert bare.metrics["coverage_score"] == 0.0
+    assert bare.metrics["issues_count"] == 0
+    assert bare.metrics["complexity_median"] == 0.0
+
+    supplied = mgr.capture(
+        graph_stats_dict={"total_nodes": 1},
+        key="k2",
+        coverage_score=0.85,
+        issues_count=3,
+        complexity_median=2.5,
+    )
+    assert supplied.metrics["coverage_score"] == 0.85
+    assert supplied.metrics["issues_count"] == 3
+    assert supplied.metrics["complexity_median"] == 2.5
+
+
+def test_metrics_ignore_treats_a_db_path_change_as_no_change(snapshot_dir: Path) -> None:
+    """Replaces the deleted _metrics_changed override.
+
+    db_path is where the graph happened to live, not something measured, so two
+    snapshots differing only in it are duplicates.
+    """
+    mgr = SnapshotManager(snapshot_dir)
+    assert mgr.metrics_ignore == frozenset({"db_path"})
+    assert not mgr._metrics_changed(
+        {"total_nodes": 5, "db_path": "/one/graph.sqlite"},
+        {"total_nodes": 5, "db_path": "/two/graph.sqlite"},
+    )
+    assert mgr._metrics_changed(
+        {"total_nodes": 6, "db_path": "/one/graph.sqlite"},
+        {"total_nodes": 5, "db_path": "/one/graph.sqlite"},
+    )
+
+
+def test_diff_carries_timestamp_and_issues_delta(snapshot_dir: Path) -> None:
+    """Replaces the deleted diff_snapshots, which existed only for timestamp."""
+    mgr = SnapshotManager(snapshot_dir)
+    for key, nodes, issues in (("dl_a", 1, ["kept", "gone"]), ("dl_b", 2, ["kept", "new"])):
+        mgr.save_snapshot(
+            mgr.capture(graph_stats_dict={"total_nodes": nodes}, key=key, issues=issues),
+            force=True,
+        )
+    result = mgr.diff_snapshots("dl_a", "dl_b")
+    assert result["a"]["timestamp"] and result["b"]["timestamp"]
+    assert result["issues_delta"] == {"introduced": ["new"], "resolved": ["gone"]}

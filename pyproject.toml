@@ -82,7 +82,13 @@ dependencies = [
     # different versions across the fleet is precisely the drift the pin
     # standard exists to stop. A reader comparing two repos should not have to
     # work out which floor is real.
-    "kgmodule-utils[semantic]>=0.19.0",
+    # 0.20.0 is a hard requirement, not a preference: snapshots.py has no
+    # __init__, capture, diff_snapshots or _metrics_changed of its own any
+    # more. It configures the base through the package_name and metrics_ignore
+    # class attributes and the _domain_metrics() hook, none of which exist
+    # before 0.20.0. Against 0.19.x the manager reports itself as "kg-utils",
+    # loses meaningful_nodes, and treats a db_path change as a real change.
+    "kgmodule-utils[semantic]>=0.20.0",
     "pymupdf4llm>=0.0.17",
 ]
 
