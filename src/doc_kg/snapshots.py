@@ -18,7 +18,7 @@ This module adds:
     ``metrics_from_dict`` / ``metrics_to_dict`` and ``delta_from_dict`` /
     ``delta_to_dict``; a ``Snapshot`` never holds one.
   - a ``SnapshotManager`` subclass that sets ``package_name="doc-kg"``, builds
-    the DocKG metrics dict in ``capture()``, adds ``coverage_delta`` and
+    the DocKG metrics dict in ``_domain_metrics()``, adds ``coverage_delta`` and
     ``issues_delta`` to deltas, ignores ``db_path`` when deciding whether
     metrics changed, and adds ``timestamp`` to each side of a diff.
 
@@ -41,7 +41,6 @@ Usage
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -179,121 +178,46 @@ class SnapshotManager(_BaseSnapshotManager):
     0.24.0 snapshot key regression through.
     """
 
-    def __init__(
-        self,
-        snapshots_dir: Path | str,
-        *,
-        package_name: str = "doc-kg",
-        db_path: Path | str | None = None,
-    ) -> None:
-        """Initialize the manager rooted at ``snapshots_dir``.
+    #: Version detection reads this; the base records it as the snapshot's
+    #: ``tool``. Replaces an ``__init__`` that only forwarded to ``super()``.
+    package_name = "doc-kg"
 
-        :param snapshots_dir: Directory holding snapshot JSON and the manifest.
-        :param package_name: Package name used for version detection.
-        :param db_path: Optional DocKG SQLite path, recorded in metrics.
-        """
-        super().__init__(snapshots_dir, package_name=package_name, db_path=db_path)
+    #: ``db_path`` is where the graph happened to live when the snapshot was
+    #: taken, not something measured, so two snapshots differing only in it are
+    #: duplicates. Consumed by the base ``_metrics_changed``.
+    metrics_ignore = frozenset({"db_path"})
 
     # ------------------------------------------------------------------
-    # capture — build the DocKG metrics dict
+    # Capture-time metrics derived by this module
     # ------------------------------------------------------------------
 
-    def capture(
-        self,
-        version: str | None = None,
-        branch: str | None = None,
-        graph_stats_dict: dict[str, Any] | None = None,
-        tree_hash: str = "",
-        hotspots: list[dict[str, Any]] | None = None,
-        issues: list[str] | None = None,
-        key: str = "",
-        subject: str = "",
-        **extra_metrics: Any,
-    ) -> Snapshot:
-        """Capture a DocKG snapshot.
+    def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+        """Derive the DocKG metric fields from the graph stats.
 
-        Derives ``meaningful_nodes`` from the graph stats and coerces the
-        DocKG metric fields, then delegates to the shared implementation.
+        Called by the inherited ``capture()``. Overriding this rather than
+        ``capture()`` is deliberate: a ``capture()`` override has to restate the
+        base signature, and restating it is how an unnamed ``key=`` fell into
+        ``**extra_metrics`` and shipped 0.24.0 with every snapshot keyed on a
+        tree hash.
 
-        :param version: Version string (e.g., "0.3.0").
-        :param branch: Git branch name; auto-detected if None.
-        :param graph_stats_dict: Output from ``graph_stats()`` / ``store.stats()``.
-        :param tree_hash: Git tree hash, recorded as provenance; auto-detected
-            if not provided. It is not the snapshot's key.
-        :param hotspots: Top hot chunks with metadata.
-        :param issues: List of issue description strings.
-        :param key: Snapshot identifier. Pass the release tag at release time;
-            omit it and the base assigns a UTC timestamp. Named explicitly
-            rather than left to ``**extra_metrics``, which would silently
-            record it as a metric instead of passing it to the base.
-        :param subject: What was measured, e.g. ``repo:doc-kg`` or
-            ``corpus:pepys``. Explicit for the same reason.
-        :param extra_metrics: Domain-specific fields; recognised keys are
-            ``coverage_score`` (float), ``issues_count`` (int), and
-            ``complexity_median`` (float).
-        :return: New :class:`~kg_utils.snapshots.Snapshot` (not yet persisted).
+        The three zero values are defaults, not measurements. Anything the
+        caller passes to ``capture()`` overrides them, which is how
+        ``cmd_snapshot`` supplies the real numbers; they exist so a snapshot
+        taken without them still carries the keys.
+
+        :param stats: Graph stats passed to ``capture()``.
+        :return: ``meaningful_nodes`` plus defaults for the DocKG metrics.
         """
-        stats = graph_stats_dict or {}
         node_counts = stats.get("node_counts", {})
-        meaningful_nodes = max(
-            0,
-            int(stats.get("total_nodes", 0)) - int(node_counts.get("document", 0)),
-        )
-
-        extra: dict[str, Any] = {
-            "meaningful_nodes": meaningful_nodes,
-            "coverage_score": float(extra_metrics.pop("coverage_score", 0.0)),
-            "issues_count": int(extra_metrics.pop("issues_count", 0)),
-            "complexity_median": float(extra_metrics.pop("complexity_median", 0.0)),
-            **extra_metrics,
+        return {
+            "meaningful_nodes": max(
+                0,
+                int(stats.get("total_nodes", 0)) - int(node_counts.get("document", 0)),
+            ),
+            "coverage_score": 0.0,
+            "issues_count": 0,
+            "complexity_median": 0.0,
         }
-
-        return super().capture(
-            version=version,
-            branch=branch,
-            graph_stats_dict=stats,
-            tree_hash=tree_hash,
-            key=key,
-            subject=subject,
-            hotspots=hotspots,
-            issues=issues,
-            **extra,
-        )
-
-    # ------------------------------------------------------------------
-    # diff_snapshots — add the timestamp the CLI prints
-    # ------------------------------------------------------------------
-
-    def diff_snapshots(self, key_a: str, key_b: str) -> dict[str, Any]:
-        """Compare two snapshots, adding ``timestamp`` to each side.
-
-        :param key_a: Earlier snapshot key.
-        :param key_b: Later snapshot key.
-        :return: The shared diff result with ``a['timestamp']`` and
-            ``b['timestamp']`` filled in.
-        """
-        result = super().diff_snapshots(key_a, key_b)
-        if "error" in result:
-            return result
-
-        for side, key in (("a", key_a), ("b", key_b)):
-            snap = self.load_snapshot(key)
-            if snap is not None:
-                result[side]["timestamp"] = snap.timestamp
-        return result
-
-    # ------------------------------------------------------------------
-    # Prune — ignore db_path when comparing metrics for duplicate detection
-    # ------------------------------------------------------------------
-
-    _METRICS_IGNORE = frozenset({"db_path"})
-
-    def _metrics_changed(self, new_metrics: dict[str, Any], old_metrics: dict[str, Any]) -> bool:
-        """Return True if meaningful metrics changed, ignoring volatile fields like db_path."""
-        strip = self._METRICS_IGNORE
-        a = {k: v for k, v in new_metrics.items() if k not in strip}
-        b = {k: v for k, v in old_metrics.items() if k not in strip}
-        return a != b
 
     # ------------------------------------------------------------------
     # Delta computation — adds coverage_delta and issues_delta

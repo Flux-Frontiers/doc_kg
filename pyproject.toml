@@ -82,7 +82,13 @@ dependencies = [
     # different versions across the fleet is precisely the drift the pin
     # standard exists to stop. A reader comparing two repos should not have to
     # work out which floor is real.
-    "kgmodule-utils[semantic]>=0.19.0",
+    # 0.20.0 is a hard requirement, not a preference: snapshots.py has no
+    # __init__, capture, diff_snapshots or _metrics_changed of its own any
+    # more. It configures the base through the package_name and metrics_ignore
+    # class attributes and the _domain_metrics() hook, none of which exist
+    # before 0.20.0. Against 0.19.x the manager reports itself as "kg-utils",
+    # loses meaningful_nodes, and treats a db_path change as a real change.
+    "kgmodule-utils[semantic]>=0.20.0",
     "pymupdf4llm>=0.0.17",
 ]
 
@@ -143,7 +149,12 @@ sqlite-vec = []
 optional = true
 
 [tool.poetry.group.kg.dependencies]
-pycode-kg = ">=0.25.1"
+# 0.27.0 retired pycode_kg's snapshot overrides and renamed the capture
+# keyword `coverage` to `docstring_coverage`. It also floors on
+# kgmodule-utils>=0.20.0, the same SDK this repo now requires, so pinning
+# below it lets `poetry install --with kg` resolve a pycodekg that predates
+# the shared extension points.
+pycode-kg = ">=0.27.0"
 
 # ---------------------------------------------------------------------------
 # Dev tooling (Poetry group, not a PEP 621 extra)
