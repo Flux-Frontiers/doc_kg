@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-08
+
+### Changed
+
+- **`SnapshotManager` configures the shared base instead of overriding it.**
+  The `__init__`, `capture`, `diff_snapshots` and `_metrics_changed` overrides
+  are deleted; `snapshots.py` goes from 497 lines to 236. Each one is replaced
+  by a kgmodule-utils 0.20.0 extension point: the `package_name` class
+  attribute, the `_domain_metrics()` hook (which derives `meaningful_nodes` and
+  declares the `coverage_score`, `issues_count` and `complexity_median`
+  defaults), `metrics_ignore = frozenset({"db_path"})`, and a base
+  `diff_snapshots` that already includes `timestamp` on each side. Only
+  `_compute_delta_from_metrics` remains, because `coverage_delta` and
+  `issues_delta` are genuinely DocKG-specific. The metric defaults still yield
+  to same-named keywords, so `cmd_snapshot` supplies the real numbers exactly
+  as before. Eight new tests pin what the deleted overrides did; the suite was
+  green before they existed, which is why they were needed.
+- **`kgmodule-utils` floor raised to `>=0.20.0`.** This is a hard requirement,
+  not currency: against 0.19.x the manager reports itself as `kg-utils`, loses
+  `meaningful_nodes`, and treats a `db_path` change as a real metric change.
+- **`pycode-kg` tooling pin (optional `kg` group) raised to `>=0.27.0`.** That
+  release retired pycode_kg's own snapshot overrides and floors on the same
+  kgmodule-utils 0.20.0, so `poetry install --with kg` can no longer resolve a
+  pycodekg that predates the shared extension points into this environment.
+
+## [0.25.0] - 2026-09-06
+
 ### Changed
 
 - **`doc_kg.snapshots.Snapshot` is now the shared `kg_utils.snapshots.Snapshot`,
@@ -36,8 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_compute_delta_from_metrics`, the `db_path`-ignoring `_metrics_changed`, and
   a `diff_snapshots` that adds `timestamp` to each side. Snapshot files,
   manifests and the CLI output are unchanged.
-
-## [0.25.0] - 2026-09-06
 
 ## [0.24.1] - 2026-09-05
 
