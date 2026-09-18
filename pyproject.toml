@@ -88,7 +88,7 @@ dependencies = [
     # class attributes and the _domain_metrics() hook, none of which exist
     # before 0.20.0. Against 0.19.x the manager reports itself as "kg-utils",
     # loses meaningful_nodes, and treats a db_path change as a real change.
-    "kgmodule-utils[semantic]>=0.20.0",
+    "kgmodule-utils[semantic]>=0.22.0",
     "pymupdf4llm>=0.0.17",
 ]
 
