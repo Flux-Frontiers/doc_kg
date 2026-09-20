@@ -30,7 +30,7 @@
       }
     },
     "pycodekg": {
-      "command": "/Users/egs/repos/doc_kg/.venv/bin/pycodekg",
+      "command": "pycodekg",
       "args": [
         "mcp",
         "--repo",
@@ -38,7 +38,7 @@
       ]
     },
     "dockg": {
-      "command": "/Users/egs/repos/doc_kg/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",

@@ -57,13 +57,15 @@ Optional flags:
 
 ## Claude Code Or Kilo Code (.mcp.json)
 
-Create `.mcp.json` in project root:
+Create `.mcp.json` in project root. `dockg` here is the globally installed
+tool (`uv tool install doc-kg`), resolved from `PATH`; it is not a path into
+any repo's `.venv`:
 
 ```json
 {
   "mcpServers": {
     "dockg": {
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",
@@ -87,7 +89,7 @@ Create `.vscode/mcp.json`:
   "servers": {
     "dockg": {
       "type": "stdio",
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",
@@ -110,7 +112,7 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "dockg": {
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",

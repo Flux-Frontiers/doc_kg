@@ -1,11 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(.venv/bin/dockg build:*)",
-      "Bash(/Users/egs/repos/doc_kg/.venv/bin/codekg-build-sqlite --repo . --wipe)",
-      "Bash(.venv/bin/pycodekg-build-sqlite --repo . --wipe)",
-      "Bash(.venv/bin/pycodekg-build-lancedb --repo . --wipe)",
-      "Bash(.venv/bin/pycodekg-analyze --repo .)"
+      "Bash(dockg build:*)",
+      "Bash(pycodekg-build-lancedb --repo . --wipe)",
+      "Bash(pycodekg-analyze --repo .)"
     ]
   }
 }

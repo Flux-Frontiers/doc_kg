@@ -25,6 +25,14 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
 
+from kg_utils.validation import (
+    MAX_HOP,
+    MAX_K,
+    MAX_MAX_NODES,
+    bounded_int,
+    require_query,
+)
+
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.graph import DocGraph
 from doc_kg.index import (
@@ -1120,6 +1128,10 @@ class DocKG:
             (e.g. ``("chunk", "section")`` to drop structural/topic nodes).
         :return: :class:`QueryResult`.
         """
+        q = require_query(q)
+        bounded_int("k", k, 1, MAX_K)
+        bounded_int("hop", hop, 0, MAX_HOP)
+        bounded_int("max_nodes", max_nodes, 1, MAX_MAX_NODES)
         # Fuse dense (vector) and lexical (BM25) seed channels via RRF.
         seed_rank = self._fused_seeds(
             q, k, file_prefixes=source_path_prefixes, node_kinds=node_kinds
@@ -1229,6 +1241,11 @@ class DocKG:
             ride on the edges already fetched for expansion — no extra queries.
         :return: :class:`TextPack`.
         """
+        q = require_query(q)
+        bounded_int("k", k, 1, MAX_K)
+        bounded_int("hop", hop, 0, MAX_HOP)
+        if max_nodes is not None:
+            bounded_int("max_nodes", max_nodes, 1, MAX_MAX_NODES)
         seed_rank = self._fused_seeds(
             q, k, file_prefixes=source_path_prefixes, node_kinds=node_kinds
         )

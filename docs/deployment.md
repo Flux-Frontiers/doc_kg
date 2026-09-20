@@ -249,7 +249,7 @@ dockg mcp \
 {
   "mcpServers": {
     "dockg": {
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": ["mcp",
         "--repo", "/absolute/path/to/repo",
         "--db",   "/absolute/path/to/repo/.dockg/graph.sqlite"
@@ -265,7 +265,7 @@ dockg mcp \
   "servers": {
     "dockg": {
       "type": "stdio",
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": ["mcp",
         "--repo", "/absolute/path/to/repo",
         "--db",   "/absolute/path/to/repo/.dockg/graph.sqlite"
