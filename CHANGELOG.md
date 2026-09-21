@@ -7,7 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`dockg-mcp` closes the graph on shutdown** via `FastMCP(lifespan=...)`,
+  the pattern `genealogy_kg` set and `kgrag_priv`'s `FLEET_STANDARDS.md`
+  records (sweep item 5). One hook covers both the stdio and SSE transports,
+  since both route through the same `Server.run()`. Verified through
+  `mcp.shared.memory`'s in-process transport, which drives a real lifespan
+  cycle rather than a mocked `close`.
+- **`DocKG.query()` and `pack()` check their arguments before touching the
+  index**, using `kg_utils.validation` from kgmodule-utils 0.23.0: an empty
+  query, `k` outside 1-100, `hop` outside 0-5 or `max_nodes` outside 1-500
+  raises `ValueError` naming the parameter; `hop=0` and `pack(max_nodes=None)`
+  stay valid. `DocKG` is not a `KGModule` subclass, so it calls the shared
+  functions directly rather than inheriting the check.
+- **A test for the pre-commit hook template**, which had none.
+
 ### Changed
+
+- **The hook `dockg install-hooks` writes resolves `dockg` from `PATH`
+  first**, falling back to `.venv/bin/dockg` only if that exists, and fails
+  with a message naming the fix if neither does. It had hard-wired the venv
+  path with `|| exit 1`, which is the shape that broke `_waverider`'s hooks
+  silently. Re-run `dockg install-hooks --force` in any repo to pick this up.
+  `kgrag_priv` sweep item 50, phase 0.
+- **`.mcp.json` and `.claude/settings.json` name the tools bare** (`dockg`,
+  `pycodekg`) instead of absolute paths into this machine's `.venv`, which
+  also makes both files portable. An obsolete `codekg-build-sqlite` allowlist
+  entry is dropped.
+- **`kgmodule-utils` floor raised to `>=0.23.0`** for the shared validator.
+- **Docs no longer point users at a repo venv for the MCP server.** Every
+  worked `.mcp.json` / Claude Desktop / VS Code example in `docs/MCP.md`,
+  `docs/deployment.md`, `docs/INSTALLATION.md` and the `dockg` skill had
+  `"command": "/absolute/path/to/repo/.venv/bin/dockg"`; they say `dockg` now,
+  with a note that it is the global `uv tool` install. The contributor install
+  is `poetry install --with dev`.
+
+### Removed
+
+- **The `kg` Poetry group.** It held `pycode-kg`, a tool this repo runs for
+  `.mcp.json` and the release workflow but never imports. Under the fleet's
+  "tools are global" rule (decided 2026-09-20, `kgrag_priv` sweep item 50) a
+  tool is installed once with `uv tool` and is never a dependency of the repo.
+  Twenty of twenty-two fleet clones carried their own copy of `dockg` for the
+  same reason, and every copy was a lock entry that drifted on each release.
 
 - **`kgmodule-utils` floor raised to `>=0.22.0`** (was `>=0.20.0`), for the
   fleet's current release. Nothing in this repo depends on 0.22.0's cast-path

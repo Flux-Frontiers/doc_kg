@@ -88,7 +88,7 @@ dependencies = [
     # class attributes and the _domain_metrics() hook, none of which exist
     # before 0.20.0. Against 0.19.x the manager reports itself as "kg-utils",
     # loses meaningful_nodes, and treats a db_path change as a real change.
-    "kgmodule-utils[semantic]>=0.22.0",
+    "kgmodule-utils[semantic]>=0.23.0",
     "pymupdf4llm>=0.0.17",
 ]
 
@@ -132,39 +132,6 @@ sqlite-vec = []
 # only reads legacy stores, and folding it in restores the weight 0.20.0 shed.
 
 # ---------------------------------------------------------------------------
-# Maintainer tooling (Poetry group, not a PEP 621 extra)
-# ---------------------------------------------------------------------------
-# pycode-kg is a tool this repo *runs*, not a library it imports: the release
-# workflow rebuilds the PyCodeKG index and .mcp.json serves it. Nothing under
-# src/ or tests/ imports it.
-#
-# A group, not an extra, because groups stay out of the wheel's metadata -- so
-# consumers never acquire pycode-kg or the pandas/networkx it carries, which
-# 0.21.0 deliberately dropped. Safe to lock as of pycode-kg 0.21.4, which no
-# longer depends on doc-kg; should it reacquire one, the breakage surfaces here
-# in `poetry lock` rather than downstream.
-#
-#   poetry install --with kg      # pycodekg CLI into .venv/bin
-[tool.poetry.group.kg]
-optional = true
-
-[tool.poetry.group.kg.dependencies]
-# 0.27.0 retired pycode_kg's snapshot overrides and renamed the capture
-# keyword `coverage` to `docstring_coverage`. It also floors on
-# kgmodule-utils>=0.20.0, the same SDK this repo now requires, so pinning
-# below it lets `poetry install --with kg` resolve a pycodekg that predates
-# the shared extension points.
-pycode-kg = ">=0.27.1"
-
-# ---------------------------------------------------------------------------
-# Dev tooling (Poetry group, not a PEP 621 extra)
-# ---------------------------------------------------------------------------
-# An extra is a feature of the *package*; dev tooling is a property of the
-# *repo*. As `doc-kg[dev]` it handed every consumer our repo-reasoned pins
-# (ruff<0.16). No pip path on purpose -- dev setups are Poetry-only across the
-# fleet (kgrag_priv/docs/FLEET_STANDARDS.md).
-#
-#   poetry install --with dev
 [tool.poetry.group.dev]
 optional = true
 

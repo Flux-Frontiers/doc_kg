@@ -124,8 +124,8 @@ Run this **after the tag is pushed**, on the release branch, as its own commit. 
 one thing the generic `/release` does not do, and the reason this command exists.
 
 ```bash
-.venv/bin/pycodekg build --repo .
-.venv/bin/pycodekg snapshot save --repo .
+pycodekg build --repo .
+pycodekg snapshot save --repo .
 git add .pycodekg/snapshots/
 ```
 

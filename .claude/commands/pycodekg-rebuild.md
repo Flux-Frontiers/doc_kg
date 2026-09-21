@@ -31,11 +31,8 @@ All artifact paths default to `$REPO_ROOT/.pycodekg/` — do not pass `--db` or 
 `pycodekg build` always wipes and rebuilds from scratch — no flag needed:
 
 ```bash
-# Poetry project
-poetry run pycodekg build --repo "$REPO_ROOT"
-
-# Direct venv binary
-"$REPO_ROOT/.venv/bin/pycodekg" build --repo "$REPO_ROOT"
+# pycodekg is a global tool (uv tool install pycode-kg), resolved from PATH
+pycodekg build --repo "$REPO_ROOT"
 ```
 
 Verify the database was created and is non-empty:

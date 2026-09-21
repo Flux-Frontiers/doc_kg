@@ -92,15 +92,17 @@ dockg query "your topic"
 ```bash
 git clone https://github.com/Flux-Frontiers/doc_kg.git
 cd doc_kg
-poetry install --extras "analysis viz" --with dev,kg
+poetry install --extras "analysis viz" --with dev
 poetry run pre-commit install
 poetry run pytest
 ```
 
 Dev setups are Poetry-only across the KG fleet — there is no `pip install -e
 '.[dev]'` path, because the toolchain is a Poetry group rather than a published
-extra. `--with kg` adds the `pycodekg` CLI that `.mcp.json` and the release
-workflow invoke; drop it if you do not need them.
+extra. The `pycodekg` CLI that `.mcp.json` and the release workflow invoke is
+not a dependency of this repo at all: it is a tool installed once, globally
+(`uv tool install pycode-kg`), and resolved from `PATH`. The same is true of
+`dockg` itself when another repo runs it.
 
 ---
 
@@ -135,7 +137,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "dockg": {
-      "command": "/path/to/.venv/bin/dockg-mcp",
+      "command": "dockg-mcp",
       "args": ["--repo", "/path/to/your/corpus"]
     }
   }

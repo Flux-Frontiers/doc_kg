@@ -228,7 +228,7 @@ Both Claude Code and Kilo Code read per-repo config from `.mcp.json` in the proj
 {
   "mcpServers": {
     "dockg": {
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",   "/absolute/path/to/repo"
@@ -251,7 +251,7 @@ GitHub Copilot requires `"servers"` key and `"type": "stdio"`:
   "servers": {
     "dockg": {
       "type": "stdio",
-      "command": "/absolute/path/to/repo/.venv/bin/dockg",
+      "command": "dockg",
       "args": [
         "mcp",
         "--repo",    "/absolute/path/to/repo"

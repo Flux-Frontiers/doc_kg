@@ -86,10 +86,17 @@ TREE_HASH=$(git write-tree)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Rebuild local DocKG index to keep it in sync with staged content.
-"$REPO_ROOT/.venv/bin/dockg" build || exit 1
+# dockg is a tool this repo runs, not a dependency it declares: the fleet
+# installs it once, globally (uv tool install doc-kg), so PATH is the normal
+# case. A .venv copy is honoured if present, for a checkout that still has one.
+DOCKG="$(command -v dockg 2>/dev/null || true)"
+[ -n "$DOCKG" ] || DOCKG="$REPO_ROOT/.venv/bin/dockg"
+[ -x "$DOCKG" ] || { echo "[dockg] not found on PATH or in .venv; uv tool install doc-kg" >&2; exit 1; }
+
+"$DOCKG" build || exit 1
 
 # Snapshot DocKG (version auto-detected from installed package).
-"$REPO_ROOT/.venv/bin/dockg" snapshot save \\
+"$DOCKG" snapshot save \\
     --repo . \\
     --tree-hash "$TREE_HASH" \\
     --branch "$BRANCH" \\

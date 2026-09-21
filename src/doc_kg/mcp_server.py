@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
@@ -32,12 +34,28 @@ def _get_kg() -> DocKG:
     return _kg
 
 
+@asynccontextmanager
+async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
+    """Close the graph's SQLite connection(s) when the server shuts down.
+
+    ``main()`` sets the module-level ``_kg`` before ``mcp.run()`` calls into
+    this, and both the stdio and SSE transports route through the same
+    underlying ``Server.run()``, so this fires on either one.
+    """
+    try:
+        yield
+    finally:
+        if _kg is not None:
+            _kg.close()
+
+
 mcp = FastMCP(
     "dockg",
     instructions=(
         "DocKG is a hybrid semantic + structural knowledge graph for document corpora. "
         "Use these tools to query document chunks, sections, topics, entities, and edges."
     ),
+    lifespan=_lifespan,
 )
 
 
