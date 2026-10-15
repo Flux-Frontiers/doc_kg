@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **PDF conversion is `kg_utils.ingest.PdfConverter`** (sweep item 48).
+  `pdf_reader.extract_pdf_markdown` now delegates to the SDK's converter,
+  which makes the same bare `pymupdf4llm.to_markdown()` call, so the Markdown
+  is byte-identical (checked on six PDFs, 56 KB to 7.8 MB) and `dockg build`
+  and `kgrag ingest` convert a PDF the same way. doc-kg declares
+  `kgmodule-utils[semantic,pdf]>=0.27.0` and no longer pins `pymupdf4llm`
+  itself; the `[pdf]` extra brings it without anydoc.
+- **A scanned PDF is skipped, not an empty document.** A PDF with no text
+  layer used to become a document node with zero chunks. The converter now
+  raises (naming OCR), and `parse_corpus` skips the file the same way it
+  already skipped an unreadable one.
+
 ## [0.27.0] - 2026-09-20
 
 ### Added

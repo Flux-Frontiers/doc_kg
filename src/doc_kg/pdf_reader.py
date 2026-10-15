@@ -1,11 +1,14 @@
 """
 pdf_reader.py
 
-PDF text extraction for DocKG via pymupdf4llm.
+PDF text extraction for DocKG, delegated to the fleet's one PDF converter,
+:class:`kg_utils.ingest.PdfConverter` (sweep item 48).
 
-Converts PDF pages to Markdown, preserving heading structure inferred from
-font size and style so the result flows naturally into the existing
-_chunk_markdown() path in chunker.py.
+The converter makes the same bare ``pymupdf4llm.to_markdown()`` call this
+module used to make, so the Markdown is byte-identical: headings inferred
+from font size and style still flow into the existing ``_chunk_markdown()``
+path in chunker.py, and ``kgrag ingest`` and ``dockg build`` convert a PDF
+the same way.
 
 Author: Eric G. Suchanek, PhD
 """
@@ -14,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pymupdf4llm
+from kg_utils.ingest import PdfConverter
 
 
 def extract_pdf_markdown(path: Path) -> str:
@@ -27,9 +30,9 @@ def extract_pdf_markdown(path: Path) -> str:
 
     :param path: Absolute path to the PDF file.
     :return: Markdown-formatted document text.
-    :raises RuntimeError: If pymupdf4llm cannot open or parse the file.
+    :raises RuntimeError: If the file cannot be opened or parsed, or has no
+        text layer (a scanned PDF needing OCR). The error is a
+        :class:`kg_utils.ingest.ConversionError`, a ``RuntimeError`` subclass,
+        whose message says which.
     """
-    try:
-        return pymupdf4llm.to_markdown(str(path))
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(f"pymupdf4llm could not parse {path}: {exc}") from exc
+    return PdfConverter().convert(Path(path)).markdown
