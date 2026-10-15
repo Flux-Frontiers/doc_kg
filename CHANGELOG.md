@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-14
+
 ### Changed
 
 - **PDF conversion is `kg_utils.ingest.PdfConverter`** (sweep item 48).
