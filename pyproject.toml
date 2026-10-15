@@ -88,8 +88,10 @@ dependencies = [
     # class attributes and the _domain_metrics() hook, none of which exist
     # before 0.20.0. Against 0.19.x the manager reports itself as "kg-utils",
     # loses meaningful_nodes, and treats a db_path change as a real change.
-    "kgmodule-utils[semantic]>=0.23.0",
-    "pymupdf4llm>=0.0.17",
+    # [pdf] brings pymupdf4llm: PDF conversion is kg_utils.ingest.PdfConverter,
+    # the fleet's one PDF converter (sweep item 48), so doc-kg no longer pins
+    # its own copy.
+    "kgmodule-utils[semantic,pdf]>=0.27.0",
 ]
 
 [project.optional-dependencies]

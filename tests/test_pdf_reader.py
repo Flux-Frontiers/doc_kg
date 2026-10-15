@@ -112,3 +112,31 @@ def test_parse_corpus_pdf_sections_from_headings(pdf_corpus):
     ]
     titles = {n.title for n in section_nodes}
     assert "Introduction" in titles or "Background" in titles
+
+
+# ---------------------------------------------------------------------------
+# Delegation to kg_utils.ingest.PdfConverter (sweep item 48)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_pdf_markdown_matches_the_direct_pymupdf4llm_call(simple_pdf):
+    """Delegating to the SDK converter must not change a byte of output."""
+    import pymupdf4llm
+
+    assert extract_pdf_markdown(simple_pdf) == pymupdf4llm.to_markdown(str(simple_pdf))
+
+
+def test_scanned_pdf_raises_and_is_skipped_not_empty(tmp_path):
+    """A PDF with no text layer is skipped by parse_corpus, never an empty node."""
+    doc = fitz.open()
+    doc.new_page()  # no text: what a scan looks like to pymupdf4llm
+    scanned = tmp_path / "scan.pdf"
+    doc.save(str(scanned))
+    doc.close()
+    (tmp_path / "readme.md").write_text("# Overview\n\nSome overview text.\n")
+
+    with pytest.raises(RuntimeError, match="OCR"):
+        extract_pdf_markdown(scanned)
+    nodes, _ = parse_corpus(tmp_path, quiet=True)
+    assert not [n for n in nodes if n.kind == "document" and "scan.pdf" in (n.file_path or "")]
+    assert [n for n in nodes if n.kind == "document" and "readme.md" in (n.file_path or "")]
