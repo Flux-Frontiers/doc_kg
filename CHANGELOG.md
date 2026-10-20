@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **PDF ingest works on a fresh install again.** doc-kg 0.28.0 floors
+  `kgmodule-utils[semantic,pdf]>=0.27.0`, and kgmodule-utils 0.27.0's `[pdf]`
+  declared `pymupdf4llm>=1.28.2`. pymupdf4llm 2.0 (2026-10-16) is an empty
+  placeholder whose code now ships inside pymupdf 2.0, so a fresh resolve
+  installed no PDF code. The floor is now `>=0.27.1`, which declares
+  `pymupdf>=2.0`. No API change; the Markdown still comes from
+  `pymupdf4llm.to_markdown`. Sweep item 86.
+- The PDF tests import `pymupdf` instead of the `fitz` name, which pymupdf
+  2.0 deprecates.
+
 ## [0.28.0] - 2026-10-14
 
 ### Changed

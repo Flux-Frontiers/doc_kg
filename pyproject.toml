@@ -90,8 +90,11 @@ dependencies = [
     # loses meaningful_nodes, and treats a db_path change as a real change.
     # [pdf] brings pymupdf4llm: PDF conversion is kg_utils.ingest.PdfConverter,
     # the fleet's one PDF converter (sweep item 48), so doc-kg no longer pins
-    # its own copy.
-    "kgmodule-utils[semantic,pdf]>=0.27.0",
+    # its own copy. 0.27.1 is the floor because 0.27.0's [pdf] declared
+    # pymupdf4llm>=1.28.2, which now resolves to the empty pymupdf4llm 2.0
+    # placeholder and installs no PDF code; 0.27.1 declares pymupdf>=2.0,
+    # whose wheel ships the pymupdf4llm module.
+    "kgmodule-utils[semantic,pdf]>=0.27.1",
 ]
 
 [project.optional-dependencies]
