@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-10-20
+
 ### Fixed
 
 - **PDF ingest works on a fresh install again.** doc-kg 0.28.0 floors
