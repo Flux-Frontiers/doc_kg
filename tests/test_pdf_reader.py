@@ -1,6 +1,6 @@
 """Tests for PDF ingestion: pdf_reader, iter_text_files, chunker dispatch, parse_corpus."""
 
-import fitz  # pymupdf — already a transitive dep via pymupdf4llm
+import pymupdf
 import pytest
 
 from doc_kg.chunker import TextChunker
@@ -15,7 +15,7 @@ from doc_kg.pdf_reader import extract_pdf_markdown
 @pytest.fixture()
 def simple_pdf(tmp_path):
     """Write a minimal two-section PDF using PyMuPDF and return its path."""
-    doc = fitz.open()
+    doc = pymupdf.open()
     page = doc.new_page()
     page.insert_text((50, 72), "Introduction", fontsize=18)
     page.insert_text((50, 120), "This is the introduction section with some content.")
@@ -128,7 +128,7 @@ def test_extract_pdf_markdown_matches_the_direct_pymupdf4llm_call(simple_pdf):
 
 def test_scanned_pdf_raises_and_is_skipped_not_empty(tmp_path):
     """A PDF with no text layer is skipped by parse_corpus, never an empty node."""
-    doc = fitz.open()
+    doc = pymupdf.open()
     doc.new_page()  # no text: what a scan looks like to pymupdf4llm
     scanned = tmp_path / "scan.pdf"
     doc.save(str(scanned))
