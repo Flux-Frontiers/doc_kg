@@ -37,6 +37,13 @@ raised when the fleet lap passes.
   `make_backend()`.
 - `dockg analyze` and `dockg semantic-analyze` take `--vectors-path` instead of
   `--lancedb`.
+- **`DocKG.stats()` answers in the fleet stats shape** (kgrag_priv
+  FLEET_STANDARDS, "KG stats shape", settled 2026-10-25): `{"kind": "doc",
+  "nodes": {"total", "by_kind"}, "edges": {"total", "by_rel"}}` plus
+  `vector_backend` and `vector_count`. The flat `node_count`, `edge_count` and
+  per-kind `document_count` ... `keyword_count` keys are gone; the same numbers
+  are in `nodes.total` and `nodes.by_kind`. The MCP `stats` tool checks the
+  shape on every call.
 
 ### Added
 

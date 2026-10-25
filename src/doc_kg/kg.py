@@ -25,6 +25,7 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
 
+from kg_utils.stats import kg_stats, stats_from_store
 from kg_utils.validation import (
     MAX_HOP,
     MAX_K,
@@ -1305,49 +1306,34 @@ class DocKG:
     # ------------------------------------------------------------------
 
     def stats(self) -> dict[str, Any]:
-        """Return live statistics for this DocKG instance.
+        """Return live statistics in the fleet shape (:mod:`kg_utils.stats`).
 
-        Returns a flat dict conforming to the KGRAG adapter stats contract.
-        All counts default to 0 on error so this method never raises.
+        ``{"kind": "doc", "nodes": {"total", "by_kind"}, "edges": {"total",
+        "by_rel"}}`` plus ``vector_backend``, ``vector_count`` and the store's
+        other keys. Never raises: on error the counts are empty and ``error``
+        says why. Reads the graph only; never loads the embedding model.
 
-        :return: Flat dict with ``node_count``, ``edge_count``, and
-            per-kind counts: ``document_count``, ``chunk_count``,
-            ``section_count``, ``topic_count``, ``entity_count``,
-            ``keyword_count``.
+        Changed in 0.29.0: the flat ``node_count`` and per-kind
+        ``document_count`` / ``chunk_count`` ... keys are gone; the same
+        numbers are in ``nodes.total`` and ``nodes.by_kind``.
+
+        :return: The statistics dict.
         """
         try:
-            s = self.store.stats()
-            nc = s.get("node_counts", {})
             # Count vectors without loading the embedder/model: a read-only
             # count doesn't need the true dim, so use a throwaway backend.
             # count() opens existing stores lazily and never creates one.
             vector_count = 0
             with contextlib.suppress(Exception):
                 vector_count = sqlite_backend(self.vectors_path, dim=384).count()
-            return {
-                "node_count": s.get("total_nodes", 0),
-                "edge_count": s.get("total_edges", 0),
-                "document_count": nc.get("document", 0),
-                "chunk_count": nc.get("chunk", 0),
-                "section_count": nc.get("section", 0),
-                "topic_count": nc.get("topic", 0),
-                "entity_count": nc.get("entity", 0),
-                "keyword_count": nc.get("keyword", 0),
-                "vector_backend": self.vector_backend,
-                "vector_count": vector_count,
-            }
+            return stats_from_store(
+                "doc",
+                self.store.stats(),
+                vector_backend=self.vector_backend,
+                vector_count=vector_count,
+            )
         except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-            return {
-                "node_count": 0,
-                "edge_count": 0,
-                "document_count": 0,
-                "chunk_count": 0,
-                "section_count": 0,
-                "topic_count": 0,
-                "entity_count": 0,
-                "keyword_count": 0,
-                "error": str(exc),
-            }
+            return kg_stats("doc", {}, {}, error=str(exc))
 
     def node(self, node_id: str) -> dict | None:
         """Fetch a single node by ID from the store."""

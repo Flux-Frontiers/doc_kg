@@ -148,7 +148,7 @@ def test_graph_tools_answer_without_a_model(corpus, monkeypatch):
         )
 
     stats, node, near, missing, query = _session(build_server(corpus), calls)
-    assert not stats.isError and stats.structuredContent["node_count"] == 4
+    assert not stats.isError and stats.structuredContent["nodes"]["total"] == 4
     assert not node.isError and node.structuredContent["title"] == "Intro"
     assert [n["id"] for n in near.structuredContent["nodes"]] == [
         "chunk:a.md:0000",
@@ -257,7 +257,7 @@ def test_stdio_subprocess_serves(corpus):
     init, tools, stats = anyio.run(run)
     assert (init.serverInfo.name, init.serverInfo.version) == ("dockg", doc_kg.__version__)
     assert [t.name for t in tools.tools] == list(CANONICAL_TOOLS)
-    assert stats.structuredContent["node_count"] == 4
+    assert stats.structuredContent["nodes"]["total"] == 4
     err = (corpus / "stderr.log").read_text(encoding="utf-8")
     assert "dockg MCP server starting (stdio)" in err and "dockg: serving" in err
 

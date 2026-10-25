@@ -84,24 +84,18 @@ def _write_minimal_graph(db_path):
     store.close()
 
 
-def test_dockg_stats_keys(tmp_path):
+def test_dockg_stats_is_in_the_fleet_shape(tmp_path):
+    from kg_utils.stats import stats_problems
+
     db = tmp_path / "graph.sqlite"
     _write_minimal_graph(db)
     kg = DocKG(corpus_root=tmp_path, db_path=db)
     s = kg.stats()
     kg.close()
-
-    required = {
-        "node_count",
-        "edge_count",
-        "document_count",
-        "chunk_count",
-        "section_count",
-        "topic_count",
-        "entity_count",
-        "keyword_count",
-    }
-    assert required <= s.keys()
+    assert stats_problems(s) == []
+    assert s["kind"] == "doc"
+    assert {"vector_backend", "vector_count"} <= s.keys()
+    assert "node_count" not in s and "document_count" not in s
 
 
 def test_dockg_stats_counts(tmp_path):
@@ -111,14 +105,16 @@ def test_dockg_stats_counts(tmp_path):
     s = kg.stats()
     kg.close()
 
-    assert s["node_count"] == 6
-    assert s["edge_count"] == 2
-    assert s["document_count"] == 1
-    assert s["chunk_count"] == 1
-    assert s["section_count"] == 1
-    assert s["topic_count"] == 1
-    assert s["entity_count"] == 1
-    assert s["keyword_count"] == 1
+    assert s["nodes"]["total"] == 6
+    assert s["edges"]["total"] == 2
+    assert s["nodes"]["by_kind"] == {
+        "document": 1,
+        "chunk": 1,
+        "section": 1,
+        "topic": 1,
+        "entity": 1,
+        "keyword": 1,
+    }
 
 
 def test_dockg_stats_never_raises(tmp_path):
@@ -127,8 +123,8 @@ def test_dockg_stats_never_raises(tmp_path):
     s = kg.stats()
     kg.close()
     # Non-existent DB creates an empty schema, so all counts should be 0
-    assert s["node_count"] == 0
-    assert s["edge_count"] == 0
+    assert s["nodes"]["total"] == 0
+    assert s["edges"]["total"] == 0
     assert "error" not in s
 
 
