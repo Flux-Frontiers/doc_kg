@@ -58,7 +58,7 @@ dockg analyze docs/                                   # corpus health report + s
 
 ### 2. Agentic — MCP server for grounded AI workflows
 
-Run `dockg-mcp` and Claude (or any MCP-aware client) gets four focused tools backed by the same graph: `graph_stats`, `query_docs`, `pack_docs`, and `get_node`. Setup for Claude Code, Claude Desktop, Kilo Code, Copilot, and Cline is a single JSON entry — see [docs/MCP.md](docs/MCP.md).
+Run `dockg-mcp` and Claude (or any MCP-aware client) gets the fleet's five canonical tools backed by the same graph: `stats`, `query`, `pack`, `get_node` and `neighbors`, the same names as every Flux-Frontiers KG server, with DocKG's own search behind `query` and `pack`. The tool list prints with `dockg mcp --manifest`; see `get_node`. Setup for Claude Code, Claude Desktop, Kilo Code, Copilot, and Cline is a single JSON entry — see [docs/MCP.md](docs/MCP.md).
 
 The agent benefit is the same as with PyCodeKG: tools return *actual text* with source attribution rather than the model's best reconstruction from training data. Multi-step workflows — *"find the deployment section, check what it references, summarise what would need updating if the port changes"* — become a handful of grounded calls instead of repeated file reads.
 
@@ -89,7 +89,7 @@ Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) 
 
 Search is hybrid by design. A query runs in two phases:
 
-1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and the sqlite-vec index returns the `k` closest chunks by exact cosine similarity. (Corpora built with the older LanceDB backend still work; convert them in place with `dockg convert-index` — no re-embedding required.)
+1. **Vector phase** — the query is embedded with a local sentence-transformer (`BAAI/bge-small-en-v1.5`, cached after first download) and the sqlite-vec index returns the `k` closest chunks by exact cosine similarity. (An index built with the LanceDB backend removed in 0.29.0 is not read; rebuild it with `dockg build`.)
 2. **Graph expansion phase** — each seed hit is expanded `hop` BFS steps along typed edges (`CONTAINS`, `REFERENCES`, `SIMILAR_TO`, `NEXT`) so co-cited passages and structurally adjacent sections surface alongside the direct semantic matches.
 
 A **deduplication pass** then suppresses coarser nodes (document, section) from files where finer chunks are already present — the pack contains the most specific evidence available, not redundant summaries of the same content.

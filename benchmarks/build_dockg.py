@@ -7,31 +7,31 @@ Standalone DocKG build pipeline for the LongMemEval corpus.
 
 Writes every unique haystack session from the LongMemEval JSON to disk as
 Markdown files, then builds a persistent DocKG consisting of a SQLite
-structural graph and a LanceDB vector index with full relational structure:
+structural graph and a sqlite-vec vector index with full relational structure:
 document/section/chunk hierarchy, SIMILAR_TO edges (cosine ≥ 0.85),
 HAS_TOPIC, MENTIONS_ENTITY, HAS_KEYWORD, and CO_OCCURS_WITH.
 
 Two build modes are supported:
 
 Standard (single-process)
-    The default. Corpus parsing, embedding, and LanceDB ingestion run
+    The default. Corpus parsing, embedding, and sqlite-vec ingestion run
     sequentially in a single process.  Suitable for small corpora or
     when worker processes are not available.
 
 Two-phase (multi-worker)
     Activated by ``--workers N`` (N > 1) or ``--emb-cache``.  Separates
-    the slow embedding pass from LanceDB ingestion:
+    the slow embedding pass from sqlite-vec ingestion:
 
         1. build_graph  — corpus parse → SQLite
                           (skipped if SQLite exists and --wipe not given)
         2. build_embeddings — spawn N worker processes, each loading its
                           own SentenceTransformer instance; saves an
                           EmbeddingCache JSON to disk
-        3. build_index_from_cache — load vectors from cache → LanceDB
-                          (always wipes LanceDB since embeddings are fresh)
+        3. build_index_from_cache — load vectors from cache → sqlite-vec
+                          (always wipes the vector store since embeddings are fresh)
                           + batched numpy SIMILAR_TO edge discovery
 
-    The embedding cache persists on disk, so LanceDB can be rebuilt from
+    The embedding cache persists on disk, so the vector store can be rebuilt from
     the cache without re-running the model (e.g. after tuning thresholds).
 
 Usage
@@ -53,7 +53,7 @@ Reuse existing graph, re-embed only (no corpus/graph rebuild)::
 
     python benchmarks/build_dockg.py /tmp/longmemeval_s_cleaned.json --workers 10
 
-Rebuild LanceDB from an existing embedding cache (no re-embedding)::
+Rebuild the vector index from an existing embedding cache (no re-embedding)::
 
     python benchmarks/build_dockg.py /tmp/longmemeval_s_cleaned.json \\
         --skip-corpus --emb-cache /tmp/.dockg/embeddings.json
@@ -63,7 +63,7 @@ Custom paths::
     python benchmarks/build_dockg.py /tmp/longmemeval_s_cleaned.json --wipe --workers 10 \\
         --corpus-dir /tmp/corpus \\
         --db /tmp/.dockg/graph.sqlite \\
-        --lancedb /tmp/.dockg/lancedb \\
+        --vectors /tmp/.dockg/vectors.sqlite \\
         --emb-cache /tmp/.dockg/embeddings.json
 
 Author: Eric G. Suchanek, PhD
@@ -88,7 +88,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 _DATA_DIR = REPO_ROOT / "benchmarks" / "data"
 DEFAULT_CORPUS_DIR = _DATA_DIR / "longmemeval_corpus"
 DEFAULT_DB = _DATA_DIR / ".dockg" / "graph.sqlite"
-DEFAULT_LANCEDB = _DATA_DIR / ".dockg" / "lancedb"
+DEFAULT_VECTORS = _DATA_DIR / ".dockg" / "vectors.sqlite"
 DEFAULT_EMB_CACHE = _DATA_DIR / ".dockg" / "embeddings.json"
 
 _LONGMEMEVAL_URL = (
@@ -166,7 +166,7 @@ def write_corpus(data_file: Path, corpus_dir: Path, *, force: bool = False) -> N
 def build_kg(
     corpus_dir: Path,
     db_path: Path,
-    lancedb_dir: Path,
+    vectors_path: Path,
     *,
     wipe: bool = False,
     model: str | None = None,
@@ -183,13 +183,13 @@ def build_kg(
     1. ``build_graph`` — corpus parse → SQLite (skipped if SQLite exists and
        *wipe* is False)
     2. ``build_embeddings`` — multi-worker embedding → JSON cache file
-    3. ``build_index_from_cache`` — load vectors → LanceDB + SIMILAR_TO edges
+    3. ``build_index_from_cache`` — load vectors → sqlite-vec + SIMILAR_TO edges
 
     Otherwise falls back to the standard single-process ``DocKG.build``.
 
     :param corpus_dir: Root directory of the Markdown corpus.
     :param db_path: Path for the SQLite graph database.
-    :param lancedb_dir: Directory for the LanceDB vector index.
+    :param vectors_path: sqlite-vec vector store file.
     :param wipe: Rebuild from scratch (clear existing data).
     :param model: Sentence-transformer model name override.
     :param workers: Worker processes for embedding (enables two-phase build).
@@ -211,7 +211,7 @@ def build_kg(
     )
     print(f"  Corpus:  {corpus_dir}")
     print(f"  SQLite:  {db_path}")
-    print(f"  LanceDB: {lancedb_dir}")
+    print(f"  Vectors: {vectors_path}")
     print(f"  Model:   {model or DEFAULT_MODEL}")
     print(
         f"  Chunks:  {chunk_strategy}"
@@ -226,13 +226,12 @@ def build_kg(
         print(f"  Cache:   {cache_path}")
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    lancedb_dir.mkdir(parents=True, exist_ok=True)
 
     t0 = time.time()
     kg = DocKG(
         corpus_root=corpus_dir,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
+        vectors_path=vectors_path,
         model=model or DEFAULT_MODEL,
         chunk_strategy=chunk_strategy,
         sentences_per_chunk=sentences_per_chunk,
@@ -253,7 +252,7 @@ def build_kg(
             else:
                 kg.build_embeddings(out=cache_path, n_workers=workers)
 
-            # Always wipe LanceDB — embeddings are recomputed fresh so
+            # Always wipe the vector store — embeddings are recomputed fresh so
             # incremental deletes are wasteful and slow.
             stats = kg.build_index_from_cache(cache_path, wipe=True, discover_similar=similar)
         else:
@@ -327,9 +326,9 @@ def main() -> None:
         help="SQLite graph database path",
     )
     parser.add_argument(
-        "--lancedb",
-        default=str(DEFAULT_LANCEDB),
-        help="LanceDB vector index directory",
+        "--vectors",
+        default=str(DEFAULT_VECTORS),
+        help="sqlite-vec vector store file",
     )
     parser.add_argument(
         "--download",
@@ -381,7 +380,7 @@ def main() -> None:
     build_kg(
         corpus_dir=Path(args.corpus_dir),
         db_path=Path(args.db),
-        lancedb_dir=Path(args.lancedb),
+        vectors_path=Path(args.vectors),
         wipe=args.wipe,
         model=args.model,
         workers=args.workers,

@@ -19,8 +19,7 @@ def _make_index(tmp_path):
     embedder = MagicMock()
     idx = SemanticIndex.__new__(SemanticIndex)
     idx.embedder = embedder
-    idx.lancedb_dir = tmp_path / "lancedb"
-    idx.table_name = "nodes"
+    idx.vectors_path = tmp_path / "vectors.sqlite"
     idx.index_kinds = {"chunk"}
     return idx
 

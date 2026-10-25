@@ -24,10 +24,10 @@ from doc_kg.dockg_semantic_analysis import main as run_semantic_analysis
     help="SQLite knowledge graph path (default: <corpus>/.dockg/graph.sqlite).",
 )
 @click.option(
-    "--lancedb",
+    "--vectors-path",
     default=None,
     type=click.Path(),
-    help="Legacy LanceDB directory; also anchors the derived sqlite-vec store (default: <corpus>/.dockg/lancedb).",
+    help="sqlite-vec vector store (default: <corpus>/.dockg/vectors.sqlite).",
 )
 @click.option(
     "--output",
@@ -53,7 +53,7 @@ from doc_kg.dockg_semantic_analysis import main as run_semantic_analysis
 def semantic_analyze(
     repo: str,
     db: str | None,
-    lancedb: str | None,
+    vectors_path: str | None,
     output: str | None,
     json_path: str | None,
     quiet: bool,
@@ -62,7 +62,7 @@ def semantic_analyze(
     run_semantic_analysis(
         corpus_root=repo,
         db_path=db,
-        lancedb_path=lancedb,
+        vectors_path=vectors_path,
         report_path=output,
         json_path=json_path,
         quiet=quiet,

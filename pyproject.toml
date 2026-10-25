@@ -8,7 +8,6 @@
 # ----------------------------------------------------------------------------
 #   pip install -e "."                   core runtime only
 #   pip install -e ".[analysis,viz]"     + clustering/manifold, Streamlit/PyVis
-#   pip install -e ".[lancedb]"          + legacy reader, for convert-index only
 #
 #   poetry install --with dev            + pytest, ruff, ty, pre-commit, pdoc
 #   poetry install --with kg             + the pycodekg CLI
@@ -59,8 +58,9 @@ classifiers = [
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
-    # Capped: mcp 2.0 split FastMCP into its own package, and mcp_server.py
-    # imports it from `mcp` at module scope. Lift only alongside that port.
+    # The server is kg_utils.mcp's now, which needs kgmodule-utils 0.29.0 (on
+    # the local wheel until the fleet lap ends). At that release this line goes
+    # and the floor below becomes kgmodule-utils[semantic,pdf,mcp]>=0.29.0.
     "mcp>=1.3.0,<2",
     "pyyaml>=6.0.0",
     # Above the >=13.0.0 kgmodule-utils[semantic] carries, to match the fleet.
@@ -110,15 +110,8 @@ analysis = [
     "joblib>=1.4.0",
     "scikit-learn>=1.3.0",
 ]
-# Reads a legacy pre-0.20.0 LanceDB store. Needed for exactly one thing --
-# `dockg convert-index`, which copies vectors into vectors.sqlite without
-# re-embedding. Install it, convert, and you are done with it.
-#
-#   pip install 'doc-kg[lancedb]'
-#   dockg convert-index --repo . --delete-lancedb
-lancedb = [
-    "lancedb>=0.29.0",
-]
+# The `lancedb` extra, which read pre-0.20.0 stores for `dockg convert-index`,
+# was removed in 0.29.0 with LanceDB support.
 # No-op alias: sqlite-vec is core as of 0.20.0, but sister packages still pin
 # `doc-kg[sqlite-vec]` (diary-kg >=0.94.0), so removing it breaks their installs.
 sqlite-vec = []
@@ -132,9 +125,6 @@ sqlite-vec = []
 # 2. An `all` aggregate. It pulled in the dev toolchain, and duplicating every
 #    package across the marker space is what sends `poetry lock` into
 #    resolution restarts. Use `--all-extras`, or name extras explicitly.
-#
-# NB: [lancedb] stays out of any "install everything" path regardless -- it
-# only reads legacy stores, and folding it in restores the weight 0.20.0 shed.
 
 # ---------------------------------------------------------------------------
 [tool.poetry.group.dev]
@@ -188,10 +178,9 @@ root = ["src"]
 [tool.ty.rules]
 # Be lenient about third-party stubs (mirrors mypy's ignore_missing_imports).
 unresolved-import = "ignore"
-# Whether a `ty: ignore` is needed depends on which extras are installed: with
-# [lancedb] absent (the default since 0.20.0) ty cannot resolve LanceDB types,
-# so those suppressions look unused -- yet deleting them breaks ty for anyone
-# working on the converter. Silence the check, keep the suppressions.
+# Whether a `ty: ignore` is needed depends on which optional packages are
+# installed (topics.py's `yaml = None` fallback, for one), so a suppression can
+# look unused in one environment and be required in another. Keep them.
 unused-ignore-comment = "ignore"
 
 [tool.pytest.ini_options]

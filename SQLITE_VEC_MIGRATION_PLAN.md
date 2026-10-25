@@ -1,5 +1,7 @@
 # sqlite-vec Migration Plan — LanceDB → SQLite across the KG fleet
 
+> **Historical (2026-10-25):** the migration this plan describes finished, and LanceDB support was removed from doc_kg in 0.29.0 (kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md, step 3). sqlite-vec is the only, exact backend. Kept for the record.
+
 **Status:** ✅ Phases 0–5 DONE (working trees, uncommitted) · RunPod push
 (Phase 5 last step) intentionally deferred · 2026-07-14
 **Driver repo:** this one (`doc_kg`). Touches `../KG_utils` (kgmodule-utils),

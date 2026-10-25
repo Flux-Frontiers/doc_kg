@@ -1,79 +1,33 @@
 """
 cmd_mcp.py
 
-Click subcommand for starting the DocKG MCP server:
+``dockg mcp`` -- the fleet's standard MCP command, from :mod:`kg_utils.mcp`:
 
-  mcp  — start the MCP server (thin wrapper around mcp_server.main)
+    dockg mcp [--repo DIR] [--db FILE] [--vectors FILE] [--model NAME]
+              [--transport stdio|streamable-http] [--host H] [--port N]
+              [--manifest]
+
+Registering it imports neither ``mcp`` nor the server module, so every other
+``dockg`` command starts as fast as before.
 """
 
 from __future__ import annotations
 
-import click
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from kg_utils.mcp import add_mcp_command
 
 from doc_kg.cli.group import cli
-from doc_kg.cli.options import repo_option
-from doc_kg.dockg import DEFAULT_MODEL
+
+if TYPE_CHECKING:
+    from kg_utils.mcp import KGServer
 
 
-@cli.command("mcp")
-@repo_option
-@click.option(
-    "--db",
-    default=".dockg/graph.sqlite",
-    type=click.Path(),
-    help="SQLite database path.",
-)
-@click.option(
-    "--lancedb",
-    default=".dockg/lancedb",
-    type=click.Path(),
-    help="Legacy LanceDB directory; also anchors the derived sqlite-vec store.",
-)
-@click.option(
-    "--vectors-path",
-    default=None,
-    type=click.Path(),
-    help="Path to the sqlite-vec vector store (default: <repo>/.dockg/vectors.sqlite).",
-)
-@click.option(
-    "--model",
-    default=DEFAULT_MODEL,
-    help="Sentence-transformer model name.",
-)
-@click.option(
-    "--transport",
-    type=click.Choice(["stdio", "sse"]),
-    default="stdio",
-    help="MCP transport protocol.",
-)
-def mcp(
-    repo: str, db: str, lancedb: str, vectors_path: str | None, model: str, transport: str
-) -> None:
-    """Start the DocKG MCP server."""
-    try:
-        import importlib.util  # pylint: disable=import-outside-toplevel
+def _build_server(repo: Path, db: Path | None, vectors: Path | None, model: str | None) -> KGServer:
+    from doc_kg.mcp_server import build_server  # pylint: disable=import-outside-toplevel
 
-        if importlib.util.find_spec("mcp") is None:
-            raise ImportError
-    except ImportError as exc:
-        msg = "'mcp' package not found. Install with: pip install mcp"
-        raise click.ClickException(msg) from exc
+    return build_server(repo, db, vectors, model)
 
-    argv = [
-        "--repo",
-        repo,
-        "--db",
-        db,
-        "--lancedb",
-        lancedb,
-        "--model",
-        model,
-        "--transport",
-        transport,
-    ]
-    if vectors_path:
-        argv += ["--vectors-path", vectors_path]
 
-    from doc_kg.mcp_server import main  # pylint: disable=import-outside-toplevel
-
-    main(argv=argv)
+mcp_command = add_mcp_command(cli, _build_server)

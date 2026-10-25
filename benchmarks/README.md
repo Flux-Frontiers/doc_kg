@@ -12,7 +12,7 @@
 >
 > Retrieval is **pure DocKG — no inference, no keyword rerank, no LLM rerank**.
 > Each question is run through `DocKG.query(q, k, hop, rels, max_nodes)`
-> (same path `pack_docs` uses): semantic seeds over sqlite-vec, then graph
+> (same path `pack` uses): semantic seeds over sqlite-vec, then graph
 > expansion across the edge set. The ranked nodes are collapsed to sessions
 > via `file_path` and post-filtered to the question's `haystack_session_ids`.
 >

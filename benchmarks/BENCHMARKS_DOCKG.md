@@ -13,7 +13,7 @@ is built from that corpus (SQLite graph + sqlite-vec vector index), then all 500
 queries run against it — ingest once, query many.
 
 Retrieval path: `DocKG.query(q, k, hop, rels, max_nodes)` — the same
-semantic-seed + graph-expansion path that `pack_docs` uses:
+semantic-seed + graph-expansion path that `pack` uses:
 
 1. sqlite-vec ANN search → top-k semantic seed nodes
 2. Graph expansion across edge types (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC,

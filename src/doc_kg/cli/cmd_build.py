@@ -9,11 +9,10 @@ Click subcommands for building the DocKG:
     build-embeddings — SQLite → embedding cache JSON only
     build-index-from-cache — embedding cache JSON → vector index
     build-two-phase — SQLite → embedding cache → vector index (stable pipeline)
-    convert-index — legacy LanceDB store → sqlite-vec store (no re-embedding)
 
-The vector index is a sqlite-vec store at ``<repo>/.dockg/vectors.sqlite``.  The
-``--lancedb``/``--table`` options address the pre-0.20.0 LanceDB store, which is
-read-only legacy and needs the ``[lancedb]`` extra; see ``--vector-backend``.
+The vector index is a sqlite-vec store at ``<repo>/.dockg/vectors.sqlite``, or
+wherever ``--vectors-path`` puts it.  ``convert-index`` and the ``--lancedb``,
+``--table`` and ``--vector-backend`` options went with LanceDB support in 0.29.0.
 
 Author: Eric G. Suchanek, PhD
 """
@@ -28,11 +27,9 @@ from rich.rule import Rule
 
 from doc_kg.cli.group import cli
 from doc_kg.cli.options import (
-    lancedb_option,
     model_option,
     repo_option,
     sqlite_option,
-    vector_backend_option,
     vectors_path_option,
 )
 from doc_kg.config import load_exclude_dirs
@@ -62,16 +59,8 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
 @cli.command("build")
 @repo_option
 @sqlite_option
-@lancedb_option
-@vector_backend_option
 @vectors_path_option
 @model_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @click.option(
     "--chunk-size",
     type=int,
@@ -224,11 +213,8 @@ def _parse_topics_prefix(topics_prefix: tuple[str, ...]) -> dict[str, str]:
 def build(
     repo: str,
     sqlite: str,
-    lancedb: str,
-    vector_backend: str | None,
     vectors_path: str | None,
     model: str,
-    table: str,
     chunk_size: int,
     chunk_overlap: int,
     similarity_threshold: float,
@@ -254,12 +240,11 @@ def build(
 
     Parses all .md and .txt files under CORPUS_ROOT, builds the structural
     and semantic graph, persists it to SQLite, and indexes it in the vector
-    store (sqlite-vec by default; see --vector-backend).  Also discovers
+    store (sqlite-vec, at <repo>/.dockg/vectors.sqlite).  Also discovers
     SIMILAR_TO edges between semantically related chunks.
     """
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     wipe = not update
     extensions = set(e if e.startswith(".") else f".{e}" for e in ext)
     exclude = load_exclude_dirs(repo_root) | set(exclude_dir)
@@ -269,10 +254,7 @@ def build(
         corpus_root=repo_root,
         exclude=exclude or None,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
-        vector_backend=vector_backend,
         vectors_path=vectors_path,
         chunk_strategy=chunk_strategy,
         chunk_size=chunk_size,
@@ -547,14 +529,7 @@ def build_graph(
 @cli.command("build-index")
 @repo_option
 @sqlite_option
-@lancedb_option
 @model_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @click.option(
     "--update",
     is_flag=True,
@@ -599,9 +574,7 @@ def build_graph(
 def build_index(
     repo: str,
     sqlite: str,
-    lancedb: str,
     model: str,
-    table: str,
     update: bool,
     no_similar: bool,
     batch: int,
@@ -613,14 +586,11 @@ def build_index(
     """Build only the semantic vector index from an existing SQLite graph."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     wipe = not update
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
         device=device,
         vectors_path=vectors_path,
     )
@@ -631,8 +601,6 @@ def build_index(
     _console.print(Rule(f"DocKG build-index — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
     _console.print(f"  vector index : {kg.vector_store_path}")
-    if kg.resolved_vector_backend == "lancedb":
-        _console.print(f"  table        : {table}")
     if index_kinds:
         _console.print(f"  kinds        : {', '.join(index_kinds)}")
 
@@ -734,14 +702,7 @@ def build_embeddings(
 @cli.command("build-index-from-cache")
 @repo_option
 @sqlite_option
-@lancedb_option
 @model_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @click.option(
     "--cache",
     "cache_path",
@@ -768,9 +729,7 @@ def build_embeddings(
 def build_index_from_cache(
     repo: str,
     sqlite: str,
-    lancedb: str,
     model: str,
-    table: str,
     cache_path: str | None,
     update: bool,
     no_similar: bool,
@@ -779,24 +738,19 @@ def build_index_from_cache(
     """Build the vector index from an embedding cache JSON (no model inference)."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     cache = Path(cache_path) if cache_path else db_path.parent / "embeddings.json"
     wipe = not update
 
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
         vectors_path=vectors_path,
     )
 
     _console.print(Rule(f"DocKG build-index-from-cache — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
     _console.print(f"  vector index : {kg.vector_store_path}")
-    if kg.resolved_vector_backend == "lancedb":
-        _console.print(f"  table        : {table}")
     _console.print(f"  cache        : {cache}")
 
     stats = kg.build_index_from_cache(
@@ -815,14 +769,7 @@ def build_index_from_cache(
 @cli.command("build-two-phase")
 @repo_option
 @sqlite_option
-@lancedb_option
 @model_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @click.option(
     "--cache",
     "cache_path",
@@ -882,9 +829,7 @@ def build_index_from_cache(
 def build_two_phase(
     repo: str,
     sqlite: str,
-    lancedb: str,
     model: str,
-    table: str,
     cache_path: str | None,
     workers: int | None,
     embed_batch: int,
@@ -898,16 +843,13 @@ def build_two_phase(
     """Run the stable two-phase pipeline: cache embeddings, then index from cache."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     cache = Path(cache_path) if cache_path else db_path.parent / "embeddings.jsonl"
     wipe = not update
 
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
         device=device,
         vectors_path=vectors_path,
     )
@@ -918,8 +860,6 @@ def build_two_phase(
     _console.print(Rule(f"DocKG build-two-phase — {db_path.name}", style="bold blue"))
     _console.print(f"  graph store  : {db_path}")
     _console.print(f"  vector index : {kg.vector_store_path}")
-    if kg.resolved_vector_backend == "lancedb":
-        _console.print(f"  table        : {table}")
     _console.print(f"  cache        : {cache}")
     if index_kinds:
         _console.print(f"  kinds        : {', '.join(index_kinds)}")
@@ -981,85 +921,3 @@ def reindex_fts(repo: str, sqlite: str) -> None:
         _console.print("\n[green]Lexical index ready.[/green]")
     else:
         _console.print("\n[yellow]No lexical index built (FTS5 unavailable or no chunks).[/yellow]")
-
-
-@cli.command("convert-index")
-@repo_option
-@lancedb_option
-@click.option(
-    "--table", default="dockg_nodes", show_default=True, help="Source LanceDB table name."
-)
-@click.option(
-    "--to",
-    "to_backend",
-    type=click.Choice(["sqlite-vec"]),
-    default="sqlite-vec",
-    show_default=True,
-    help="Target backend.",
-)
-@click.option(
-    "--dtype",
-    type=click.Choice(["fp32", "int8"]),
-    default="fp32",
-    show_default=True,
-    help="fp32 (exact) or int8 (3x smaller; assumes unit-norm vectors).",
-)
-@click.option(
-    "--vectors-path",
-    default=None,
-    type=click.Path(),
-    help="Destination sqlite path (default: <repo>/.dockg/vectors.sqlite).",
-)
-@click.option("--wipe/--no-wipe", default=True, show_default=True, help="Overwrite destination.")
-@click.option(
-    "--delete-lancedb",
-    is_flag=True,
-    default=False,
-    help="After a VALIDATED conversion, delete the source LanceDB directory "
-    "to reclaim space. No-op if validation fails.",
-)
-def convert_index(
-    repo: str,
-    lancedb: str,
-    table: str,
-    to_backend: str,
-    dtype: str,
-    vectors_path: str | None,
-    wipe: bool,
-    delete_lancedb: bool,
-) -> None:
-    """Convert an existing LanceDB vector index to a sqlite-vec store.
-
-    Reads vectors straight out of LanceDB and writes ``vectors.sqlite`` — no
-    model load, no re-embedding. Validates row count and re-reads a sample of
-    vectors to confirm the conversion is lossless (fp32) / near-lossless (int8).
-    With ``--delete-lancedb`` the source LanceDB dir is removed *only after*
-    validation succeeds.
-    """
-    import shutil  # pylint: disable=import-outside-toplevel
-
-    from doc_kg.index import convert_lancedb_to_sqlite  # pylint: disable=import-outside-toplevel
-
-    repo_root = Path(repo).resolve()
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
-
-    _console.print(Rule(f"DocKG convert-index — {repo_root.name}", style="bold blue"))
-    _console.print(f"  source lancedb : {lancedb_dir}")
-    _console.print(f"  target backend : {to_backend} (dtype={dtype})")
-
-    stats = convert_lancedb_to_sqlite(
-        lancedb_dir,
-        table=table,
-        vectors_path=vectors_path,
-        dtype="int8" if dtype == "int8" else "float",
-        wipe=wipe,
-    )
-    if not stats["validated"]:
-        raise click.ClickException("conversion validation failed")
-    _console.print("\n[green]Conversion complete and validated.[/green]")
-
-    if delete_lancedb:
-        # Guarded: only reached after validation passed above.
-        if lancedb_dir.exists():
-            shutil.rmtree(lancedb_dir)
-            _console.print(f"[yellow]Deleted source LanceDB dir:[/yellow] {lancedb_dir}")

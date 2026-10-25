@@ -2,207 +2,168 @@
 """
 mcp_server.py — DocKG MCP Server
 
-Exposes the DocKG hybrid query and text-pack pipeline as Model Context Protocol
-(MCP) tools for MCP-compatible agents.
+Serves a document corpus's knowledge graph to any MCP-compatible agent over
+the fleet's shared server base, :mod:`kg_utils.mcp`.
+
+The server answers the fleet's canonical tools -- ``stats``, ``query``,
+``pack``, ``get_node``, ``neighbors`` -- under the same names as every other
+KG server. ``query`` and ``pack`` are DocKG's own: its search fuses dense and
+keyword (BM25) seeds, and ``pack`` sizes excerpts in characters and can trace
+why each result was retrieved. ``stats``, ``get_node`` and ``neighbors`` are
+the shared ones.
+
+The tool list is not kept by hand anywhere: each tool's docstring is its
+description, the server's instructions are generated from them, and::
+
+    dockg mcp --manifest
+
+prints the whole list as JSON without opening the graph.
+
+Usage
+-----
+::
+
+    dockg mcp --repo /path/to/corpus
+
+``--db`` and ``--vectors`` default to ``.dockg/graph.sqlite`` and
+``.dockg/vectors.sqlite``; a relative path is taken from ``--repo``.
+``dockg-mcp`` is the same command under its older name.
+
+Author: Eric G. Suchanek, PhD
+
+License: Elastic 2.0
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import sys
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from kg_utils.mcp import Context, KGServer, kg_from, make_server
 
-from doc_kg import DocKG
+from doc_kg import DocKG, __version__
 from doc_kg.dockg import DEFAULT_MODEL
 from doc_kg.store import DEFAULT_RELS
 
-_kg: DocKG | None = None  # pylint: disable=invalid-name
-_default_rels = (  # pylint: disable=invalid-name
-    "CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"
+#: Relations ``query`` and ``pack`` follow when the caller names none: the
+#: store's defaults plus CO_OCCURS_WITH, as the server has always used.
+SERVER_RELS: tuple[str, ...] = (*DEFAULT_RELS, "CO_OCCURS_WITH")
+
+PREAMBLE = (
+    "DocKG is a hybrid semantic + structural knowledge graph for a document corpus. "
+    "Nodes are documents ('doc:<file>'), sections ('sec:<file>:<heading-slug>'), "
+    "chunks ('chunk:<file>:<0000>'), and the topics, entities and keywords drawn "
+    "from them ('topic:<slug>', 'entity:<slug>', 'keyword:<slug>'). Edges: CONTAINS "
+    "(document → section → chunk), NEXT (reading order), REFERENCES, SIMILAR_TO, "
+    "HAS_TOPIC, MENTIONS_ENTITY, HAS_KEYWORD and CO_OCCURS_WITH.\n\n"
+    "## Recommended workflows\n\n"
+    "- **Orientation**: stats\n"
+    "- **Find material on a subject**: query → get_node\n"
+    "- **Read it**: pack with a descriptive query; traced=True shows why each "
+    "excerpt was retrieved\n"
+    "- **Walk the structure**: neighbors(node_id) — a section's chunks, a chunk's "
+    "NEXT and SIMILAR_TO neighbours, a topic's members; narrow with rels=[...] or "
+    "direction"
 )
 
 
-def _get_kg() -> DocKG:
-    """Return the global DocKG instance, raising if not initialised."""
-    if _kg is None:
-        raise RuntimeError("DocKG not initialised. Run via 'dockg-mcp --repo /path/to/repo'")
-    return _kg
-
-
-@asynccontextmanager
-async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
-    """Close the graph's SQLite connection(s) when the server shuts down.
-
-    ``main()`` sets the module-level ``_kg`` before ``mcp.run()`` calls into
-    this, and both the stdio and SSE transports route through the same
-    underlying ``Server.run()``, so this fires on either one.
-    """
-    try:
-        yield
-    finally:
-        if _kg is not None:
-            _kg.close()
-
-
-mcp = FastMCP(
-    "dockg",
-    instructions=(
-        "DocKG is a hybrid semantic + structural knowledge graph for document corpora. "
-        "Use these tools to query document chunks, sections, topics, entities, and edges."
-    ),
-    lifespan=_lifespan,
-)
-
-
-@mcp.tool()
-def query_docs(
+def query(
     q: str,
     k: int = 8,
     hop: int = 1,
-    rels: str = _default_rels,
     max_nodes: int = 25,
-) -> str:
-    """Run hybrid semantic + graph query over DocKG and return JSON."""
-    rel_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
-    result = _get_kg().query(
-        q,
-        k=k,
-        hop=hop,
-        rels=rel_tuple or DEFAULT_RELS,
-        max_nodes=max_nodes,
+    rels: list[str] | None = None,
+    *,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Hybrid search over the corpus: ranked sections, chunks and topics, and the edges among them.
+
+    Seeds fuse dense (vector) and keyword (BM25) matches, then expand through
+    the graph. Use ``pack`` instead when you want the text itself.
+
+    :param q: Natural-language query.
+    :param k: Seeds to start from (1-100, default 8).
+    :param hop: Graph expansion hops from each seed (0-5, default 1).
+    :param max_nodes: Most nodes to return (default 25).
+    :param rels: Edge types to follow; omit for every relation listed above.
+    """
+    result = kg_from(ctx).query(
+        q, k=k, hop=hop, rels=tuple(rels) if rels else SERVER_RELS, max_nodes=max_nodes
     )
-    return result.to_json()
+    return result.to_dict()
 
 
-@mcp.tool()
-def pack_docs(
+def pack(
     q: str,
     k: int = 8,
     hop: int = 1,
-    rels: str = _default_rels,
-    max_chars: int = 2000,
     max_nodes: int = 15,
+    rels: list[str] | None = None,
+    max_chars: int = 2000,
     traced: bool = False,
+    *,
+    ctx: Context,
 ) -> str:
-    """Run hybrid query and return Markdown text pack.
-
-    Set ``traced=True`` to attach a provenance path (seed → … → node, with a
-    quoted source line at each hop) under every returned node — a traceable
-    chain of *why* each result was retrieved.
     """
-    rel_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
-    pack = _get_kg().pack(
+    Hybrid search rendered as a Markdown pack of text excerpts, ready to read.
+
+    :param q: Natural-language query.
+    :param k: Seeds to start from (1-100, default 8).
+    :param hop: Graph expansion hops (0-5, default 1).
+    :param max_nodes: Most excerpts (default 15).
+    :param rels: Edge types to follow; omit for every relation listed above.
+    :param max_chars: Longest excerpt, in characters (default 2000).
+    :param traced: Attach a provenance path under each excerpt (seed → … →
+        node, with a quoted source line at each hop): why it was retrieved.
+    """
+    result = kg_from(ctx).pack(
         q,
         k=k,
         hop=hop,
-        rels=rel_tuple or DEFAULT_RELS,
+        rels=tuple(rels) if rels else SERVER_RELS,
         max_chars=max_chars,
         max_nodes=max_nodes,
         traced=traced,
     )
-    return pack.to_markdown()
+    return result.to_markdown()
 
 
-@mcp.tool()
-def get_node(node_id: str) -> str:
-    """Fetch a single DocKG node by ID and return JSON."""
-    node = _get_kg().node(node_id)
-    if node is None:
-        return json.dumps({"error": f"Node not found: {node_id!r}"})
-    return json.dumps(node, indent=2, ensure_ascii=False)
+def build_server(
+    repo: str | Path,
+    db: str | Path | None = None,
+    vectors: str | Path | None = None,
+    model: str | None = None,
+) -> KGServer:
+    """Build the DocKG MCP server for one corpus, without opening its graph.
 
+    :param repo: Corpus root the graph was built from.
+    :param db: Graph database; ``None`` for ``<repo>/.dockg/graph.sqlite``.
+    :param vectors: Vector store; ``None`` for ``<repo>/.dockg/vectors.sqlite``.
+    :param model: Embedding model; ``None`` for :data:`DEFAULT_MODEL`.
+    :return: The server; serve it with :func:`kg_utils.mcp.run`.
+    """
+    root = Path(repo).resolve()
 
-@mcp.tool()
-def graph_stats() -> str:
-    """Return node/edge count stats for the current DocKG store."""
-    stats = _get_kg().stats()
-    return json.dumps(stats, indent=2, ensure_ascii=False)
+    def open_kg() -> DocKG:
+        return DocKG(root, db, vectors, model=model or DEFAULT_MODEL)
 
-
-def _parse_args(argv: list | None = None) -> argparse.Namespace:
-    """Parse command-line arguments for the DocKG MCP server."""
-    p = argparse.ArgumentParser(
-        prog="dockg-mcp",
-        description="DocKG MCP server — exposes document graph query tools to AI agents.",
+    server = make_server(
+        open_kg, name="dockg", kind="doc", version=__version__, instructions=PREAMBLE
     )
-    p.add_argument("--repo", default=".", help="Repository root directory")
-    p.add_argument(
-        "--db",
-        default=".dockg/graph.sqlite",
-        help="Path to SQLite graph (default: .dockg/graph.sqlite)",
-    )
-    p.add_argument(
-        "--lancedb",
-        default=".dockg/lancedb",
-        help="Path to the legacy LanceDB directory (default: .dockg/lancedb). "
-        "Also anchors where the sqlite-vec store is derived from.",
-    )
-    p.add_argument(
-        "--vectors-path",
-        default=None,
-        help="Path to the sqlite-vec vector store (default: derived next to the graph)",
-    )
-    p.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"Sentence-transformer model name (default: {DEFAULT_MODEL})",
-    )
-    p.add_argument(
-        "--transport",
-        choices=["stdio", "sse"],
-        default="stdio",
-        help="MCP transport: stdio (default) or sse",
-    )
-    return p.parse_args(argv)
+    server.canonical("query")(query)
+    server.canonical("pack")(pack)
+    return server
 
 
-def main(argv: list | None = None) -> None:
-    """Start the DocKG MCP server and expose tools over MCP transport."""
-    global _kg
+def main(argv: list[str] | None = None) -> None:
+    """Entry point for ``dockg-mcp``: the same command as ``dockg mcp``.
 
-    args = _parse_args(argv)
+    :param argv: Arguments; ``None`` for ``sys.argv[1:]``.
+    """
+    from doc_kg.cli.cmd_mcp import mcp_command  # noqa: PLC0415
 
-    repo = Path(args.repo).resolve()
-    db = Path(args.db) if Path(args.db).is_absolute() else repo / args.db
-    lancedb_dir = Path(args.lancedb) if Path(args.lancedb).is_absolute() else repo / args.lancedb
-    vectors_path = None
-    if args.vectors_path:
-        vp = Path(args.vectors_path)
-        vectors_path = vp if vp.is_absolute() else repo / vp
-
-    if not db.exists():
-        print(
-            f"WARNING: SQLite database not found at '{db}'.\nRun 'dockg build' first.",
-            file=sys.stderr,
-        )
-
-    # Constructed before the banner so the banner can report the vector store
-    # that will actually be opened. DocKG.__init__ is lazy — no model is loaded.
-    _kg = DocKG(
-        corpus_root=repo,
-        db_path=db,
-        lancedb_dir=lancedb_dir,
-        model=args.model,
-        vectors_path=vectors_path,
-    )
-
-    print(
-        f"DocKG MCP server starting\n"
-        f"  repo     : {repo}\n"
-        f"  db       : {db}\n"
-        f"  backend  : {_kg.resolved_vector_backend}\n"
-        f"  vectors  : {_kg.vector_store_path}\n"
-        f"  model    : {args.model}\n"
-        f"  transport: {args.transport}",
-        file=sys.stderr,
-    )
-
-    mcp.run(transport=args.transport)
+    mcp_command.main(args=argv, prog_name="dockg-mcp")
 
 
 if __name__ == "__main__":

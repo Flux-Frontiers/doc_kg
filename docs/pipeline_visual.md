@@ -168,8 +168,8 @@ sqlite-vec (ANN seed)
   ┌─────┴─────┐
   ▼           ▼
 CLI         MCP server
-(dockg      (query_docs
- pack)       pack_docs
+(dockg      (query
+ pack)       pack
              get_node)
 ```
 

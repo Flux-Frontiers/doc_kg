@@ -105,7 +105,6 @@ def save_snapshot(
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=repo_root / ".dockg" / "lancedb",
         vectors_path=vectors_path,
     )
     try:

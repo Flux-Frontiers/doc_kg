@@ -1,13 +1,13 @@
 ---
 name: dockg
-description: Expert knowledge for installing, configuring, and using DocKG — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or sqlite-vec knowledge graph from documents, running the multipass analysis pipeline (dockg pipeline run/embed/manifold), configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg semantic-analyze, dockg pipeline, dockg viz, dockg mcp, dockg snapshot), using the graph_stats / query_docs / pack_docs / get_node MCP tools, or troubleshooting DocKG errors.
+description: Expert knowledge for installing, configuring, and using DocKG — a hybrid semantic + structural knowledge graph for document corpora (.md and .txt files). Use this skill when the user asks about: setting up DocKG in a project, adding doc-kg as a Poetry dependency, building the SQLite or sqlite-vec knowledge graph from documents, running the multipass analysis pipeline (dockg pipeline run/embed/manifold), configuring .mcp.json for Claude Code or Kilo Code, configuring .vscode/mcp.json for GitHub Copilot, configuring claude_desktop_config.json for Claude Desktop, using the dockg CLI (dockg build, dockg build-graph, dockg build-index, dockg query, dockg pack, dockg analyze, dockg semantic-analyze, dockg pipeline, dockg viz, dockg mcp, dockg snapshot), using the stats / query / pack / get_node / neighbors MCP tools, or troubleshooting DocKG errors.
 ---
 
 # DocKG Skill
 
 > **Use DocKG first — before grep, file reads, or text search.**
 >
-> Text search finds strings. DocKG understands documents. It knows which sections contain which chunks, how topics and entities cross-reference across files, and surfaces the most semantically relevant excerpts in a single query. One `pack_docs` call replaces five rounds of search-and-read and gives the agent real structural insight into the corpus — not just keyword matches.
+> Text search finds strings. DocKG understands documents. It knows which sections contain which chunks, how topics and entities cross-reference across files, and surfaces the most semantically relevant excerpts in a single query. One `pack` call replaces five rounds of search-and-read and gives the agent real structural insight into the corpus — not just keyword matches.
 
 DocKG indexes `.md` and `.txt` document corpora into a hybrid knowledge graph (SQLite + sqlite-vec) and exposes it as MCP tools for AI agents. It also provides a **multipass analysis pipeline** (diary_kg-style) for deep NLP transformation with diversity sampling, hybrid topic classification, corpus embedding, and manifold analysis.
 
@@ -293,10 +293,14 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 
 | Tool | When to use |
 |---|---|
-| `graph_stats()` | First call — understand corpus size, node/edge breakdown |
-| `query_docs(q)` | Structural exploration — find relevant nodes and relationships |
-| `pack_docs(q)` | Read actual document text (prefer over `query_docs`) |
+| `stats()` | First call — understand corpus size, node/edge breakdown |
+| `query(q)` | Structural exploration — find relevant nodes and relationships |
+| `pack(q)` | Read actual document text (prefer over `query`) |
 | `get_node(node_id)` | Fetch one node by its stable ID — metadata, title, file path |
+| `neighbors(node_id)` | Walk the structure — a section's chunks, a chunk's NEXT / SIMILAR_TO neighbours; graph only, no model |
+
+These are the fleet's canonical names, the same on every KG server. `rels` is a
+list (`["HAS_TOPIC", "SIMILAR_TO"]`). `dockg mcp --manifest` prints the live list.
 
 ## Node & Edge Reference
 
@@ -304,8 +308,8 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 
 | Kind | ID prefix | Description |
 |---|---|---|
-| `document` | `document:<file_path>` | Top-level document (one per file) |
-| `section` | `section:<file_path>:<heading-slug>` | Markdown heading block |
+| `document` | `doc:<file_path>` | Top-level document (one per file) |
+| `section` | `sec:<file_path>:<heading-slug>` | Markdown heading block |
 | `chunk` | `chunk:<file_path>:<index:04d>` | Text fragment (≈512 chars, overlapping) |
 | `topic` | `topic:<slug>` | Inferred topic category (e.g. `topic:architecture`) |
 | `entity` | `entity:<slug>` | Named entity extracted from chunk text |
@@ -333,9 +337,9 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 | Narrow, precise lookup | `k=4, hop=0` |
 | Standard exploration | `k=8, hop=1` (default) |
 | Broad topic sweep | `k=12, hop=2` |
-| Follow document structure | `k=8, hop=1, rels="CONTAINS,NEXT"` |
-| Trace topics and entities | `k=8, hop=2, rels="HAS_TOPIC,MENTIONS_ENTITY"` |
-| Find semantically similar chunks | `k=6, hop=1, rels="SIMILAR_TO"` |
+| Follow document structure | `k=8, hop=1, rels=["CONTAINS", "NEXT"]` |
+| Trace topics and entities | `k=8, hop=2, rels=["HAS_TOPIC", "MENTIONS_ENTITY"]` |
+| Find semantically similar chunks | `k=6, hop=1, rels=["SIMILAR_TO"]` |
 
 ### Choosing `rels`
 
@@ -353,35 +357,35 @@ Config path: `~/Library/Application Support/Claude/claude_desktop_config.json` (
 ### Typical session workflow
 
 ```
-1. graph_stats()                                              → orientation: corpus size and shape
-2. query_docs("authentication flow", k=8, hop=1)             → find relevant nodes
-3. pack_docs("JWT token validation", k=6, hop=1)             → read actual document text
-4. pack_docs("error handling", k=4, hop=2, rels="SIMILAR_TO")→ related chunks across files
-5. get_node("document:docs/auth.md")                         → single node metadata
-6. query_docs("topic overview", rels="HAS_TOPIC", hop=2)     → topic-centric traversal
+1. stats()                                                 → orientation: corpus size and shape
+2. query("authentication flow", k=8, hop=1)                → find relevant nodes
+3. pack("JWT token validation", k=6, hop=1)                → read actual document text
+4. pack("error handling", k=4, hop=2, rels=["SIMILAR_TO"]) → related chunks across files
+5. get_node("doc:docs/auth.md")                            → single node metadata
+6. query("topic overview", rels=["HAS_TOPIC"], hop=2)      → topic-centric traversal
 ```
 
 ### Common query patterns
 
 | Goal | Query |
 |---|---|
-| "What does this corpus say about X?" | `pack_docs("X concept")` |
-| "Find all documents about topic T" | `query_docs("T", rels="HAS_TOPIC")` |
-| "What chunks mention entity E?" | `query_docs("E", rels="MENTIONS_ENTITY")` |
-| "Find chunks similar to this one" | `query_docs("concept", rels="SIMILAR_TO")` |
-| "Show the structure of a document" | `query_docs("doc name", rels="CONTAINS", hop=2)` |
-| "Find cross-references between docs" | `query_docs("topic", rels="REFERENCES")` |
-| "Get adjacent context around a chunk" | `query_docs("chunk text", rels="CONTAINS,NEXT")` |
+| "What does this corpus say about X?" | `pack("X concept")` |
+| "Find all documents about topic T" | `query("T", rels=["HAS_TOPIC"])` |
+| "What chunks mention entity E?" | `query("E", rels=["MENTIONS_ENTITY"])` |
+| "Find chunks similar to this one" | `query("concept", rels=["SIMILAR_TO"])` |
+| "Show the structure of a document" | `query("doc name", rels=["CONTAINS"], hop=2)` |
+| "Find cross-references between docs" | `query("topic", rels=["REFERENCES"])` |
+| "Get adjacent context around a chunk" | `query("chunk text", rels=["CONTAINS", "NEXT"])` |
 
 ## Key Defaults
 
-- `k=8, hop=1, rels="CONTAINS,NEXT,REFERENCES,SIMILAR_TO,HAS_TOPIC,MENTIONS_ENTITY,HAS_KEYWORD,CO_OCCURS_WITH"`
-- `max_chars=2000` (pack_docs), `max_nodes=15` (pack_docs), `max_nodes=25` (query_docs)
+- `k=8, hop=1`, `rels` omitted = every relation above
+- `max_chars=2000` (pack), `max_nodes=15` (pack), `max_nodes=25` (query)
 - Embedding model (all pipelines): `BAAI/bge-small-en-v1.5` (384-d)
 - Storage: `.dockg/graph.sqlite` (SQLite) + `.dockg/vectors.sqlite` (sqlite-vec)
 - Pipeline output: `.dockg/pipeline/` (`.psv` runs, `embeddings.json` cache)
 - Feature cache: `.dockg/cache/` (pickle, per-file with SHA-256 invalidation)
-- Transport: `stdio` (Claude Code/Desktop), `sse` (HTTP clients)
+- Transport: `stdio` (Claude Code/Desktop), `streamable-http` (HTTP clients)
 
 ## .gitignore Setup
 
@@ -408,7 +412,8 @@ export DOCKG_MODEL_DIR=/path/to/shared/models
 
 | Error | Fix |
 |---|---|
-| `WARNING: SQLite database not found` | Run `dockg build <corpus_root>` first |
+| `no graph at ...` | Run `dockg build <corpus_root>` first |
+| `no such option: --vectors-path` | Rename it `--vectors` in the MCP config (0.29.0) |
 | `mcp package not found` | `poetry install` — `mcp` is a core dependency, no extra needed |
 | No tools visible in MCP client | Use absolute paths in config; restart the client |
 | Empty query results | Run `dockg build <corpus_root>` (full rebuild, no flags needed) |

@@ -155,9 +155,9 @@ runs:
           --wipe
 
     # ------------------------------------------------------------------
-    # 6. Build LanceDB semantic index  (skip when cache was restored)
+    # 6. Build the sqlite-vec semantic index  (skip when cache was restored)
     # ------------------------------------------------------------------
-    - name: Build LanceDB semantic index
+    - name: Build semantic index
       if: steps.cache-dockg.outputs.cache-hit != 'true'
       shell: bash
       env:

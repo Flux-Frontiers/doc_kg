@@ -7,7 +7,7 @@ post-expansion scope guard helpers added to support genre-restricted queries.
 from __future__ import annotations
 
 from doc_kg.dockg import DocNode
-from doc_kg.kg import _lance_where, _node_in_scope
+from doc_kg.kg import _node_in_scope, _vector_where
 from doc_kg.store import GraphStore, _node_filter_sql
 
 # ---------------------------------------------------------------------------
@@ -43,35 +43,35 @@ class TestNodeFilterSql:
 
 
 # ---------------------------------------------------------------------------
-# _lance_where — LanceDB prefilter string
+# _vector_where — vector-store prefilter string
 # ---------------------------------------------------------------------------
 
 
 class TestLanceWhere:
     def test_empty_returns_none(self):
-        assert _lance_where(None, None) is None
+        assert _vector_where(None, None) is None
 
     def test_prefixes(self):
-        where = _lance_where(("sci-fi/",), None)
+        where = _vector_where(("sci-fi/",), None)
         assert where == "(starts_with(file_path, 'sci-fi/'))"
 
     def test_kinds(self):
-        where = _lance_where(None, ("chunk", "section"))
+        where = _vector_where(None, ("chunk", "section"))
         assert where == "kind IN ('chunk', 'section')"
 
     def test_combined(self):
-        where = _lance_where(("a/",), ("chunk",))
+        where = _vector_where(("a/",), ("chunk",))
         assert where == "(starts_with(file_path, 'a/')) AND kind IN ('chunk')"
 
     def test_single_quotes_escaped(self):
-        where = _lance_where(("o'brien/",), None)
+        where = _vector_where(("o'brien/",), None)
         assert "o''brien/" in where
 
     def test_underscore_matches_literally(self):
         # starts_with takes a plain string, so SQL LIKE wildcards (%/_) in a
         # prefix need no escaping and cannot over-match (e.g. 'doc_kg' must
         # not match 'docXkg').
-        where = _lance_where(("doc_kg/",), None)
+        where = _vector_where(("doc_kg/",), None)
         assert where == "(starts_with(file_path, 'doc_kg/'))"
         assert "LIKE" not in where
 

@@ -230,9 +230,10 @@ dockg mcp \
 
 | Tool | Description |
 |---|---|
-| `graph_stats()` | Node and edge counts by kind/relation |
-| `query_docs(q, ...)` | Hybrid semantic + structural query; returns JSON |
-| `pack_docs(q, ...)` | Hybrid query + document excerpts; returns Markdown |
+| `stats()` | Node and edge counts by kind/relation |
+| `query(q, ...)` | Hybrid semantic + structural query; returns JSON |
+| `pack(q, ...)` | Hybrid query + document excerpts; returns Markdown |
+| `neighbors(node_id, ...)` | A node's one-hop neighbourhood: edges and far-end nodes |
 | `get_node(node_id)` | Fetch a single node by stable ID |
 
 ### Agent configuration quick reference

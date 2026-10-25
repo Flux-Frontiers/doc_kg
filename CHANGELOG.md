@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Step 3 of the fleet's MCP centralization (kgrag_priv
+`docs/MCP_CENTRALIZATION_PLAN.md`, sweep item 93), with LanceDB removal folded
+in. **Needs kgmodule-utils 0.29.0**, which provides `kg_utils.mcp`; until that
+release it is tested against the local 0.29.0.dev0 wheel, and the floor is
+raised when the fleet lap passes.
+
+### Changed
+
+- **The MCP server is built on `kg_utils.mcp`.** It serves the fleet's five
+  canonical tools under the same names as every other KG server: `stats`,
+  `query`, `pack`, `get_node` and `neighbors`. `query` and `pack` keep DocKG's
+  own hybrid search (`pack` still takes `max_chars` and `traced`). The server's
+  instructions are generated from the tools' docstrings, and
+  `dockg mcp --manifest` prints the tool list as JSON without opening a graph.
+  Each session prints the store it is actually serving to stderr, and a corpus
+  with no graph is refused (`no graph at ...`) rather than served empty. Under
+  stdio, stray prints go to stderr instead of corrupting the protocol stream.
+- `dockg mcp` and `dockg-mcp` are one command with the fleet's standard flags:
+  `--repo`, `--db`, `--vectors`, `--model`, `--transport stdio|streamable-http`,
+  `--host`, `--port`, `--manifest`. A relative `--db` or `--vectors` is taken
+  from `--repo`. Registering the command no longer imports `mcp`, so every
+  other `dockg` command starts without it.
+- **`DocKG(corpus_root, db_path=None, vectors_path=None, ...)`.** The vector
+  store is a file; `vectors_path` defaults to `<corpus>/.dockg/vectors.sqlite`.
+  `vector_store_path` remains as a read-only alias.
+- `SemanticIndex(vectors_path, *, embedder=None, index_kinds=..., backend=None)`.
+- `index.sqlite_backend(vectors_path, *, dim, dtype="float")` replaces
+  `make_backend()`.
+- `dockg analyze` and `dockg semantic-analyze` take `--vectors-path` instead of
+  `--lancedb`.
+
+### Added
+
+- `DocKG.neighbors(node_id, *, rels=None, direction="both", limit=50)` and
+  `GraphStore.edges_touching()`: the edges touching one node and the nodes at
+  their other ends, ordered by (rel, src, dst). Graph only; no model is loaded.
+  Same contract as `kg_utils.pipeline.KGModule.neighbors`.
+
+### Removed
+
+- **MCP tool names `graph_stats`, `query_docs` and `pack_docs`**, with no
+  aliases: use `stats`, `query` and `pack`. Their `rels` argument is now a
+  list (`["HAS_TOPIC", "SIMILAR_TO"]`), not a comma-separated string.
+- `dockg mcp --vectors-path`, `--lancedb` and `--transport sse`. An MCP config
+  passing `--vectors-path` must rename it `--vectors`.
+- **LanceDB support.** `dockg convert-index`, the `[lancedb]` extra, and the
+  `--lancedb`, `--table` and `--vector-backend` options are gone; so are
+  `DocKG(lancedb_dir=..., table=...)`, `make_backend`, `resolve_backend_name`,
+  `vector_store_path()`, `sqlite_vectors_path()` and
+  `convert_lancedb_to_sqlite`. `vector_backend="lancedb"` raises `ValueError`;
+  `"auto"` and `"sqlite-vec"` are still accepted. A corpus with only a
+  `.dockg/lancedb` directory needs `dockg build`.
+- `benchmarks/ann_recall_bench.py` and `benchmarks/test_similar.py`, which
+  measured the LanceDB ANN index. The other benchmarks take `--vectors`.
+
 ## [0.28.1] - 2026-10-20
 
 ### Fixed

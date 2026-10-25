@@ -200,11 +200,11 @@ Override the cache location with the `KGRAG_MODEL_DIR` environment variable.
 
 **Slow first build** — the model downloads on first run (~90 MB). Subsequent builds use the local cache.
 
-**`lancedb` not installed** — as of 0.20.0 DocKG builds and queries `sqlite-vec` only, and no longer depends on `lancedb`. You need it for exactly one thing: reading a pre-0.20.0 store with `dockg convert-index`. Install the extra, convert once, and drop it again:
+**A corpus still has a `.dockg/lancedb` directory** — LanceDB support, including `dockg convert-index`, was removed in 0.29.0. The vector index is derived from the graph, so rebuild it and delete the old directory:
 
 ```bash
-pip install 'doc-kg[lancedb]'
-dockg convert-index --repo . --delete-lancedb
+dockg build-index --repo .
+rm -rf .dockg/lancedb
 ```
 
 **Empty query results** — run `dockg build .` first. The graph must be indexed before querying.
