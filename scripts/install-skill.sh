@@ -144,7 +144,7 @@ LOCAL_SKILL="${REPO_ROOT:+${REPO_ROOT}/.claude/skills/dockg/SKILL.md}"
 # The target repo is where the user ran the script from (CWD).
 TARGET_REPO="${PWD}"
 GRAPH_DB="${TARGET_REPO}/.dockg/graph.sqlite"
-LANCEDB_DIR="${TARGET_REPO}/.dockg/lancedb"
+VECTORS_DB="${TARGET_REPO}/.dockg/vectors.sqlite"
 
 echo "╔══════════════════════════════════════════════════╗"
 echo "║     DocKG Integration Installer (doc_kg)         ║"
@@ -403,20 +403,20 @@ echo ""
 echo "── Step 5: Building vector index ───────────────────"
 echo ""
 
-if [ -d "$LANCEDB_DIR" ] && [ "$(ls -A "$LANCEDB_DIR" 2>/dev/null)" ] && [ -z "$WIPE_FLAG" ]; then
-    echo "  ✓ Vector index already exists: ${LANCEDB_DIR} — skipping build"
+if [ -s "$VECTORS_DB" ] && [ -z "$WIPE_FLAG" ]; then
+    echo "  ✓ Vector index already exists: ${VECTORS_DB} — skipping build"
     echo "    (Run with --wipe to force rebuild)"
 else
     if [ -n "$DRY_RUN" ]; then
         echo "  [dry-run] would run: dockg build-index --repo ${TARGET_REPO}"
     else
-        echo "  → Building vector index at: ${LANCEDB_DIR}"
+        echo "  → Building vector index at: ${VECTORS_DB}"
         # See the note in Step 4: build-index has no --wipe flag either.
         (cd "${TARGET_REPO}" && "${DOCKG_BIN}" build-index --repo "${TARGET_REPO}")
-        if [ -d "$LANCEDB_DIR" ] && [ "$(ls -A "$LANCEDB_DIR" 2>/dev/null)" ]; then
-            echo "  ✓ Built: ${LANCEDB_DIR}"
+        if [ -s "$VECTORS_DB" ]; then
+            echo "  ✓ Built: ${VECTORS_DB}"
         else
-            echo "  ✗ Build failed — ${LANCEDB_DIR} not populated"
+            echo "  ✗ Build failed — ${VECTORS_DB} not populated"
             exit 1
         fi
     fi
@@ -541,7 +541,7 @@ fi
 echo ""
 echo "  Repo:     ${TARGET_REPO}"
 echo "  Graph DB: ${GRAPH_DB}"
-echo "  LanceDB:  ${LANCEDB_DIR}"
+echo "  Vectors:  ${VECTORS_DB}"
 echo ""
 echo "  Claude commands installed:"
 for _CMD_FILE in "${CLAUDE_COMMAND_FILES[@]}"; do

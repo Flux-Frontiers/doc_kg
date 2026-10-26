@@ -10,8 +10,9 @@
 #   pip install -e ".[analysis,viz]"     + clustering/manifold, Streamlit/PyVis
 #
 #   poetry install --with dev            + pytest, ruff, ty, pre-commit, pdoc
-#   poetry install --with kg             + the pycodekg CLI
-#   poetry install --extras "analysis viz" --with dev,kg    full maintainer env
+#   poetry install --extras "analysis viz" --with dev       full maintainer env
+#
+# pycodekg is a global tool (`uv tool install pycode-kg`), not a dependency.
 #
 # No [dev] and no [all] extra -- see the notes below. [sqlite-vec] is a no-op
 # alias kept for sister packages that still pin it.

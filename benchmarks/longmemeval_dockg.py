@@ -18,7 +18,7 @@ plus full relational structure: document/section/chunk hierarchy, SIMILAR_TO
 edges (cosine ≥ 0.85), HAS_TOPIC, MENTIONS_ENTITY, HAS_KEYWORD, CO_OCCURS_WITH.
 
 Retrieval uses ``DocKG.query`` — the same semantic-seed + graph-expansion path
-``pack_docs`` uses. No keyword-overlap rerank, no LLM rerank, no inference.
+``pack`` uses. No keyword-overlap rerank, no LLM rerank, no inference.
 The graph is the retrieval engine: semantic hits seed the search, and edge
 expansion walks to any node that shares a topic, entity, keyword, structural
 parent, or similarity edge with a seed. For each question the ranked nodes are

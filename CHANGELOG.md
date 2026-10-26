@@ -69,6 +69,12 @@ raised when the fleet lap passes.
 - `benchmarks/ann_recall_bench.py` and `benchmarks/test_similar.py`, which
   measured the LanceDB ANN index. The other benchmarks take `--vectors`.
 
+### Fixed
+
+- `scripts/install-skill.sh` checks for `.dockg/vectors.sqlite` instead of a
+  `.dockg/lancedb` directory. It had reported every successful index build as
+  failed and exited 1.
+
 ## [0.28.1] - 2026-10-20
 
 ### Fixed
