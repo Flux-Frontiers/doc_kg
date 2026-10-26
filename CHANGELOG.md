@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-25
+
 Step 3 of the fleet's MCP centralization (kgrag_priv
 `docs/MCP_CENTRALIZATION_PLAN.md`, sweep item 93), with LanceDB removal folded
-in. **Needs kgmodule-utils 0.29.0**, which provides `kg_utils.mcp`; until that
-release it is tested against the local 0.29.0.dev0 wheel, and the floor is
-raised when the fleet lap passes.
+in. **Needs kgmodule-utils 0.29.0**, which provides `kg_utils.mcp`: the floor
+is `kgmodule-utils[semantic,pdf,mcp]>=0.29.0`, and its `[mcp]` extra replaces
+the direct `mcp` pin.
 
 ### Changed
 
