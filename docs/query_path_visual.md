@@ -39,7 +39,7 @@ via the same `_fused_seeds()` path.
 1. Embed the query with `BAAI/bge-small-en-v1.5` (384-d, L2-normalised)
 2. sqlite-vec ANN search, cosine metric, oversampled to `k × 3` to survive downstream filtering
 3. **Scope pushdown:** optional `starts_with(file_path, …)` / `kind IN (…)` prefilter
-   (`_lance_where()` — a historical name, now shared by both backends) applied *inside*
+   (`_vector_where()`) applied *inside*
    the vector search, so the seed budget is spent entirely on in-scope nodes —
    wildcard-free, literal-prefix semantics
 

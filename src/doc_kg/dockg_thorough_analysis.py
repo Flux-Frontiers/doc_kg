@@ -363,7 +363,7 @@ def _print_summary(console: Console, result: dict) -> None:
 def main(
     corpus_root: str = ".",
     db_path: str | None = None,
-    lancedb_path: str | None = None,
+    vectors_path: str | None = None,
     report_path: str | None = None,
     json_path: str | None = None,
     quiet: bool = False,
@@ -372,8 +372,8 @@ def main(
 
     :param corpus_root: Corpus root path.
     :param db_path: SQLite database path.
-    :param lancedb_path: Legacy LanceDB directory; also anchors the derived
-        sqlite-vec store.
+    :param vectors_path: sqlite-vec vector store (default:
+        ``<corpus>/.dockg/vectors.sqlite``).
     :param report_path: Markdown report output path.
     :param json_path: JSON output path.
     :param quiet: Suppress Rich summary output.
@@ -382,9 +382,8 @@ def main(
     console = Console()
     root = Path(corpus_root).resolve()
     db = Path(db_path) if db_path else (root / ".dockg" / "graph.sqlite")
-    lancedb = Path(lancedb_path) if lancedb_path else (root / ".dockg" / "lancedb")
 
-    kg = DocKG(corpus_root=root, db_path=db, lancedb_dir=lancedb)
+    kg = DocKG(corpus_root=root, db_path=db, vectors_path=vectors_path)
     analyzer = DocKGAnalyzer(kg, console=console)
 
     report_out = report_path or _default_report_path(root)

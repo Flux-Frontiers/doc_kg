@@ -4,8 +4,8 @@ index.py
 
 SemanticIndex — semantic vector index for DocKG.
 
-Backed by a sqlite-vec store since 0.20.0; LanceDB is a legacy, read-only
-backend behind the ``[lancedb]`` extra (see ``make_backend``).
+Backed by a sqlite-vec store (``vectors.sqlite``). LanceDB support, kept as a
+read-only legacy backend from 0.20.0, was removed in 0.29.0 with the SDK's.
 
 Mirrors PyCodeKG's index.py with the following additions:
 
@@ -41,14 +41,14 @@ from typing import TYPE_CHECKING, Any, TextIO, cast
 
 from kg_utils.embed import DEFAULT_MODEL
 from kg_utils.embedder import Embedder, SentenceTransformerEmbedder
-from kg_utils.vector_backend import LanceDBBackend, SqliteVecBackend, VectorBackend
+from kg_utils.vector_backend import SqliteVecBackend, VectorBackend
 from rich.console import Console
 
 if TYPE_CHECKING:
     from doc_kg.store import GraphStore
 
 # Metadata columns DocKG persists per vector (id + these). Filterable in the
-# sqlite backend's ``where`` prefilter; carried through LanceDB rows too.
+# sqlite backend's ``where`` prefilter.
 _META_COLUMNS = ("kind", "name", "title", "file_path")
 
 
@@ -59,7 +59,7 @@ _META_COLUMNS = ("kind", "name", "title", "file_path")
 
 def suppress_ingestion_logging() -> None:
     """Suppress verbose progress output during model loading and ingestion."""
-    for name in ("sentence_transformers", "transformers", "huggingface_hub", "lancedb"):
+    for name in ("sentence_transformers", "transformers", "huggingface_hub"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
     try:
@@ -141,35 +141,7 @@ class SeedHit:
 # SemanticIndex
 # ---------------------------------------------------------------------------
 
-_DEFAULT_TABLE = "dockg_nodes"
 _DEFAULT_KINDS = ("document", "section", "chunk", "topic", "entity", "keyword")
-
-# ---------------------------------------------------------------------------
-# Approximate-nearest-neighbour (IVF) index configuration
-# ---------------------------------------------------------------------------
-# DocKG defaults to an exact flat cosine scan, which is optimal for small
-# corpora (sub-millisecond, exact).  Past ``_ANN_THRESHOLD`` rows the scan cost
-# grows linearly and an IVF index pays off (measured: ~64 ms flat at 683k rows
-# vs single-digit ms indexed).  The index is built automatically at the end of
-# a build and consumed transparently by ``search`` — both gated on row count so
-# small corpora are never touched.  All knobs are overridable via env so a
-# large-corpus build (e.g. the gutenberg bundle) can tune without code changes.
-#
-# Index type — measured on the 683k-vector gutenberg-all bundle (384-d):
-#   IVF_FLAT (default) — keeps full vectors; exact within probed cells, so it's
-#     literally the flat scan partitioned.  On real text queries, fidelity to the
-#     exact top-10 is 0.91 with 94% top-1 retention at nprobes=50 (the default),
-#     vs 0.83 / 81% at nprobes=20 — hence nprobes defaults to 50.  ``refine_factor``
-#     is a no-op for FLAT (full vectors already), so it defaults to 0 to avoid a
-#     pointless latency tax.  Costs ~1 GB index on disk at this scale.
-#   IVF_PQ — ~60× smaller index (product-quantized), but lossy: needs
-#     ``refine_factor`` >= 10 to recover recall (0.60 → 0.90 @ nprobes=20).
-#     Switch to it (and set DOCKG_ANN_REFINE_FACTOR) only at multi-million
-#     scale or under disk pressure.
-_ANN_THRESHOLD = int(os.environ.get("DOCKG_ANN_THRESHOLD", "50000"))
-_ANN_INDEX_TYPE = os.environ.get("DOCKG_ANN_INDEX_TYPE", "IVF_FLAT")
-_ANN_NPROBES = int(os.environ.get("DOCKG_ANN_NPROBES", "50"))
-_ANN_REFINE_FACTOR = int(os.environ.get("DOCKG_ANN_REFINE_FACTOR", "0"))
 
 
 def _is_jsonl_cache(path: Path) -> bool:
@@ -186,8 +158,7 @@ class SemanticIndex:
     """Semantic vector index for DocKG.
 
     Reads nodes from a :class:`~doc_kg.store.GraphStore`, embeds them, and
-    stores the vectors in a :class:`~kg_utils.vector_backend.VectorBackend` —
-    sqlite-vec by default, LanceDB only when one is passed in.  The index is
+    stores the vectors in a sqlite-vec store (``vectors.sqlite``).  The index is
     **derived and disposable** — it can be rebuilt from SQLite at any time
     without data loss.
 
@@ -197,46 +168,36 @@ class SemanticIndex:
     Example::
 
         embedder = SentenceTransformerEmbedder()
-        idx = SemanticIndex("./.dockg/lancedb", embedder=embedder)
+        idx = SemanticIndex("./.dockg/vectors.sqlite", embedder=embedder)
         idx.build(store, wipe=True)
 
         hits = idx.search("climate change policy", k=8)
         for h in hits:
             print(h.id, h.distance)
 
-    :param lancedb_dir: Legacy LanceDB directory.  Also anchors the default
-        sqlite-vec sidecar, which is derived beside it (see
-        :func:`sqlite_vectors_path`) — so this is required even though the
-        default backend writes no LanceDB store.
+    Changed in 0.29.0: the first parameter was ``lancedb_dir``, a *directory*
+    the sqlite-vec store was derived beside. It is now ``vectors_path``, the
+    store's file, as in :class:`kg_utils.semantic.SemanticIndex`; ``table``
+    and the ``ann_*`` options went with LanceDB.
+
+    :param vectors_path: The ``vectors.sqlite`` store.
     :param embedder: Embedding backend.
-    :param table: LanceDB table name (legacy backend only; ignored by sqlite-vec).
     :param index_kinds: Node kinds to embed.
+    :param backend: Vector backend; defaults to a sqlite-vec store at
+        *vectors_path*, constructed on first use.
     """
 
     def __init__(
         self,
-        lancedb_dir: str | Path,
+        vectors_path: str | Path,
         *,
         embedder: Embedder | None = None,
-        table: str = _DEFAULT_TABLE,
         index_kinds: Sequence[str] = _DEFAULT_KINDS,
-        ann_threshold: int = _ANN_THRESHOLD,
-        ann_index_type: str = _ANN_INDEX_TYPE,
-        ann_nprobes: int = _ANN_NPROBES,
-        ann_refine_factor: int = _ANN_REFINE_FACTOR,
         backend: VectorBackend | None = None,
     ) -> None:
-        self.lancedb_dir = Path(lancedb_dir)
+        self.vectors_path = Path(vectors_path)
         self.embedder: Embedder = embedder or SentenceTransformerEmbedder()
-        self.table_name = table
         self.index_kinds = tuple(index_kinds)
-        # ANN index policy (see module-level _ANN_* constants).  ``ann_threshold``
-        # <= 0 disables IVF entirely (always exact flat scan).  ANN applies only
-        # to the LanceDB backend; the sqlite-vec backend is always exact.
-        self.ann_threshold = int(ann_threshold)
-        self.ann_index_type = str(ann_index_type)
-        self.ann_nprobes = int(ann_nprobes)
-        self.ann_refine_factor = int(ann_refine_factor)
         # Vector store backend (sqlite-vec by default, constructed lazily so the
         # embedder's ``dim`` — which may load the model — is only touched on use).
         self._backend: VectorBackend | None = backend
@@ -246,48 +207,14 @@ class SemanticIndex:
     # ------------------------------------------------------------------
 
     def _get_backend(self) -> VectorBackend:
-        """Return the vector backend, constructing the default sqlite-vec one lazily.
+        """Return the vector backend, constructing the sqlite-vec store lazily.
 
-        Changed in 0.20.0: this used to default to a LanceDB store at
-        :attr:`lancedb_dir`.  It now builds a
-        :class:`~kg_utils.vector_backend.SqliteVecBackend` at the sidecar derived
-        from that directory, so a bare ``SemanticIndex`` no longer reaches for a
-        dependency that is not installed by default.
-
-        Pass ``backend=`` explicitly (see :func:`make_backend`) for anything
-        else, including LanceDB.
+        Deferred so the embedder's ``dim`` (which may load the model) is only
+        touched when the index is built or searched.
         """
         if self._backend is None:
-            self._backend = SqliteVecBackend(
-                sqlite_vectors_path(self.lancedb_dir),
-                dim=self.embedder.dim,
-                meta_columns=_META_COLUMNS,
-            )
+            self._backend = sqlite_backend(self.vectors_path, dim=self.embedder.dim)
         return self._backend
-
-    def _lance_table(self) -> Any:
-        """The underlying LanceDB table if the backend is LanceDB, else ``None``.
-
-        Used only for LanceDB-specific ingest telemetry / compaction, which are
-        no-ops on the sqlite-vec backend.
-        """
-        backend = self._get_backend()
-        return backend._table() if isinstance(backend, LanceDBBackend) else None
-
-    def _finalize_backend(self, *, quiet: bool) -> None:
-        """Post-ingest steps: LanceDB compaction + ANN index (no-ops on sqlite)."""
-        backend = self._get_backend()
-        if not isinstance(backend, LanceDBBackend):
-            return
-        tbl = backend._table()
-        # Avoid synchronous compaction in the hot ingest loop; do it once here.
-        with contextlib.suppress(Exception):
-            stats = tbl.stats()
-            frag_stats = stats.get("fragment_stats", {}) if isinstance(stats, dict) else {}
-            if int(frag_stats.get("num_fragments", 0) or 0) >= 256:
-                tbl.compact_files()
-        # Build the IVF index now that all rows are loaded (no-op below threshold).
-        backend.maybe_create_ann_index(quiet=quiet)
 
     # ------------------------------------------------------------------
     # Build
@@ -340,7 +267,6 @@ class SemanticIndex:
             Console().print(f"  nodes    : {n_total:,} to embed")
         backend = self._get_backend()
         backend.open(wipe=wipe)
-        lance_tbl = self._lance_table()  # None on sqlite-vec
 
         indexed = 0
         all_ids: list[str] = []
@@ -438,7 +364,7 @@ class SemanticIndex:
 
                 # Stale-row deletion (incremental builds) and the wipe-build
                 # skip-delete fast path both live in backend.upsert() now.
-                # Buffer multiple encode batches so LanceDB gets fewer, larger fragments.
+                # Buffer multiple encode batches into fewer, larger writes.
                 rows = [
                     {
                         "id": n["id"],
@@ -466,17 +392,6 @@ class SemanticIndex:
                 if not quiet and batches % telemetry_every == 0:
                     with contextlib.suppress(Exception):
                         if show_telemetry:
-                            frags = small = None
-                            if lance_tbl is not None:
-                                stats = lance_tbl.stats()
-                                if isinstance(stats, dict):
-                                    frag_stats = stats.get("fragment_stats", {})
-                                    frags = frag_stats.get("num_fragments")
-                                    small = frag_stats.get("num_small_fragments")
-                                else:
-                                    frag_stats = getattr(stats, "fragment_stats", None)
-                                    frags = getattr(frag_stats, "num_fragments", None)
-                                    small = getattr(frag_stats, "num_small_fragments", None)
                             embed_ms = (
                                 (window_embed_s / max(window_rows, 1)) * 1000.0
                                 if window_rows
@@ -490,7 +405,6 @@ class SemanticIndex:
 
                             Console().print(
                                 f"  ingest   : batch={batches} rows={indexed:,} "
-                                f"fragments={frags} small={small} "
                                 f"embed_ms_per_row={embed_ms:.3f} add_ms_per_row={add_ms:.3f} "
                                 f"encode_batch_eff={eff_batch}"
                             )
@@ -517,9 +431,6 @@ class SemanticIndex:
             indexed += len(pending_rows)
             all_ids.extend(pending_ids)
 
-        # LanceDB compaction (if fragmented) + IVF index build; no-op on sqlite-vec.
-        self._finalize_backend(quiet=quiet)
-
         # SIMILAR_TO edge discovery — a blocked NumPy matmul, backend-independent.
         similar_edges_added = 0
         if discover_similar and chunk_pair_ids and chunk_pair_vecs is not None:
@@ -538,8 +449,7 @@ class SemanticIndex:
             "indexed_rows": indexed,
             "dim": self.embedder.dim,
             "model_name": getattr(self.embedder, "model_name", repr(self.embedder)),
-            "table": self.table_name,
-            "lancedb_dir": str(self.lancedb_dir),
+            "vectors_path": str(self.vectors_path),
             "kinds": list(self.index_kinds),
             "similar_edges_added": similar_edges_added,
         }
@@ -994,9 +904,6 @@ class SemanticIndex:
                 if prog is not None and task_id is not None:
                     prog.advance(task_id, len(batch_meta))
 
-        # LanceDB compaction + IVF index; no-op on sqlite-vec.
-        self._finalize_backend(quiet=quiet)
-
         similar_edges_added = 0
         if discover_similar and chunk_pair_ids and chunk_pair_vecs is not None:
             similar_edges_added = self._discover_similar_edges(
@@ -1014,8 +921,7 @@ class SemanticIndex:
             "indexed_rows": indexed,
             "dim": cache.dim,
             "model_name": cache.model,
-            "table": self.table_name,
-            "lancedb_dir": str(self.lancedb_dir),
+            "vectors_path": str(self.vectors_path),
             "kinds": list(self.index_kinds),
             "similar_edges_added": similar_edges_added,
         }
@@ -1099,9 +1005,6 @@ class SemanticIndex:
             backend.upsert(pending_rows, batch_size=len(pending_rows))
             indexed += len(pending_rows)
 
-        # LanceDB compaction + IVF index; no-op on sqlite-vec.
-        self._finalize_backend(quiet=quiet)
-
         similar_edges_added = 0
         if discover_similar and chunk_pair_ids and chunk_vecs_list:
             chunk_pair_vecs = np.asarray(chunk_vecs_list, dtype=np.float32)
@@ -1120,8 +1023,7 @@ class SemanticIndex:
             "indexed_rows": indexed,
             "dim": dim,
             "model_name": model_name,
-            "table": self.table_name,
-            "lancedb_dir": str(self.lancedb_dir),
+            "vectors_path": str(self.vectors_path),
             "kinds": list(self.index_kinds),
             "similar_edges_added": similar_edges_added,
         }
@@ -1146,11 +1048,11 @@ class SemanticIndex:
     ) -> int:
         """Find semantically similar chunk pairs and write SIMILAR_TO edges.
 
-        Replaces the per-chunk LanceDB ANN loop with a blocked NumPy matmul.
+        A blocked NumPy matmul rather than one vector query per chunk.
         Since all chunk vectors are L2-normalised by the embedder
         (``normalize_embeddings=True``), cosine similarity equals the dot
         product, so one BLAS SGEMM call per block gives exact similarities
-        with no per-query Python↔LanceDB round-trip overhead.
+        with no per-query round-trip overhead.
 
         The ``(block_size × n_chunks)`` sims matrix is clamped adaptively to
         stay under ~256 MB regardless of corpus size (e.g. block_size auto-
@@ -1340,9 +1242,8 @@ class SemanticIndex:
         :param where: Optional SQL filter applied as a *prefilter* (evaluated
             before the vector search, so the ``k`` nearest are drawn from the
             matching subset rather than filtered afterwards).  Built against the
-            metadata columns ``file_path`` and ``kind``.  Valid on both backends:
-            LanceDB evaluates it as a prefilter; sqlite-vec compiles it to a
-            ``rowid IN (SELECT rowid FROM vec_meta WHERE <where>)`` subquery.
+            metadata columns ``file_path`` and ``kind``.  sqlite-vec compiles it
+            to a ``rowid IN (SELECT rowid FROM vec_meta WHERE <where>)`` subquery.
         :return: List of :class:`SeedHit` ordered by ascending distance.
         """
         backend = self._get_backend()
@@ -1373,284 +1274,26 @@ class SemanticIndex:
         return store.query_nodes(kinds=list(self.index_kinds))
 
     def __repr__(self) -> str:
-        return (
-            f"SemanticIndex(lancedb_dir={self.lancedb_dir!r}, "
-            f"table={self.table_name!r}, embedder={self.embedder!r})"
-        )
+        return f"SemanticIndex(vectors_path={self.vectors_path!r}, embedder={self.embedder!r})"
 
 
 # ---------------------------------------------------------------------------
-# Backend factory
+# Vector store
 # ---------------------------------------------------------------------------
 
-_SQLITE_ALIASES = frozenset({"sqlite", "sqlite-vec", "sqlite_vec", "sqlitevec", "vec0"})
-_LANCE_ALIASES = frozenset({"lancedb", "lance"})
-_AUTO_ALIASES = frozenset({"auto", ""})
 
+def sqlite_backend(vectors_path: str | Path, *, dim: int, dtype: str = "float") -> SqliteVecBackend:
+    """The sqlite-vec store DocKG keeps its vectors in, with DocKG's metadata columns.
 
-def resolve_backend_name(
-    vector_backend: str | None,
-    *,
-    lancedb_dir: str | Path,
-    vectors_path: str | Path | None = None,
-) -> str:
-    """Resolve ``"auto"`` to a concrete backend by what exists on disk.
+    Replaced ``make_backend()`` in 0.29.0, when LanceDB support was removed and
+    there was no backend left to choose.
 
-    ``auto`` prefers an existing ``vectors.sqlite`` sidecar; else an existing
-    LanceDB store (don't silently change an un-migrated corpus's store type);
-    else sqlite-vec for a fresh build (migration-forward). Concrete names pass
-    through unchanged.
-
-    .. note::
-       ``auto`` stopped being :class:`~doc_kg.kg.DocKG`'s default in 0.20.0 — it
-       is reached only when a caller asks for it. Resolving to ``"lancedb"``
-       therefore needs the ``[lancedb]`` extra, which :func:`make_backend`
-       enforces.
-
-    :param vector_backend: ``"auto"`` / ``None`` / ``"lancedb"`` / ``"sqlite-vec"``.
-    :param lancedb_dir: LanceDB directory (also locates the sqlite sidecar).
-    :param vectors_path: Explicit sqlite path override.
-    :return: ``"lancedb"`` or ``"sqlite-vec"``.
-    """
-    key = (vector_backend or "auto").strip().lower()
-    if key not in _AUTO_ALIASES:
-        return key
-    vpath = Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
-    if vpath.exists():
-        return "sqlite-vec"
-    if Path(lancedb_dir).exists():
-        return "lancedb"
-    return "sqlite-vec"
-
-
-def _require_lancedb(what: str) -> None:
-    """Raise a actionable error if the optional ``lancedb`` extra is absent.
-
-    ``lancedb`` stopped being a core dependency in 0.20.0 — DocKG builds and
-    queries sqlite-vec only.  It is still needed to *read* a legacy store, which
-    is what :func:`convert_lancedb_to_sqlite` does, so the dependency is
-    installable on demand rather than removed outright.
-
-    :param what: Human description of the operation needing LanceDB, used in the
-        error message.
-    :raises ImportError: If ``lancedb`` is not importable.
-    """
-    import importlib.util  # pylint: disable=import-outside-toplevel
-
-    if importlib.util.find_spec("lancedb") is not None:
-        return
-    raise ImportError(
-        f"{what} requires the 'lancedb' package, which DocKG no longer installs "
-        "by default (it was dropped as a core dependency in 0.20.0).\n"
-        "\n"
-        "Install it only if you are reading a pre-0.20.0 store:\n"
-        "    pip install 'doc-kg[lancedb]'\n"
-        "\n"
-        "Then migrate the store once and you will not need it again:\n"
-        "    dockg convert-index --repo <repo> --delete-lancedb"
-    )
-
-
-def sqlite_vectors_path(lancedb_dir: str | Path) -> Path:
-    """Derive the sidecar ``vectors.sqlite`` path next to ``graph.sqlite``.
-
-    DocKG's LanceDB store lives at ``<store>/.dockg/lancedb``; the sqlite-vec
-    sidecar sits alongside it at ``<store>/.dockg/vectors.sqlite``.
-
-    :param lancedb_dir: The LanceDB directory (``.../.dockg/lancedb``).
-    :return: ``.../.dockg/vectors.sqlite``.
-    """
-    return Path(lancedb_dir).parent / "vectors.sqlite"
-
-
-def vector_store_path(
-    vector_backend: str | None,
-    *,
-    lancedb_dir: str | Path,
-    vectors_path: str | Path | None = None,
-) -> Path:
-    """Location of the store :func:`make_backend` would open for these settings.
-
-    Mirrors :func:`make_backend`'s dispatch so callers can *report* the store
-    without constructing a backend (which loads a model to learn ``dim``).
-    Printing ``lancedb_dir`` unconditionally is wrong for the default backend —
-    the vectors land in the sqlite sidecar.
-
-    :param vector_backend: ``"auto"`` / ``None`` / ``"lancedb"`` / ``"sqlite-vec"``.
-    :param lancedb_dir: LanceDB directory (also locates the sqlite sidecar).
-    :param vectors_path: Explicit sqlite path override.
-    :return: ``vectors.sqlite`` under the sqlite-vec backend, else the LanceDB dir.
-    """
-    key = resolve_backend_name(vector_backend, lancedb_dir=lancedb_dir, vectors_path=vectors_path)
-    if key in _SQLITE_ALIASES:
-        return Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
-    return Path(lancedb_dir)
-
-
-def make_backend(
-    vector_backend: str,
-    *,
-    lancedb_dir: str | Path,
-    dim: int,
-    table: str = _DEFAULT_TABLE,
-    vectors_path: str | Path | None = None,
-    ann_threshold: int = _ANN_THRESHOLD,
-    ann_nprobes: int = _ANN_NPROBES,
-    ann_refine_factor: int = _ANN_REFINE_FACTOR,
-    ann_index_type: str = _ANN_INDEX_TYPE,
-    dtype: str = "float",
-) -> VectorBackend:
-    """Construct a :class:`~kg_utils.vector_backend.VectorBackend` by name.
-
-    :param vector_backend: ``"sqlite-vec"``, ``"lancedb"``, or ``"auto"`` (resolved
-        by :func:`resolve_backend_name`).  Required — callers that want DocKG's
-        default should pass :attr:`~doc_kg.kg.DocKG.vector_backend`, which is
-        ``"sqlite-vec"``.  ``"lancedb"`` needs the ``[lancedb]`` extra.
-    :param lancedb_dir: LanceDB directory; also used to derive the sqlite sidecar.
+    :param vectors_path: The ``vectors.sqlite`` file.
     :param dim: Embedding dimensionality.
-    :param table: LanceDB table name (ignored by the sqlite backend).
-    :param vectors_path: Explicit ``vectors.sqlite`` path (sqlite only); defaults
-        to :func:`sqlite_vectors_path`.
-    :param dtype: ``"float"`` or ``"int8"`` (sqlite only).
-    :raises ValueError: On an unknown backend name.
+    :param dtype: ``"float"`` or ``"int8"``.
+    :return: An unopened :class:`~kg_utils.vector_backend.SqliteVecBackend`.
     """
-    key = resolve_backend_name(vector_backend, lancedb_dir=lancedb_dir, vectors_path=vectors_path)
-    if key in _SQLITE_ALIASES:
-        path = Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
-        return SqliteVecBackend(path, dim=dim, meta_columns=_META_COLUMNS, dtype=dtype)
-    if key in _LANCE_ALIASES:
-        _require_lancedb("the 'lancedb' vector backend")
-        return LanceDBBackend(
-            lancedb_dir,
-            table=table,
-            dim=dim,
-            meta_columns=_META_COLUMNS,
-            ann_threshold=ann_threshold,
-            ann_nprobes=ann_nprobes,
-            ann_refine_factor=ann_refine_factor,
-            ann_index_type=ann_index_type,
-        )
-    raise ValueError(
-        f"unknown vector_backend {vector_backend!r} (expected 'lancedb' or 'sqlite-vec')"
-    )
-
-
-# ---------------------------------------------------------------------------
-# LanceDB → sqlite-vec conversion (no re-embedding)
-# ---------------------------------------------------------------------------
-
-
-def convert_lancedb_to_sqlite(
-    lancedb_dir: str | Path,
-    *,
-    table: str = _DEFAULT_TABLE,
-    vectors_path: str | Path | None = None,
-    dtype: str = "float",
-    wipe: bool = True,
-    batch_size: int = 5000,
-    validate: bool = True,
-    quiet: bool = False,
-) -> dict[str, Any]:
-    """Convert an existing LanceDB vector table into a ``vectors.sqlite`` store.
-
-    Reads ``id``/``kind``/``name``/``title``/``file_path``/``vector`` straight
-    out of LanceDB (the ``text`` embed-blob is intentionally dropped — hydration
-    comes from the authoritative SQLite GraphStore) and writes them to a
-    :class:`~kg_utils.vector_backend.SqliteVecBackend`.  No model is loaded and
-    no re-embedding happens.
-
-    :param lancedb_dir: The source LanceDB directory.
-    :param table: Source table name.
-    :param vectors_path: Destination sqlite path (default: sidecar next to it).
-    :param dtype: ``"float"`` (fp32) or ``"int8"`` (3× smaller; assumes unit-norm).
-    :param wipe: Drop any existing destination store first.
-    :param validate: Verify row count and re-read 5 random vectors (cosine ≥ 0.9999).
-    :param quiet: Suppress the summary line.
-    :return: Stats dict ``{converted, dim, dtype, vectors_path, validated}``.
-    :raises FileNotFoundError: If the source table is absent.
-    :raises RuntimeError: If validation fails.
-    """
-    _require_lancedb("Reading a LanceDB store (dockg convert-index)")
-
-    import lancedb  # pylint: disable=import-outside-toplevel
-    import numpy as np  # pylint: disable=import-outside-toplevel
-
-    lancedb_dir = Path(lancedb_dir)
-    db = lancedb.connect(str(lancedb_dir))
-    if table not in db.list_tables().tables:
-        raise FileNotFoundError(f"LanceDB table {table!r} not found in {lancedb_dir}")
-    tbl = db.open_table(table)
-    # Project only the columns we persist — never load the big ``text`` blob.
-    # ``columns=`` exists on newer LanceDB; on versions whose ``to_arrow()`` lacks
-    # it we fall back to a full read (TypeError). The ty stub tracks the older
-    # signature, hence the suppression — which only fires when the ``[lancedb]``
-    # extra is installed and ty can resolve the type at all (see the
-    # ``unused-ignore-comment`` note in pyproject.toml).
-    wanted = ["id", *[c for c in _META_COLUMNS if c != "id"], "vector"]
-    try:
-        arrow = tbl.to_arrow(columns=wanted)  # ty: ignore[unknown-argument]
-    except TypeError:
-        arrow = tbl.to_arrow()
-
-    ids = arrow.column("id").to_pylist()
-    cols = {c: arrow.column(c).to_pylist() for c in _META_COLUMNS if c in arrow.column_names}
-    vectors = np.asarray(arrow.column("vector").to_pylist(), dtype=np.float32)
-
-    # Drop the bootstrap dummy row if it lingers.
-    keep = [i for i, nid in enumerate(ids) if nid and nid != "__dummy__"]
-    ids = [ids[i] for i in keep]
-    vectors = vectors[keep]
-    for c in cols:
-        cols[c] = [cols[c][i] for i in keep]
-
-    dim = int(vectors.shape[1]) if vectors.size else 0
-    dest = Path(vectors_path) if vectors_path else sqlite_vectors_path(lancedb_dir)
-    backend = SqliteVecBackend(dest, dim=dim, meta_columns=_META_COLUMNS, dtype=dtype)
-    backend.open(wipe=wipe)
-
-    rows = [
-        {
-            "id": ids[i],
-            **{c: (cols.get(c) or [None] * len(ids))[i] or "" for c in _META_COLUMNS},
-            "vector": vectors[i],
-        }
-        for i in range(len(ids))
-    ]
-    converted = backend.upsert(rows, batch_size=batch_size)
-
-    validated = False
-    if validate:
-        if backend.count() != len(ids):
-            raise RuntimeError(f"row-count mismatch: source {len(ids)} vs sqlite {backend.count()}")
-        # Re-read a handful of vectors and confirm cosine ≈ 1.0 vs the source.
-        # (int8 quantization loosens the tolerance.)
-        tol = 0.999 if dtype == "int8" else 0.9999
-        step = max(1, len(ids) // 5)
-        sample = list(range(0, len(ids), step))[:5]
-        for idx_i in sample:
-            src = vectors[idx_i]
-            hits = backend.search(src.tolist(), 1)
-            if not hits or hits[0]["id"] != ids[idx_i]:
-                raise RuntimeError(f"self-query did not return {ids[idx_i]!r}")
-            sim = 1.0 - float(hits[0]["_distance"])
-            if sim < tol:
-                raise RuntimeError(
-                    f"vector {ids[idx_i]!r} cosine {sim:.5f} < {tol} after conversion"
-                )
-        validated = True
-
-    if not quiet:
-        Console().print(
-            f"  converted {converted:,} vectors → {dest} "
-            f"(dim={dim}, dtype={dtype}, validated={validated})"
-        )
-    return {
-        "converted": converted,
-        "dim": dim,
-        "dtype": dtype,
-        "vectors_path": str(dest),
-        "validated": validated,
-    }
+    return SqliteVecBackend(vectors_path, dim=dim, meta_columns=_META_COLUMNS, dtype=dtype)
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 # Design: Row-count-gated ANN index for `SemanticIndex`
 
+> **Historical (2026-10-25):** the IVF/ANN index this describes was LanceDB-only and went with LanceDB support in 0.29.0 (kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md, step 3). sqlite-vec is the only, exact backend. Kept for the record.
+
 Status: draft · Branch: `feat/ann-index-gate` · Owner: doc_kg
 
 > **Scope note (added 0.20.0).** ANN is a **LanceDB-only** concern: sqlite-vec

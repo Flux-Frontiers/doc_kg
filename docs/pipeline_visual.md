@@ -10,7 +10,7 @@
 
 ## Image Generation Prompt (text-to-image / illustration brief)
 
-> A clean, high-contrast technical architecture diagram on a dark navy background. Left side shows a stack of labeled document files (.md, .txt, .rst, .pdf) flowing downward through a branching arrow into two parallel vertical pipeline columns. The left column, labeled "Core Build Pipeline," contains two stacked rectangular process boxes connected by downward arrows: "Corpus Parsing" (subdivided into sub-steps: heading extraction → section nodes → semantic chunking → entity/topic/keyword extraction) and "Semantic Indexing" (subdivided into: batch embedding with bge-small-en-v1.5 → sqlite-vec vector store → SIMILAR_TO edge discovery). The right column, labeled "Multipass Analysis Pipeline," contains five sequential boxes: "Diversity Sampling," "Chunking," "Hybrid Topic Classification," "Memory Creation," and "Structured Output." Both columns converge at the bottom into a single output layer showing three artifacts side by side: a cylinder labeled "SQLite graph.sqlite," a cylinder labeled "sqlite-vec vectors.sqlite," and a folder labeled ".dockg/pipeline/*.psv." Below that, two final output boxes: "MCP Server (query_docs / pack_docs)" and "CLI (dockg query / pack / analyze)." Connecting lines use thin white arrows with labeled edge types (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC, MENTIONS_ENTITY, HAS_KEYWORD) rendered as small annotation bubbles on the arrows. Color coding: structural edges in blue, semantic edges in amber, topic/entity edges in teal. Style: flat design, sans-serif labels, IBM Plex Mono for code names, minimal drop shadows.
+> A clean, high-contrast technical architecture diagram on a dark navy background. Left side shows a stack of labeled document files (.md, .txt, .rst, .pdf) flowing downward through a branching arrow into two parallel vertical pipeline columns. The left column, labeled "Core Build Pipeline," contains two stacked rectangular process boxes connected by downward arrows: "Corpus Parsing" (subdivided into sub-steps: heading extraction → section nodes → semantic chunking → entity/topic/keyword extraction) and "Semantic Indexing" (subdivided into: batch embedding with bge-small-en-v1.5 → sqlite-vec vector store → SIMILAR_TO edge discovery). The right column, labeled "Multipass Analysis Pipeline," contains five sequential boxes: "Diversity Sampling," "Chunking," "Hybrid Topic Classification," "Memory Creation," and "Structured Output." Both columns converge at the bottom into a single output layer showing three artifacts side by side: a cylinder labeled "SQLite graph.sqlite," a cylinder labeled "sqlite-vec vectors.sqlite," and a folder labeled ".dockg/pipeline/*.psv." Below that, two final output boxes: "MCP Server (query / pack)" and "CLI (dockg query / pack / analyze)." Connecting lines use thin white arrows with labeled edge types (CONTAINS, NEXT, SIMILAR_TO, HAS_TOPIC, MENTIONS_ENTITY, HAS_KEYWORD) rendered as small annotation bubbles on the arrows. Color coding: structural edges in blue, semantic edges in amber, topic/entity edges in teal. Style: flat design, sans-serif labels, IBM Plex Mono for code names, minimal drop shadows.
 
 ---
 
@@ -168,8 +168,8 @@ sqlite-vec (ANN seed)
   ┌─────┴─────┐
   ▼           ▼
 CLI         MCP server
-(dockg      (query_docs
- pack)       pack_docs
+(dockg      (query
+ pack)       pack
              get_node)
 ```
 

@@ -54,7 +54,7 @@ _REL_COLOR: dict[str, str] = {
 }
 
 _DEFAULT_DB = os.environ.get("DOCKG_DB", ".dockg/graph.sqlite")
-_DEFAULT_LANCEDB = os.environ.get("DOCKG_LANCEDB", ".dockg/lancedb")
+_DEFAULT_VECTORS = os.environ.get("DOCKG_VECTORS", ".dockg/vectors.sqlite")
 
 
 st.set_page_config(
@@ -94,11 +94,11 @@ def _load_store(db_path: str) -> GraphStore | None:
 
 
 @st.cache_resource(show_spinner="Loading DocKG...")
-def _load_kg(corpus_root: str, db_path: str, lancedb_dir: str, model: str) -> DocKG:
+def _load_kg(corpus_root: str, db_path: str, vectors_path: str, model: str) -> DocKG:
     return DocKG(
         corpus_root=corpus_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
+        vectors_path=vectors_path,
         model=model,
     )
 
@@ -235,7 +235,7 @@ def _render_sidebar() -> dict:
 
     st.sidebar.markdown("---")
     corpus_root = st.sidebar.text_input("Corpus root", value=str(Path.cwd()))
-    lancedb_dir = st.sidebar.text_input("Vector store anchor dir", value=_DEFAULT_LANCEDB)
+    vectors_path = st.sidebar.text_input("Vector store", value=_DEFAULT_VECTORS)
     model = st.sidebar.selectbox(
         "Embedding model",
         [
@@ -267,7 +267,7 @@ def _render_sidebar() -> dict:
         "db_path": db_path,
         "store": store,
         "corpus_root": corpus_root,
-        "lancedb_dir": lancedb_dir,
+        "vectors_path": vectors_path,
         "model": model,
         "k": k,
         "hop": hop,
@@ -339,7 +339,7 @@ def main() -> None:
                 kg = _load_kg(
                     cfg["corpus_root"],
                     cfg["db_path"],
-                    cfg["lancedb_dir"],
+                    cfg["vectors_path"],
                     cfg["model"],
                 )
                 result = kg.query(
@@ -384,7 +384,7 @@ def main() -> None:
                 kg = _load_kg(
                     cfg["corpus_root"],
                     cfg["db_path"],
-                    cfg["lancedb_dir"],
+                    cfg["vectors_path"],
                     cfg["model"],
                 )
                 pack = kg.pack(

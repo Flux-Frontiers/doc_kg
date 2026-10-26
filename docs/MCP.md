@@ -9,12 +9,17 @@ DocKG includes an MCP server exposed by:
 - `dockg mcp`
 - `dockg-mcp`
 
-Once configured, agents get these tools:
+Once configured, agents get the fleet's five canonical tools, under the same
+names as every other KG server built on `kg_utils.mcp`:
 
-- `graph_stats()`
-- `query_docs(q, k, hop, rels, max_nodes)`
-- `pack_docs(q, k, hop, rels, max_chars, max_nodes)`
+- `stats()`
+- `query(q, k, hop, max_nodes, rels)`
+- `pack(q, k, hop, max_nodes, rels, max_chars, traced)`
 - `get_node(node_id)`
+- `neighbors(node_id, rels, direction, limit)`
+
+The list is generated, not kept by hand: `dockg mcp --manifest` prints it as
+JSON without opening the graph.
 
 ## Quick Start
 
@@ -48,12 +53,17 @@ Equivalent:
 dockg-mcp --repo /absolute/path/to/repo
 ```
 
-Optional flags:
+Optional flags (the standard set every fleet server takes):
 
 - `--db .dockg/graph.sqlite`
-- `--vectors-path .dockg/vectors.sqlite`
+- `--vectors .dockg/vectors.sqlite`
 - `--model all-mpnet-base-v2`
-- `--transport stdio|sse`
+- `--transport stdio|streamable-http` (with `--host` / `--port` for HTTP)
+- `--manifest` — print the tool list as JSON and exit
+
+A relative `--db` or `--vectors` is taken from `--repo`. On startup each
+session prints the store it is actually serving to stderr, and a corpus with
+no graph is refused rather than served empty.
 
 ## Claude Code Or Kilo Code (.mcp.json)
 
@@ -72,7 +82,7 @@ any repo's `.venv`:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--vectors-path",
+        "--vectors",
         "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
@@ -96,7 +106,7 @@ Create `.vscode/mcp.json`:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--vectors-path",
+        "--vectors",
         "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
@@ -119,7 +129,7 @@ Add to `claude_desktop_config.json`:
         "/absolute/path/to/repo",
         "--db",
         "/absolute/path/to/repo/.dockg/graph.sqlite",
-        "--vectors-path",
+        "--vectors",
         "/absolute/path/to/repo/.dockg/vectors.sqlite"
       ]
     }
@@ -149,28 +159,38 @@ Both options are additive — CLI flags extend `pyproject.toml` excludes. Exclud
 
 ## Tool Semantics
 
-- `graph_stats()`
+- `stats()`
 Returns node and edge totals and breakdowns by kind and relation.
 
-- `query_docs(...)`
-Hybrid semantic and graph expansion query. Returns JSON.
+- `query(...)`
+Hybrid search: dense and keyword (BM25) seeds, then graph expansion. Returns
+JSON. `rels` is a list, e.g. `["HAS_TOPIC", "SIMILAR_TO"]`; omit it for every
+relation.
 
-- `pack_docs(...)`
-Same hybrid retrieval, returns a Markdown context pack.
+- `pack(...)`
+Same hybrid retrieval, returns a Markdown context pack. `max_chars` caps each
+excerpt; `traced=true` attaches the provenance path that retrieved it.
 
 - `get_node(node_id)`
 Returns one node record as JSON.
+
+- `neighbors(node_id, rels, direction, limit)`
+The edges touching one node and the nodes at their other ends. Graph only; no
+model is loaded.
 
 ## Troubleshooting
 
 - `mcp package not found`
 Install dependencies in the active environment (`poetry install`) and retry.
 
-- `SQLite database not found`
+- `no graph at ...`
 Run `dockg build <corpus_root>` first.
+
+- `no such option: --vectors-path` / `--lancedb`
+Rename the flag to `--vectors` in the MCP config (doc-kg 0.29.0).
 
 - No tools visible in client
 Verify absolute paths in MCP config and restart the client.
 
 - Wrong corpus queried
-Ensure `--repo`, `--db`, and `--vectors-path` all point to the same repository.
+Ensure `--repo`, `--db`, and `--vectors` all point to the same repository.

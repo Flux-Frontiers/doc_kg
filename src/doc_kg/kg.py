@@ -25,6 +25,7 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
 
+from kg_utils.stats import kg_stats, stats_from_store
 from kg_utils.validation import (
     MAX_HOP,
     MAX_K,
@@ -38,10 +39,8 @@ from doc_kg.graph import DocGraph
 from doc_kg.index import (
     Embedder,
     SemanticIndex,
-    make_backend,
     make_embedder,
-    resolve_backend_name,
-    vector_store_path,
+    sqlite_backend,
 )
 from doc_kg.store import DEFAULT_RELS, GraphStore, ProvMeta
 
@@ -509,7 +508,7 @@ def _semantic_rank_boost(node_id: str, edges: list[dict]) -> float:
     return round(score, 4)
 
 
-def _lance_where(
+def _vector_where(
     file_prefixes: tuple[str, ...] | None,
     node_kinds: tuple[str, ...] | None,
 ) -> str | None:
@@ -589,6 +588,10 @@ def _node_in_scope(
 # ---------------------------------------------------------------------------
 
 
+#: ``vector_backend`` values that mean the sqlite-vec store, the only backend.
+_SQLITE_NAMES = frozenset({"sqlite-vec", "sqlite", "sqlite_vec", "sqlitevec", "vec0", "auto", ""})
+
+
 class DocKG:
     """Top-level orchestrator for the Document Knowledge Graph.
 
@@ -613,9 +616,11 @@ class DocKG:
 
     :param corpus_root: Corpus root directory.
     :param db_path: SQLite database path.
-    :param lancedb_dir: LanceDB directory.
+    :param vectors_path: The sqlite-vec store; defaults to
+        ``<corpus_root>/.dockg/vectors.sqlite``. Replaced ``lancedb_dir`` in
+        0.29.0, when LanceDB support was removed; the default is the file the
+        old derivation produced.
     :param model: Sentence-transformer model name.
-    :param table: LanceDB table name (legacy backend only).
     :param chunk_strategy: ``"semantic"`` (default), ``"sentence_group"``, or ``"fixed"``.
     :param sentences_per_chunk: Sentences per chunk for the ``sentence_group`` strategy.
     :param chunk_size: Approximate max characters per chunk.
@@ -637,23 +642,20 @@ class DocKG:
                      so the lazy-init never fires ``SentenceTransformerEmbedder``.
                      Defaults to ``None`` (preserves existing behaviour).
     :param device: Embedding device override: ``auto`` (default), ``cpu``, ``mps``, ``cuda``.
-    :param vector_backend: ``"sqlite-vec"`` (default), ``"auto"``, or
-                           ``"lancedb"``.  The latter two read a legacy store and
-                           need the ``[lancedb]`` extra installed.
-    :param vectors_path: Explicit location of the sqlite-vec store.  Defaults to
-                         ``None``, which derives the sidecar next to the graph
-                         (``<store>/.dockg/vectors.sqlite``).  Set this when the
-                         vector store does not live beside ``lancedb_dir``.
+    :param vector_backend: ``"sqlite-vec"`` (default) or ``"auto"``, both meaning
+                           the sqlite-vec store, the only backend since 0.29.0;
+                           kept because diary_kg and gutenberg_kg pass it.
+                           ``"lancedb"`` raises :exc:`ValueError` naming the
+                           removal. ``DOCKG_VECTOR_BACKEND`` is read the same way.
     """
 
     def __init__(
         self,
         corpus_root: str | Path,
         db_path: str | Path | None = None,
-        lancedb_dir: str | Path | None = None,
+        vectors_path: str | Path | None = None,
         *,
         model: str = DEFAULT_MODEL,
-        table: str = "dockg_nodes",
         chunk_strategy: str = "semantic",
         sentences_per_chunk: int = 4,
         chunk_size: int = 512,
@@ -672,37 +674,29 @@ class DocKG:
         embedder: Embedder | None = None,
         device: str = "auto",
         vector_backend: str | None = None,
-        vectors_path: str | Path | None = None,
     ) -> None:
         self.corpus_root = Path(corpus_root).resolve()
         self.exclude: set[str] = exclude or set()
         self.db_path = (
             Path(db_path) if db_path is not None else self.corpus_root / ".dockg" / "graph.sqlite"
         )
-        self.lancedb_dir = (
-            Path(lancedb_dir)
-            if lancedb_dir is not None
-            else self.corpus_root / ".dockg" / "lancedb"
+        self.vectors_path = (
+            Path(vectors_path)
+            if vectors_path is not None
+            else self.corpus_root / ".dockg" / "vectors.sqlite"
         )
         self.model_name = model
         self.device = device
-        self.table_name = table
-        # Vector store backend. Explicit arg wins; else DOCKG_VECTOR_BACKEND
-        # env; else "sqlite-vec".
-        #
-        # The default was "auto" before 0.20.0, which resolved per-store from
-        # what happened to be on disk — so a corpus stayed on LanceDB simply
-        # because a lancedb/ directory existed, and a repo could look migrated
-        # in code while still running the retired backend. The default is now
-        # pinned. "auto" and "lancedb" still resolve for callers that ask
-        # explicitly, and both require the [lancedb] extra.
-        self.vector_backend = (
-            vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "sqlite-vec"
-        )
-        # Explicit sqlite-vec store location. None derives the sidecar next to
-        # the graph (see sqlite_vectors_path); an explicit path also lets
-        # "auto" resolve to sqlite-vec when that file exists.
-        self.vectors_path = Path(vectors_path) if vectors_path else None
+        requested = vector_backend or os.environ.get("DOCKG_VECTOR_BACKEND") or "sqlite-vec"
+        if requested.strip().lower() not in _SQLITE_NAMES:
+            if requested.strip().lower() in ("lancedb", "lance"):
+                raise ValueError(
+                    "vector_backend='lancedb' was removed in doc-kg 0.29.0; sqlite-vec is "
+                    "the only backend. The index is derived from the graph: rebuild it "
+                    "with `dockg build-index`."
+                )
+            raise ValueError(f"vector_backend must be 'sqlite-vec' or 'auto', got {requested!r}")
+        self.vector_backend = "sqlite-vec"
         self.chunk_strategy = chunk_strategy
         self.sentences_per_chunk = sentences_per_chunk
         self.chunk_size = chunk_size
@@ -767,52 +761,20 @@ class DocKG:
         return self._embedder
 
     @property
-    def resolved_vector_backend(self) -> str:
-        """Concrete backend name this instance will use, with ``"auto"`` resolved.
-
-        :return: ``"sqlite-vec"`` or ``"lancedb"``.
-        """
-        return resolve_backend_name(
-            self.vector_backend,
-            lancedb_dir=self.lancedb_dir,
-            vectors_path=self.vectors_path,
-        )
-
-    @property
     def vector_store_path(self) -> Path:
-        """Filesystem location of the vector store this instance will use.
+        """Where the vectors live: the same as :attr:`vectors_path`.
 
-        Resolves ``vector_backend`` exactly as :attr:`index` does, but without
-        loading the embedding model.  Use this — not :attr:`lancedb_dir` — when
-        reporting where vectors live: under the default sqlite-vec backend they
-        are in ``vectors.sqlite``, and ``lancedb_dir`` is merely the anchor the
-        sidecar path is derived from.
+        Kept for callers that report the store location.
 
-        :return: ``vectors.sqlite`` under sqlite-vec, else the LanceDB directory.
+        :return: The ``vectors.sqlite`` path.
         """
-        return vector_store_path(
-            self.vector_backend,
-            lancedb_dir=self.lancedb_dir,
-            vectors_path=self.vectors_path,
-        )
+        return self.vectors_path
 
     @property
     def index(self) -> SemanticIndex:
-        """Semantic vector index (lazy). Backend chosen by ``vector_backend``."""
+        """Semantic vector index over the sqlite-vec store (lazy)."""
         if self._index is None:
-            backend = make_backend(
-                self.vector_backend,
-                lancedb_dir=self.lancedb_dir,
-                dim=self.embedder.dim,
-                table=self.table_name,
-                vectors_path=self.vectors_path,
-            )
-            self._index = SemanticIndex(
-                self.lancedb_dir,
-                embedder=self.embedder,
-                table=self.table_name,
-                backend=backend,
-            )
+            self._index = SemanticIndex(self.vectors_path, embedder=self.embedder)
         return self._index
 
     # ------------------------------------------------------------------
@@ -1049,7 +1011,7 @@ class DocKG:
         :param node_kinds: Restrict seeds to these node kinds.
         :return: ``{node_id: {"rank": int, "dist": float}}`` ordered best-first.
         """
-        where = _lance_where(file_prefixes, node_kinds)
+        where = _vector_where(file_prefixes, node_kinds)
         # Oversample the dense channel to survive front-matter / reference filtering.
         raw_hits = self.index.search(q, k=k * 3, where=where)
         dense = [h for h in raw_hits if not (h.file_path or "").endswith("reference.md")]
@@ -1344,59 +1306,86 @@ class DocKG:
     # ------------------------------------------------------------------
 
     def stats(self) -> dict[str, Any]:
-        """Return live statistics for this DocKG instance.
+        """Return live statistics in the fleet shape (:mod:`kg_utils.stats`).
 
-        Returns a flat dict conforming to the KGRAG adapter stats contract.
-        All counts default to 0 on error so this method never raises.
+        ``{"kind": "doc", "nodes": {"total", "by_kind"}, "edges": {"total",
+        "by_rel"}}`` plus ``vector_backend``, ``vector_count`` and the store's
+        other keys. Never raises: on error the counts are empty and ``error``
+        says why. Reads the graph only; never loads the embedding model.
 
-        :return: Flat dict with ``node_count``, ``edge_count``, and
-            per-kind counts: ``document_count``, ``chunk_count``,
-            ``section_count``, ``topic_count``, ``entity_count``,
-            ``keyword_count``.
+        Changed in 0.29.0: the flat ``node_count`` and per-kind
+        ``document_count`` / ``chunk_count`` ... keys are gone; the same
+        numbers are in ``nodes.total`` and ``nodes.by_kind``.
+
+        :return: The statistics dict.
         """
         try:
-            s = self.store.stats()
-            nc = s.get("node_counts", {})
             # Count vectors without loading the embedder/model: a read-only
             # count doesn't need the true dim, so use a throwaway backend.
             # count() opens existing stores lazily and never creates one.
             vector_count = 0
             with contextlib.suppress(Exception):
-                vector_count = make_backend(
-                    self.vector_backend,
-                    lancedb_dir=self.lancedb_dir,
-                    dim=384,
-                    table=self.table_name,
-                    vectors_path=self.vectors_path,
-                ).count()
-            return {
-                "node_count": s.get("total_nodes", 0),
-                "edge_count": s.get("total_edges", 0),
-                "document_count": nc.get("document", 0),
-                "chunk_count": nc.get("chunk", 0),
-                "section_count": nc.get("section", 0),
-                "topic_count": nc.get("topic", 0),
-                "entity_count": nc.get("entity", 0),
-                "keyword_count": nc.get("keyword", 0),
-                "vector_backend": self.vector_backend,
-                "vector_count": vector_count,
-            }
+                vector_count = sqlite_backend(self.vectors_path, dim=384).count()
+            return stats_from_store(
+                "doc",
+                self.store.stats(),
+                vector_backend=self.vector_backend,
+                vector_count=vector_count,
+            )
         except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-            return {
-                "node_count": 0,
-                "edge_count": 0,
-                "document_count": 0,
-                "chunk_count": 0,
-                "section_count": 0,
-                "topic_count": 0,
-                "entity_count": 0,
-                "keyword_count": 0,
-                "error": str(exc),
-            }
+            return kg_stats("doc", {}, {}, error=str(exc))
 
     def node(self, node_id: str) -> dict | None:
         """Fetch a single node by ID from the store."""
         return self.store.node(node_id)
+
+    def neighbors(
+        self,
+        node_id: str,
+        *,
+        rels: tuple[str, ...] | list[str] | None = None,
+        direction: str = "both",
+        limit: int = 50,
+    ) -> dict[str, Any] | None:
+        """Return a node's one-hop neighbourhood: its edges and the nodes at their far ends.
+
+        The same contract as :meth:`kg_utils.pipeline.KGModule.neighbors`, so
+        the fleet's canonical ``neighbors`` tool means the same here: a
+        section's chunks, a chunk's NEXT and SIMILAR_TO neighbours, a topic's
+        members. Reads the graph only; never loads the embedding model.
+
+        :param node_id: The node whose neighbours to return.
+        :param rels: Relation types to follow, or ``None`` for all of them.
+        :param direction: ``"out"``, ``"in"`` or ``"both"``.
+        :param limit: Maximum number of edges, between 1 and 500.
+        :return: ``{"node": ..., "edges": [...], "nodes": [...]}``, ``nodes``
+            holding each distinct far-end node that exists, in edge order;
+            ``None`` if *node_id* is not in the graph, matching :meth:`node`.
+        :raises ValueError: On an empty *node_id*, an unknown *direction* or an
+            out-of-range *limit*.
+        """
+        if not isinstance(node_id, str) or not node_id.strip():
+            raise ValueError("node_id must be a non-empty string")
+        bounded_int("limit", limit, 1, MAX_MAX_NODES)
+        if direction not in ("out", "in", "both"):
+            raise ValueError(f"direction must be 'out', 'in' or 'both', got {direction!r}")
+        node = self.store.node(node_id)
+        if node is None:
+            return None
+        edges = self.store.edges_touching(
+            node_id, direction=direction, rels=list(rels) if rels else None, limit=limit
+        )
+        seen: set[str] = set()
+        nodes: list[dict] = []
+        for e in edges:
+            other = e["dst"] if e["src"] == node_id else e["src"]
+            if other in seen:
+                continue
+            seen.add(other)
+            far = self.store.node(other)
+            if far is not None:
+                nodes.append(far)
+        return {"node": node, "edges": edges, "nodes": nodes}
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
@@ -1413,6 +1402,6 @@ class DocKG:
         return (
             f"DocKG(corpus_root={self.corpus_root!r}, "
             f"db_path={self.db_path!r}, "
-            f"lancedb_dir={self.lancedb_dir!r}, "
+            f"vectors_path={self.vectors_path!r}, "
             f"model={self.model_name!r})"
         )

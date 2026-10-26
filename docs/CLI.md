@@ -42,7 +42,6 @@ Runs the full pipeline: parse documents → SQLite graph → sqlite-vec semantic
 | `CORPUS_ROOT`    | required                 | Root directory of documents to index                          |
 | `--db`           | `.dockg/graph.sqlite`    | SQLite database path                                          |
 | `--vectors-path` | `.dockg/vectors.sqlite`  | sqlite-vec store (the default vector index)                                                               |
-| `--lancedb`      | `.dockg/lancedb`         | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)                                       |
 | `--model`        | `BAAI/bge-small-en-v1.5` | Sentence-transformer embedding model                          |
 | `--update`       | off                      | Incremental update — keep existing data instead of wiping     |
 | `--no-similar`   | off                      | Skip computing `SIMILAR_TO` edges                             |
@@ -78,7 +77,6 @@ Reads an existing SQLite graph and builds (or rebuilds) the sqlite-vec vector in
 |----------------|--------------------------|------------------------------------|
 | `--db`         | `.dockg/graph.sqlite`    | SQLite database path               |
 | `--vectors-path` | `.dockg/vectors.sqlite`  | sqlite-vec store (the default vector index)                                    |
-| `--lancedb`    | `.dockg/lancedb`         | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)            |
 | `--model`      | `BAAI/bge-small-en-v1.5` | Sentence-transformer model         |
 | `--no-similar` | off                      | Skip `SIMILAR_TO` edge computation |
 
@@ -95,7 +93,6 @@ dockg query QUERY [OPTIONS]
 | `QUERY`   | required                           | Natural-language search string    |
 | `--db`    | `.dockg/graph.sqlite`              | SQLite database path              |
 | `--vectors-path` | `.dockg/vectors.sqlite`          | sqlite-vec store (the default vector index)                                   |
-| `--lancedb` | `.dockg/lancedb`                 | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)           |
 | `--k`     | `8`                                | Top-K semantic seed hits          |
 | `--hop`   | `1`                                | Graph expansion hops              |
 | `--rels`  | `CONTAINS,NEXT,REFERENCES,SIMILAR_TO` | Edge types to traverse         |
@@ -113,7 +110,6 @@ dockg pack QUERY [OPTIONS]
 | `QUERY`       | required              | Natural-language search string           |
 | `--db`        | `.dockg/graph.sqlite` | SQLite database path                     |
 | `--vectors-path` | `.dockg/vectors.sqlite` | sqlite-vec store (the default vector index)                                          |
-| `--lancedb`   | `.dockg/lancedb`      | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)                  |
 | `--k`         | `8`                   | Top-K semantic seed hits                 |
 | `--hop`       | `1`                   | Graph expansion hops                     |
 | `--format`    | `md`                  | Output format: `md` or `json`            |
@@ -135,7 +131,6 @@ Runs the full `DocKGAnalyzer` pipeline — baseline stats, per-document metrics,
 |------------|-----------------------|----------------------------------------|
 | `--db`     | `.dockg/graph.sqlite` | SQLite database path                   |
 | `--vectors-path` | `.dockg/vectors.sqlite` | sqlite-vec store (the default vector index)                                        |
-| `--lancedb`| `.dockg/lancedb`      | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)                |
 | `--output` | stdout                | Markdown report output file            |
 | `--json`   | off                   | Also emit a JSON snapshot              |
 | `--quiet`  | off                   | Suppress Rich output; exit 1 on issues |
@@ -177,14 +172,17 @@ Requires the `[viz]` extra: `pip install 'doc-kg[viz]'`.
 dockg mcp [OPTIONS]
 ```
 
+The fleet's standard MCP command, from `kg_utils.mcp`.
+
 | Option        | Default               | Description                                 |
 |---------------|-----------------------|---------------------------------------------|
 | `--repo`      | `.`                   | Corpus root                                 |
-| `--db`        | `.dockg/graph.sqlite` | SQLite database path                        |
-| `--vectors-path` | `.dockg/vectors.sqlite` | sqlite-vec store (the default vector index)                                             |
-| `--lancedb`   | `.dockg/lancedb`      | Legacy LanceDB dir (pre-0.20.0 stores; needs the `[lancedb]` extra)                     |
+| `--db`        | `.dockg/graph.sqlite` | SQLite database path (relative paths are taken from `--repo`) |
+| `--vectors`   | `.dockg/vectors.sqlite` | sqlite-vec store (relative paths are taken from `--repo`) |
 | `--model`     | `BAAI/bge-small-en-v1.5` | Embedding model                          |
-| `--transport` | `stdio`               | Transport mode: `stdio` (agents) or `sse`   |
+| `--transport` | `stdio`               | `stdio` (agents) or `streamable-http`       |
+| `--host`, `--port` | `127.0.0.1`, `8765` | Bind address for `streamable-http`       |
+| `--manifest`  | off                   | Print the tool list as JSON and exit, without opening the graph |
 
 See [MCP.md](MCP.md) for provider-specific config (Claude Code, GitHub Copilot, Claude Desktop, Cline).
 

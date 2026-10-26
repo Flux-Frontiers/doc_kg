@@ -17,11 +17,9 @@ import click
 
 from doc_kg.cli.group import cli
 from doc_kg.cli.options import (
-    lancedb_option,
     model_option,
     repo_option,
     sqlite_option,
-    vector_backend_option,
     vectors_path_option,
 )
 from doc_kg.kg import DocKG
@@ -34,15 +32,7 @@ _DEFAULT_RELS_STR = ",".join(DEFAULT_RELS)
 @click.argument("query_text", metavar="QUERY")
 @repo_option
 @sqlite_option
-@lancedb_option
-@vector_backend_option
 @vectors_path_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @model_option
 @click.option("--k", type=int, default=8, show_default=True, help="Top-k semantic hits.")
 @click.option("--hop", type=int, default=1, show_default=True, help="Graph expansion hops.")
@@ -63,9 +53,6 @@ def query(
     query_text: str,
     repo: str,
     sqlite: str,
-    lancedb: str,
-    vector_backend: str | None,
-    table: str,
     model: str,
     k: int,
     hop: int,
@@ -76,16 +63,12 @@ def query(
     """Run a hybrid semantic + graph query and print a ranked result summary."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
 
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
-        vector_backend=vector_backend,
         vectors_path=vectors_path,
     )
 
@@ -104,13 +87,6 @@ def query(
 @click.argument("query_text", metavar="QUERY")
 @repo_option
 @sqlite_option
-@lancedb_option
-@click.option(
-    "--table",
-    default="dockg_nodes",
-    show_default=True,
-    help="LanceDB table name (legacy backend only; ignored by sqlite-vec).",
-)
 @model_option
 @click.option("--k", type=int, default=8, show_default=True, help="Top-k semantic hits.")
 @click.option("--hop", type=int, default=1, show_default=True, help="Graph expansion hops.")
@@ -157,8 +133,6 @@ def pack(
     query_text: str,
     repo: str,
     sqlite: str,
-    lancedb: str,
-    table: str,
     model: str,
     k: int,
     hop: int,
@@ -173,15 +147,12 @@ def pack(
     """Run a hybrid query and emit text excerpt packs."""
     repo_root = Path(repo).resolve()
     db_path = Path(sqlite) if sqlite else repo_root / ".dockg" / "graph.sqlite"
-    lancedb_dir = Path(lancedb) if lancedb else repo_root / ".dockg" / "lancedb"
     rels_tuple = tuple(r.strip() for r in rels.split(",") if r.strip())
 
     kg = DocKG(
         corpus_root=repo_root,
         db_path=db_path,
-        lancedb_dir=lancedb_dir,
         model=model,
-        table=table,
         vectors_path=vectors_path,
     )
 

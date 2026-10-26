@@ -1,13 +1,12 @@
-"""End-to-end SemanticIndex tests over both vector backends (offline).
+"""End-to-end SemanticIndex and DocKG vector-store tests (offline).
 
 Builds a real doc_kg GraphStore with a handful of nodes and runs
-``SemanticIndex.build``/``search`` against both the LanceDB and sqlite-vec
-backends with a deterministic fake embedder (no model download). Asserts the
-two backends agree on top-k, that the ``where`` prefilter works, and that the
-sqlite build writes ``vectors.sqlite`` rather than a LanceDB directory.
-
-The LanceDB half skips unless the optional ``[lancedb]`` extra is installed —
-see ``requires_lancedb`` below.
+``SemanticIndex.build``/``search`` against the sqlite-vec store with a
+deterministic fake embedder (no model download). sqlite-vec is the only
+backend since 0.29.0; these tests pin where the store lives, that an explicit
+``vectors_path`` reaches every reader, and that LanceDB is refused by name.
+The LanceDB parity tests and the ANN configuration tests (test_ann_index.py)
+went with LanceDB support.
 """
 
 # pylint: disable=redefined-outer-name,missing-function-docstring
@@ -15,38 +14,20 @@ see ``requires_lancedb`` below.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 from pathlib import Path
 
 import numpy as np
 import pytest
+from kg_utils.vector_backend import SqliteVecBackend
 
 # sqlite-vec is a core dependency as of 0.20.0; the guard stays as cheap
 # insurance for a partial install.
 pytest.importorskip("sqlite_vec")
 
 from doc_kg.dockg import DocNode  # noqa: E402
-from doc_kg.index import (  # noqa: E402
-    SemanticIndex,
-    convert_lancedb_to_sqlite,
-    make_backend,
-    resolve_backend_name,
-    sqlite_vectors_path,
-    vector_store_path,
-)
+from doc_kg.index import _META_COLUMNS, SemanticIndex, sqlite_backend  # noqa: E402
 from doc_kg.kg import DocKG  # noqa: E402
 from doc_kg.store import GraphStore
-
-# lancedb is NOT installed by default as of 0.20.0 — it moved to the optional
-# [lancedb] extra, needed only to read a pre-0.20.0 store. The cross-backend
-# parity tests below are kept rather than deleted: they are what proves the
-# converter is lossless and that the two backends rank identically. They simply
-# skip unless the extra is present, so `pip install 'doc-kg[lancedb]'` turns the
-# full parity guard back on.
-requires_lancedb = pytest.mark.skipif(
-    importlib.util.find_spec("lancedb") is None,
-    reason="optional [lancedb] extra not installed",
-)
 
 _KEYWORDS = ["whale", "rocket", "bread", "planet"]
 
@@ -56,8 +37,8 @@ class _FakeEmbedder:
 
     The keyword dimension (magnitude 1.0) dominates ranking; a small
     hash-derived salt (magnitude ~1e-3, same salt dims) makes every distinct
-    text produce a distinct vector, so no two nodes tie on distance — both
-    backends then sort identically (real embeddings never tie either).
+    text produce a distinct vector, so no two nodes tie on distance (real
+    embeddings never tie either).
     """
 
     dim = len(_KEYWORDS) + 4  # keyword dims + salt dims
@@ -123,22 +104,24 @@ def store(tmp_path):
     s.close()
 
 
-def _index(tmp_path, backend_name):
-    lancedb_dir = tmp_path / ".dockg" / "lancedb"
-    be = make_backend(
-        backend_name, lancedb_dir=lancedb_dir, dim=_FakeEmbedder.dim, table="dockg_nodes"
-    )
-    return SemanticIndex(lancedb_dir, embedder=_FakeEmbedder(), backend=be)
+def _index(tmp_path: Path) -> SemanticIndex:
+    return SemanticIndex(tmp_path / ".dockg" / "vectors.sqlite", embedder=_FakeEmbedder())
 
 
-@pytest.mark.parametrize(
-    "backend_name",
-    [pytest.param("lancedb", marks=requires_lancedb), "sqlite-vec"],
-)
-def test_build_and_search(tmp_path, store, backend_name):
-    idx = _index(tmp_path, backend_name)
+def _dockg(tmp_path: Path, **kwargs) -> DocKG:
+    return DocKG(corpus_root=tmp_path, embedder=_FakeEmbedder(), **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# SemanticIndex
+# ---------------------------------------------------------------------------
+
+
+def test_build_and_search(tmp_path, store):
+    idx = _index(tmp_path)
     stats = idx.build(store, wipe=True, discover_similar=False, quiet=True)
     assert stats["indexed_rows"] == 8
+    assert stats["vectors_path"] == str(tmp_path / ".dockg" / "vectors.sqlite")
 
     hits = idx.search("tell me about the whale", k=3)
     assert "whale" in hits[0].id  # a whale node ranks first
@@ -148,124 +131,43 @@ def test_build_and_search(tmp_path, store, backend_name):
     assert chunk_hits and all(h.kind == "chunk" for h in chunk_hits)
 
 
-@requires_lancedb
-def test_backends_agree(tmp_path, store):
-    # build both in isolated dirs
-    lidx = _index(tmp_path / "ldir", "lancedb")
-    sidx = _index(tmp_path / "sdir", "sqlite-vec")
-    lidx.build(store, wipe=True, discover_similar=False, quiet=True)
-    sidx.build(store, wipe=True, discover_similar=False, quiet=True)
-    for q in ("whale", "rocket", "bread"):
-        lids = [h.id for h in lidx.search(q, k=4)]
-        sids = [h.id for h in sidx.search(q, k=4)]
-        assert lids == sids, f"{q}: {lids} != {sids}"
-
-
-def test_sqlite_writes_sidecar_not_lancedb(tmp_path, store):
-    idx = _index(tmp_path, "sqlite-vec")
-    idx.build(store, wipe=True, discover_similar=False, quiet=True)
-    assert sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
+def test_build_writes_the_store_and_nothing_else(tmp_path, store):
+    _index(tmp_path).build(store, wipe=True, discover_similar=False, quiet=True)
+    assert (tmp_path / ".dockg" / "vectors.sqlite").exists()
     assert not (tmp_path / ".dockg" / "lancedb").exists()
 
 
-def test_resolve_backend_name_auto(tmp_path):
-    lancedb_dir = tmp_path / ".dockg" / "lancedb"
-    # nothing exists yet -> fresh build picks sqlite-vec
-    assert resolve_backend_name("auto", lancedb_dir=lancedb_dir) == "sqlite-vec"
-    assert resolve_backend_name(None, lancedb_dir=lancedb_dir) == "sqlite-vec"
-    # only lancedb exists -> keep lancedb (don't silently switch)
-    lancedb_dir.mkdir(parents=True)
-    assert resolve_backend_name("auto", lancedb_dir=lancedb_dir) == "lancedb"
-    # once converted (sidecar present) -> sqlite-vec wins
-    sqlite_vectors_path(lancedb_dir).write_bytes(b"")
-    assert resolve_backend_name("auto", lancedb_dir=lancedb_dir) == "sqlite-vec"
-    # explicit names pass through
-    assert resolve_backend_name("lancedb", lancedb_dir=lancedb_dir) == "lancedb"
-    assert resolve_backend_name("sqlite-vec", lancedb_dir=lancedb_dir) == "sqlite-vec"
+def test_default_backend_is_sqlite_vec_at_vectors_path(tmp_path):
+    idx = _index(tmp_path)
+    be = idx._get_backend()
+    assert isinstance(be, SqliteVecBackend)
+    assert be.meta_columns == _META_COLUMNS
+    assert Path(be.db_path) == tmp_path / ".dockg" / "vectors.sqlite"
 
 
-def test_vector_store_path_tracks_the_backend(tmp_path):
-    """The reported store must be the one make_backend would open.
-
-    Reporting ``lancedb_dir`` unconditionally is wrong under the default
-    backend — it names a directory that is never written.
-    """
-    lancedb_dir = tmp_path / ".dockg" / "lancedb"
-
-    assert vector_store_path("sqlite-vec", lancedb_dir=lancedb_dir) == sqlite_vectors_path(
-        lancedb_dir
-    )
-    assert vector_store_path("lancedb", lancedb_dir=lancedb_dir) == lancedb_dir
-
-    # An explicit override wins over the derived sidecar.
-    custom = tmp_path / "elsewhere.sqlite"
-    assert vector_store_path("sqlite-vec", lancedb_dir=lancedb_dir, vectors_path=custom) == custom
-
-    # "auto" reports whichever store it would resolve to.
-    lancedb_dir.mkdir(parents=True)
-    assert vector_store_path("auto", lancedb_dir=lancedb_dir) == lancedb_dir
-    sqlite_vectors_path(lancedb_dir).write_bytes(b"")
-    assert vector_store_path("auto", lancedb_dir=lancedb_dir) == sqlite_vectors_path(lancedb_dir)
-
-
-def test_dockg_reports_its_own_vector_store(tmp_path):
-    """DocKG's reporting properties agree with the backend it will construct."""
-    kg = DocKG(corpus_root=tmp_path)
-    assert kg.resolved_vector_backend == "sqlite-vec"
-    assert kg.vector_store_path == tmp_path / ".dockg" / "vectors.sqlite"
-    assert kg.vector_store_path != kg.lancedb_dir
-
-    custom = tmp_path / "elsewhere.sqlite"
-    kg2 = DocKG(corpus_root=tmp_path, vectors_path=custom)
-    assert kg2.vector_store_path == custom
-
-
-@requires_lancedb
-def test_convert_lancedb_to_sqlite_matches(tmp_path, store):
-    # Build a LanceDB index, convert it, and confirm the sqlite store returns
-    # the same top-k as the original LanceDB index (no re-embedding).
-    lidx = _index(tmp_path, "lancedb")
-    lidx.build(store, wipe=True, discover_similar=False, quiet=True)
-
-    lancedb_dir = tmp_path / ".dockg" / "lancedb"
-    stats = convert_lancedb_to_sqlite(lancedb_dir, table="dockg_nodes", quiet=True)
-    assert stats["validated"] is True
-    assert stats["converted"] == 8
-    assert sqlite_vectors_path(lancedb_dir).exists()
-
-    sbe = make_backend(
-        "sqlite-vec", lancedb_dir=lancedb_dir, dim=_FakeEmbedder.dim, table="dockg_nodes"
-    )
-    sidx = SemanticIndex(lancedb_dir, embedder=_FakeEmbedder(), backend=sbe)
-    for q in ("whale", "rocket", "bread"):
-        lids = [h.id for h in lidx.search(q, k=4)]
-        sids = [h.id for h in sidx.search(q, k=4)]
-        assert lids == sids, f"{q}: {lids} != {sids}"
+def test_explicit_backend_is_used(tmp_path):
+    sb = sqlite_backend(tmp_path / "v.sqlite", dim=_FakeEmbedder.dim)
+    idx = SemanticIndex(tmp_path / "unused.sqlite", embedder=_FakeEmbedder(), backend=sb)
+    assert idx._get_backend() is sb
 
 
 # ---------------------------------------------------------------------------
-# DocKG(vectors_path=...) — explicit store location
-#
-# doc_kg.index has always supported an explicit vectors_path; these cover the
-# DocKG-level plumbing that forwards it, so a caller (e.g. the KGRAG registry)
-# can point at a store that does not sit beside lancedb_dir.
+# DocKG: where the store lives
 # ---------------------------------------------------------------------------
 
 
-def _dockg(tmp_path, **kwargs):
-    """A DocKG wired to the fake embedder so no model is ever downloaded."""
-    return DocKG(
-        corpus_root=tmp_path,
-        db_path=tmp_path / "graph.sqlite",
-        lancedb_dir=tmp_path / ".dockg" / "lancedb",
-        embedder=_FakeEmbedder(),
-        **kwargs,
-    )
+def test_vectors_path_defaults_beside_the_graph(tmp_path):
+    """The file the pre-0.29.0 derivation from lancedb_dir produced."""
+    kg = _dockg(tmp_path)
+    assert kg.vectors_path == tmp_path / ".dockg" / "vectors.sqlite"
+    assert kg.vector_store_path == kg.vectors_path
 
 
-def test_vectors_path_defaults_to_none(tmp_path):
-    """Omitting the argument must preserve the derived-sidecar behaviour."""
-    assert _dockg(tmp_path).vectors_path is None
+def test_vectors_path_is_the_third_positional_argument(tmp_path):
+    """The SDK's (root, db_path, vectors_path) convention."""
+    custom = tmp_path / "v.sqlite"
+    kg = DocKG(tmp_path, tmp_path / "g.sqlite", custom)
+    assert kg.vectors_path == custom
 
 
 def test_vectors_path_is_normalised_to_path(tmp_path):
@@ -278,45 +180,75 @@ def test_index_writes_to_explicit_vectors_path(tmp_path, store):
     """The override must reach the backend, not just be stored on the object."""
     custom = tmp_path / "elsewhere" / "vectors.sqlite"
     custom.parent.mkdir()
-    kg = _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom)
+    kg = _dockg(tmp_path, vectors_path=custom)
 
     kg.index.build(store, wipe=True, discover_similar=False, quiet=True)
 
     assert custom.exists()
-    # The derived sidecar must NOT have been used.
-    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
-
-
-def test_explicit_path_lets_auto_resolve_to_sqlite(tmp_path, store):
-    """An existing store at the explicit path makes `auto` pick sqlite-vec even
-    though nothing sits at the derived sidecar location."""
-    custom = tmp_path / "elsewhere" / "vectors.sqlite"
-    custom.parent.mkdir()
-    _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom).index.build(
-        store, wipe=True, discover_similar=False, quiet=True
-    )
-
-    # Pin down *which* store answered: the custom one must exist and the
-    # derived sidecar must not, else this passes on the fallback path.
-    assert custom.exists()
-    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
-
-    auto = _dockg(tmp_path, vectors_path=custom)  # vector_backend defaults to "auto"
-    hits = auto.index.search("tell me about the whale", k=3)
+    assert not (tmp_path / ".dockg" / "vectors.sqlite").exists()
+    hits = kg.index.search("tell me about the whale", k=3)
     assert "whale" in hits[0].id
-    assert not (tmp_path / ".dockg" / "lancedb").exists()
 
 
 def test_stats_counts_vectors_at_explicit_path(tmp_path, store):
-    """stats() builds its own backend — it must honour the override too, or it
+    """stats() builds its own backend -- it must honour the override too, or it
     silently reports 0 vectors for a corpus that has them."""
     custom = tmp_path / "elsewhere" / "vectors.sqlite"
     custom.parent.mkdir()
-    kg = _dockg(tmp_path, vector_backend="sqlite-vec", vectors_path=custom)
+    kg = _dockg(tmp_path, vectors_path=custom)
     kg.index.build(store, wipe=True, discover_similar=False, quiet=True)
 
-    # The vectors live only at the custom path, so a stats() that ignored the
-    # override would count the (absent) sidecar and report 0.
-    assert custom.exists()
-    assert not sqlite_vectors_path(tmp_path / ".dockg" / "lancedb").exists()
-    assert kg.stats()["vector_count"] == 8
+    assert not (tmp_path / ".dockg" / "vectors.sqlite").exists()
+    stats = kg.stats()
+    assert stats["vector_count"] == 8
+    assert stats["vector_backend"] == "sqlite-vec"
+
+
+# ---------------------------------------------------------------------------
+# DocKG: what was removed
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["sqlite-vec", "auto", "sqlite", None])
+def test_sqlite_spellings_are_accepted(tmp_path, name):
+    assert _dockg(tmp_path, vector_backend=name).vector_backend == "sqlite-vec"
+
+
+@pytest.mark.parametrize("name", ["lancedb", "lance", "LanceDB"])
+def test_lancedb_is_refused_naming_the_removal(tmp_path, name):
+    with pytest.raises(ValueError, match=r"removed in doc-kg 0\.29\.0"):
+        _dockg(tmp_path, vector_backend=name)
+
+
+def test_lancedb_is_refused_from_the_environment_too(tmp_path, monkeypatch):
+    monkeypatch.setenv("DOCKG_VECTOR_BACKEND", "lancedb")
+    with pytest.raises(ValueError, match="removed"):
+        _dockg(tmp_path)
+
+
+def test_an_unknown_backend_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="'sqlite-vec' or 'auto'"):
+        _dockg(tmp_path, vector_backend="faiss")
+
+
+def test_lancedb_dir_is_no_longer_accepted(tmp_path):
+    """Removed with no deprecation period, as kg_utils dropped it in 0.14.0."""
+    with pytest.raises(TypeError, match="lancedb_dir"):
+        DocKG(corpus_root=tmp_path, lancedb_dir=tmp_path / "lancedb")  # ty: ignore[unknown-argument]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "make_backend",
+        "resolve_backend_name",
+        "vector_store_path",
+        "sqlite_vectors_path",
+        "convert_lancedb_to_sqlite",
+        "_require_lancedb",
+    ],
+)
+def test_removed_index_functions_are_gone(name):
+    import doc_kg.index as index_mod
+
+    assert not hasattr(index_mod, name)

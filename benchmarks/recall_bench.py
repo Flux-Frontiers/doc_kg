@@ -23,7 +23,7 @@ Phrase mode (benefit side)
 
 The corpus artifacts are never modified: each book's ``graph.sqlite`` is
 copied to a temp directory and the FTS5 index is built on the copy; the
-existing LanceDB index is opened read-only, so node IDs stay stable and
+existing sqlite-vec index is opened read-only, so node IDs stay stable and
 match the gold labels.
 
 Conditions are seeding variants, applied at query time to the same indices:
@@ -290,14 +290,14 @@ def main() -> None:
         for bi, book in enumerate(books, 1):
             book_dir = books_root / book
             src_db = book_dir / ".dockg" / "graph.sqlite"
-            lance = book_dir / ".dockg" / "lancedb"
-            if not src_db.exists() or not lance.exists():
+            vectors = book_dir / ".dockg" / "vectors.sqlite"
+            if not src_db.exists() or not vectors.exists():
                 print(f"[{bi}/{len(books)}] SKIP {book} (missing .dockg artifacts)")
                 continue
 
             work_db = tmp_root / f"book_{bi}.sqlite"
             shutil.copy2(src_db, work_db)
-            kg = DocKG(book_dir, db_path=work_db, lancedb_dir=lance, embedder=embedder)
+            kg = DocKG(book_dir, db_path=work_db, vectors_path=vectors, embedder=embedder)
             kg.store.rebuild_fts(quiet=True)
 
             queries = list(gold[book])

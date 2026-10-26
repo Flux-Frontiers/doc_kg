@@ -606,6 +606,47 @@ class GraphStore:
         rows = self.con.execute(query, params).fetchall()
         return [{"src": r[0], "rel": r[1], "dst": r[2], "evidence": r[3]} for r in rows]
 
+    def edges_touching(
+        self,
+        node_id: str,
+        *,
+        direction: str = "both",
+        rels: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        """Return the edges incident on *node_id*, in either or both directions.
+
+        The same contract as :meth:`kg_utils.store.GraphStore.edges_touching`:
+        every relation unless *rels* narrows it, ordered by ``(rel, src, dst)``
+        so a capped result is deterministic.
+
+        :param node_id: The node whose edges to return.
+        :param direction: ``"out"``, ``"in"`` or ``"both"``.
+        :param rels: Relation types to keep, or ``None`` for all of them.
+        :param limit: Maximum number of edges, or ``None`` for no cap.
+        :return: Edge dicts with keys ``src``, ``rel``, ``dst``, ``evidence``.
+        :raises ValueError: If *direction* is not one of the three values.
+        """
+        if direction == "out":
+            where, args = "src = ?", [node_id]
+        elif direction == "in":
+            where, args = "dst = ?", [node_id]
+        elif direction == "both":
+            where, args = "(src = ? OR dst = ?)", [node_id, node_id]
+        else:
+            raise ValueError(f"direction must be 'out', 'in' or 'both', got {direction!r}")
+        sql = f"SELECT src, rel, dst, evidence FROM edges WHERE {where}"
+        params: list[object] = list(args)
+        if rels:
+            sql += f" AND rel IN ({','.join('?' for _ in rels)})"
+            params.extend(rels)
+        sql += " ORDER BY rel, src, dst"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = self.con.execute(sql, params).fetchall()
+        return [{"src": r[0], "rel": r[1], "dst": r[2], "evidence": r[3]} for r in rows]
+
     # ------------------------------------------------------------------
     # Graph traversal
     # ------------------------------------------------------------------
