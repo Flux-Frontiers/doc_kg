@@ -15,8 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speech before it ("battlements. DUNCAN. O valiant cousin!"). A chunk now
   carries `text[char_start:char_end]` from the source, blank lines included.
   Where chunks split is unchanged, because sizes are still measured on the
-  joined sentences, so chunk ids and counts stay the same. `VerseChunker` is
-  untouched.
+  joined sentences, so chunk counts and the index-based ids in a DocKG store
+  (`chunk:<file>:NNNN`) stay the same. Ids from `make_chunk_id` in
+  `pipeline.py` hash the text, so they change for every chunk whose
+  whitespace is restored. An incremental embed (`only_missing=True`) keeps the old
+  text in the vector store's `text` column for ids it already has; embed in
+  full to refresh it. `VerseChunker` is untouched.
 - **A repeated sentence no longer misplaces a chunk.** `char_start` came from
   the first copy of the chunk's first sentence after the previous chunk, and
   `char_end` from the first copy of its last; a play's "MACBETH." recurs within
