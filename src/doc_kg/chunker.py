@@ -350,6 +350,13 @@ def _groups_to_chunks(
 ) -> list[dict]:
     """Convert sentence groups into chunk dicts with character offsets.
 
+    A chunk's text is the source slice it spans, so the blank line between
+    two paragraphs (a play's speaker cue and its speech) survives. When the
+    slice does not hold exactly the group's words, which happens when a
+    sentence cannot be located, the sentences joined with spaces are used
+    instead. Length checks use the joined form either way, so where chunks
+    split does not depend on whitespace.
+
     :param groups: List of sentence lists.
     :param full_text: Original section text (used to locate char offsets).
     :param base_offset: Character offset of *full_text* in the source file.
@@ -366,18 +373,23 @@ def _groups_to_chunks(
         if len(chunk_text) < min_chunk_chars:
             continue
 
-        # Locate the chunk in the full section text
-        first_sent = group[0]
-        pos = full_text.find(first_sent, search_from)
-        if pos == -1:
-            pos = search_from
-
-        last_sent = group[-1]
-        end_pos = full_text.find(last_sent, pos)
-        if end_pos == -1:
-            end_pos = pos + len(chunk_text)
+        span = _locate_group(group, full_text, search_from)
+        if span is not None:
+            pos, end_pos = span
+            chunk_text = full_text[pos:end_pos]
         else:
-            end_pos += len(last_sent)
+            # Locate the chunk in the full section text
+            first_sent = group[0]
+            pos = full_text.find(first_sent, search_from)
+            if pos == -1:
+                pos = search_from
+
+            last_sent = group[-1]
+            end_pos = full_text.find(last_sent, pos)
+            if end_pos == -1:
+                end_pos = pos + len(chunk_text)
+            else:
+                end_pos += len(last_sent)
 
         chunks.append(
             {
@@ -389,6 +401,34 @@ def _groups_to_chunks(
         search_from = pos
 
     return chunks
+
+
+def _locate_group(group: list[str], full_text: str, search_from: int) -> tuple[int, int] | None:
+    """Find the span of *full_text* that holds *group*'s sentences, in order.
+
+    A play repeats short sentences ("MACBETH.", "Knock, knock!") within a
+    chunk's reach, so the first copy of the first or last sentence is not
+    always the chunk's. Each copy of the first sentence is tried in turn, and
+    a span counts only when it holds exactly the group's words.
+
+    :param group: The chunk's sentences.
+    :param full_text: Section text the sentences came from.
+    :param search_from: Offset to start looking from.
+    :return: ``(start, end)`` offsets in *full_text*, or ``None`` if no span matches.
+    """
+    words = " ".join(group).split()
+    start = full_text.find(group[0], search_from)
+    while start != -1:
+        cursor = start
+        for sent in group:
+            found = full_text.find(sent, cursor)
+            if found == -1:
+                return None
+            cursor = found + len(sent)
+        if full_text[start:cursor].split() == words:
+            return start, cursor
+        start = full_text.find(group[0], start + 1)
+    return None
 
 
 def _extract_links(text: str) -> list[str]:
