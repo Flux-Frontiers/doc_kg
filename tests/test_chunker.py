@@ -79,3 +79,58 @@ def test_chunker_references_extracted():
     chunks = chunker.chunk(md, file_path="notes.md")
     all_refs = [r for c in chunks for r in c["references"]]
     assert "other.md" in all_refs
+
+
+_MACBETH = (
+    "Till he unseam'd him from the nave to the chops,\n"
+    "And fix'd his head upon our battlements.\n\n"
+    "DUNCAN.\n"
+    "O valiant cousin! worthy gentleman!\n\n"
+    "SOLDIER.\n"
+    "As whence the sun 'gins his reflection\n"
+    "Shipwracking storms and direful thunders break,\n"
+)
+
+
+def test_chunk_text_keeps_the_blank_line_between_speeches():
+    chunks = TextChunker(chunk_size=2000).chunk(_MACBETH, file_path="macbeth.txt")
+    assert len(chunks) == 1
+    assert (
+        "battlements.\n\nDUNCAN.\nO valiant cousin! worthy gentleman!\n\nSOLDIER."
+        in chunks[0]["text"]
+    )
+
+
+def test_chunk_text_is_the_source_slice_it_spans():
+    text = "Intro words here.\n\n" + _MACBETH
+    for chunk in TextChunker(chunk_size=120, chunk_overlap=40).chunk(text, file_path="m.txt"):
+        assert chunk["text"] == text[chunk["char_start"] : chunk["char_end"]]
+
+
+def test_chunk_boundaries_ignore_whitespace():
+    # The same words with every run of whitespace collapsed split in the same
+    # places: chunk sizes are measured on the joined sentences.
+    flat = " ".join(_MACBETH.split())
+    chunker = TextChunker(chunk_size=90, chunk_overlap=30)
+    restored = chunker.chunk(_MACBETH, file_path="m.txt")
+    joined = chunker.chunk(flat, file_path="m.txt")
+    assert [c["text"].split() for c in restored] == [c["text"].split() for c in joined]
+
+
+def test_a_repeated_speaker_cue_does_not_misplace_the_chunk():
+    # "FIRST WITCH." recurs, so the first copy of a chunk's first or last
+    # sentence is not always the chunk's own.
+    text = (
+        "FIRST WITCH.\nWhere hast thou been, sister?\n\n"
+        "SECOND WITCH.\nKilling swine.\n\n"
+        "THIRD WITCH.\nSister, where thou?\n\n"
+        "FIRST WITCH.\nA sailor's wife had chestnuts in her lap.\n\n"
+        "SECOND WITCH.\nI'll give thee a wind.\n\n"
+        "FIRST WITCH.\nThou art kind.\n"
+    )
+    chunks = TextChunker(chunk_size=105, chunk_overlap=5, min_chunk_chars=10).chunk(
+        text, file_path="w.txt"
+    )
+    assert len(chunks) > 2
+    for chunk in chunks:
+        assert text[chunk["char_start"] : chunk["char_end"]].split() == chunk["text"].split()

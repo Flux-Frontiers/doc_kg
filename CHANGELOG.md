@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A chunk's text is the source it spans.** The sentence chunkers rebuilt
+  each chunk by joining its sentences with single spaces, so every paragraph
+  break between sentences was lost: in a play the speaker cue ran into the
+  speech before it ("battlements. DUNCAN. O valiant cousin!"). A chunk now
+  carries `text[char_start:char_end]` from the source, blank lines included.
+  Where chunks split is unchanged, because sizes are still measured on the
+  joined sentences, so chunk counts and the index-based ids in a DocKG store
+  (`chunk:<file>:NNNN`) stay the same. Ids from `make_chunk_id` in
+  `pipeline.py` hash the text, so they change for every chunk whose
+  whitespace is restored. An incremental embed (`only_missing=True`) keeps the old
+  text in the vector store's `text` column for ids it already has; embed in
+  full to refresh it. `VerseChunker` is untouched.
+- **A repeated sentence no longer misplaces a chunk.** `char_start` came from
+  the first copy of the chunk's first sentence after the previous chunk, and
+  `char_end` from the first copy of its last; a play's "MACBETH." recurs within
+  that reach. The span is now the first one that holds the chunk's sentences
+  in order, which moves `char_start` forward on 3,443 of 396,615 chunks in the
+  GutenbergKG corpus (none move back).
+
 ## [0.29.0] - 2026-10-25
 
 Step 3 of the fleet's MCP centralization (kgrag_priv
