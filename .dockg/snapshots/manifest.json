@@ -1,6 +1,6 @@
 {
   "format": "1.0",
-  "last_update": "2026-10-26T03:31:52.341603+00:00",
+  "last_update": "2026-11-04T19:42:15.146865+00:00",
   "snapshots": [
     {
       "key": "80f3e6c13e30126c69472146f3a1d4fae8a33d95",
@@ -575,6 +575,52 @@
           "nodes": 2199,
           "edges": 18581,
           "coverage_delta": 0.09722318319149437,
+          "issues_delta": 0
+        }
+      }
+    },
+    {
+      "key": "0.30.0",
+      "branch": "main",
+      "timestamp": "2026-11-04T19:42:15.145138+00:00",
+      "version": "0.30.0",
+      "subject": "repo:doc-kg",
+      "tool": "doc-kg",
+      "tool_version": "0.30.0",
+      "file": "0.30.0.json",
+      "metrics": {
+        "db_path": ".dockg/graph.sqlite",
+        "total_nodes": 4179,
+        "total_edges": 30325,
+        "node_counts": {
+          "chunk": 897,
+          "document": 42,
+          "entity": 1049,
+          "keyword": 1021,
+          "section": 571,
+          "topic": 599
+        },
+        "edge_counts": {
+          "CONTAINS": 1468,
+          "CO_OCCURS_WITH": 18378,
+          "HAS_KEYWORD": 3575,
+          "HAS_TOPIC": 919,
+          "MENTIONS_ENTITY": 3859,
+          "NEXT": 319,
+          "REFERENCES": 21,
+          "SIMILAR_TO": 1786
+        },
+        "meaningful_nodes": 4137,
+        "coverage_score": 0.9825343738387217,
+        "issues_count": 0,
+        "complexity_median": 23.0
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": {
+          "nodes": 2212,
+          "edges": 18636,
+          "coverage_delta": 0.09765464875281105,
           "issues_delta": 0
         }
       }

@@ -1,47 +1,44 @@
-# Release Notes -- v0.29.0
+# Release Notes -- v0.30.0
 
-> Released: 2026-10-25
+> Released: 2026-11-04
 
-DocKG's MCP server now runs on the fleet's shared base, `kg_utils.mcp`, so it
-answers the same five tools under the same names as every other KG server:
-`stats`, `query`, `pack`, `get_node` and `neighbors`. LanceDB support is gone;
-the vector index is a single sqlite-vec file. Both changes break existing MCP
-configs and some Python callers, so read Upgrading before you install.
+A chunk's text is now the stretch of the source it covers, blank lines and
+line breaks included. Before, the chunkers rebuilt each chunk by joining its
+sentences with single spaces, so every paragraph break between two sentences
+disappeared. Plays showed it worst: a speaker's name ran into the line before
+it ("battlements. DUNCAN. O valiant cousin!"). Where chunks split has not
+changed, so a rebuilt store has the same chunks under the same ids.
 
 ## What changed
 
-**One MCP vocabulary across the fleet.** `graph_stats`, `query_docs` and
-`pack_docs` are now `stats`, `query` and `pack`, with no aliases, and the new
-`neighbors` tool walks one node's edges without loading the embedding model.
-`query` and `pack` keep DocKG's own hybrid search; `pack` still sizes excerpts
-by `max_chars`. The server's instructions are generated from the tools'
-docstrings, and `dockg mcp --manifest` prints the tool list without opening a
-graph.
+**Chunk text keeps the source's whitespace.** Each chunk carries
+`text[char_start:char_end]` from its document. The chunkers still measure
+sizes on the joined sentences, so boundaries do not depend on whitespace:
+across the 265 books and 13,286 diary entries of the GutenbergKG corpus,
+every document gives the same number of chunks with the same words as
+before, and 147,067 chunks get their whitespace back. Embeddings are
+unaffected, since the tokenizer ignores whitespace. `VerseChunker` is
+unchanged; it collapses whitespace on purpose.
 
-**One command, standard flags.** `dockg mcp` and `dockg-mcp` are the same
-command, with the fleet's `--repo`, `--db`, `--vectors`, `--model`,
-`--transport stdio|streamable-http`, `--host`, `--port` and `--manifest`. The
-graph opens per session and closes after, a corpus with no graph is refused
-instead of served empty, and stray output can no longer corrupt the stdio
-stream.
-
-**Statistics in the fleet shape.** `DocKG.stats()` returns `kind`, `nodes`
-(`total`, `by_kind`) and `edges` (`total`, `by_rel`), plus `vector_backend` and
-`vector_count`, the shape KGRAG and every other module read.
-
-**sqlite-vec only.** `dockg convert-index`, the `[lancedb]` extra and the
-LanceDB options are removed. The vector store is
-`<corpus>/.dockg/vectors.sqlite`.
+**Chunk offsets are right when a sentence repeats.** A chunk's start was
+taken from the first copy of its first sentence after the previous chunk.
+A play repeats short sentences such as "MACBETH." within that reach, so
+`char_start` and `char_end` could point at the wrong text. The span is now
+the first one that holds the chunk's sentences in order. In the GutenbergKG
+corpus this moves `char_start` forward on 3,443 of 396,615 book chunks, each
+of which was misplaced before.
 
 ## Upgrading
 
-Rename the tools in any agent instructions or scripts (`graph_stats` ->
-`stats`, `query_docs` -> `query`, `pack_docs` -> `pack`), pass `rels` as a list,
-and rename `--vectors-path` to `--vectors` in MCP configs. Code that read
-`DocKG.stats()["node_count"]` reads `["nodes"]["total"]` instead. A corpus that
-still has only a `.dockg/lancedb` directory needs `dockg build` (or
-`dockg build-index`). doc-kg now needs kgmodule-utils 0.29.0, whose `[mcp]`
-extra brings the MCP SDK.
+Rebuild a corpus to get the new text: `dockg build`. Index-based ids
+(`chunk:<file>:NNNN`) and chunk counts stay the same, so references to
+chunks keep resolving. Two things do change:
+
+- Ids from the multipass pipeline's `make_chunk_id` hash the chunk text, so
+  they change for every chunk whose whitespace is restored.
+- An incremental embed (`only_missing=True`) skips ids that already have a
+  vector, so the vector store's `text` column keeps the old joined text. The
+  vectors are the same; embed in full if you read text from the vector store.
 
 ---
 
