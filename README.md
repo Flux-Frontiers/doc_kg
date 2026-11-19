@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/dockg_logo.png" alt="DocKG logo"/>
+  <img src="assets/dockg_banner.png" alt="DocKG logo" width="720"/>
 </p>
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)

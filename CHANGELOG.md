@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The logo is redrawn in Art Techno.** The brain is replaced by a page that
+  holds its own graph: a die for the document, three gold nodes for its
+  sections, and a chain of copper chunks under each. `scripts/build_logo.py`
+  draws the square mark, a 64 px icon and a banner as SVG and writes every PNG
+  size under `assets/`; `dockg_logo_64.png` and `dockg_logo_32.png` now come
+  from the icon. The README header shows the banner.
+
+### Removed
+
+- **`dockg_logo.png` at the repository root**, a second copy of the old logo
+  that nothing referenced.
+
 ## [0.30.0] - 2026-11-04
 
 ### Fixed
