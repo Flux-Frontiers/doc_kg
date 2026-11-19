@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is centered on the banner's height; `scripts/build_logo.py` draws it this
   way and the banner is redrawn.
 
+- **The line under the name is a tagline.** The mark and banner read
+  "DOCUMENTS AS A GRAPH" instead of the organization and repository name.
+
 ### Removed
 
 - **`dockg_logo.png` at the repository root**, a second copy of the old logo
