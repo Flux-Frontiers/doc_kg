@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`dockg_logo.png` at the repository root**, a second copy of the old logo
   that nothing referenced.
 
+### Fixed
+
+- **The pdoc and wiki logos are written.** `scripts/build_logo.py` also
+  writes `src/logo.png`, which the pdoc task passes as `--logo`, and
+  `assets/logo-md-256x256.png`, which `scripts/generate_wiki.py` reads. Both
+  had been missing, so neither showed a logo.
+
 ## [0.30.0] - 2026-11-04
 
 ### Fixed
