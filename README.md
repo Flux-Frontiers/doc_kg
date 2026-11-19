@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/dockg_banner.png" alt="DocKG logo" width="720"/>
+  <img src="https://raw.githubusercontent.com/Flux-Frontiers/doc_kg/main/assets/dockg_banner.png" alt="DocKG logo" width="720"/>
 </p>
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
@@ -84,7 +84,7 @@ Variants (editable install, Streamlit visualizer, MCP setup, contributor setup) 
 ## How retrieval works
 
 <p align="center">
-  <img src="assets/dockg_pipeline.png" alt="DocKG pipeline architecture" width="800"/>
+  <img src="https://raw.githubusercontent.com/Flux-Frontiers/doc_kg/main/assets/dockg_pipeline.png" alt="DocKG pipeline architecture" width="800"/>
 </p>
 
 Search is hybrid by design. A query runs in two phases:
