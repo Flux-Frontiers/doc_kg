@@ -22,6 +22,9 @@ Writes, under ``assets/``:
 - ``dockg_banner.svg`` and ``dockg_banner.png``
 - ``dockg_logo_{256,128}.png`` from the mark and ``dockg_logo_{64,32}.png``
   from the icon
+- ``src/logo.png`` (read by the pdoc task) and
+  ``assets/logo-md-256x256.png`` (read by ``scripts/generate_wiki.py``)
+  from the mark
 """
 
 import importlib.util
@@ -239,6 +242,8 @@ def main() -> None:
             resized(assets / "dockg_logo.png", assets / f"dockg_logo_{px}.png", px)
         for px in (64, 32):
             resized(icon_png, assets / f"dockg_logo_{px}.png", px)
+    resized(assets / "dockg_logo.png", ROOT / "src" / "logo.png", 512)
+    resized(assets / "dockg_logo.png", assets / "logo-md-256x256.png", 256)
 
 
 if __name__ == "__main__":
